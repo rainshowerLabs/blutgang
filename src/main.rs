@@ -1,3 +1,5 @@
+mod balancer;
+
 use clap::{Command, Arg};
 
 #[tokio::main]
