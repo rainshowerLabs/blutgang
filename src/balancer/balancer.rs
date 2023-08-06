@@ -24,6 +24,8 @@ fn pick(
 
 pub async fn forward(
 	tx: Request<hyper::body::Incoming>,
+	rpc_list: Vec<Rpc>,
+	last: i32,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
