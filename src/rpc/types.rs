@@ -1,13 +1,14 @@
-// All as floats so we have an easier time getting averages, stats and terminology copied from flood
-#[derive(Debug)]
-struct Status {
-	is_erroring: bool,
-	latency: f64,
-	throughput: f64,
+// All as floats so we have an easier time getting averages, stats and terminology copied from flood.
+#[derive(Debug, Clone)]
+pub struct Status {
+	pub is_erroring: bool,
+	pub latency: f64,
+	pub throughput: f64,
 }
 
-#[derive(Debug)]
-struct Rpc {
-	url: String,
-	status: Status,
+#[derive(Debug, Clone)]
+pub struct Rpc {
+	pub url: String, // url of the rpc we're forwarding requests to.
+	pub rank: i32, // rank of the rpc, higer is better.
+	pub status: Status, // stores stats related to the rpc.
 }
