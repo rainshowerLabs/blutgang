@@ -1,4 +1,5 @@
 mod balancer;
+mod rpc;
 
 use clap::{Command, Arg};
 

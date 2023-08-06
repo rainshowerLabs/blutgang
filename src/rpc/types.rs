@@ -1,6 +1,7 @@
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood
+#[derive(Debug)]
 struct Status {
-	is_erroring: bool
+	is_erroring: bool,
 	latency: f64,
 	throughput: f64,
 }
