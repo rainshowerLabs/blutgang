@@ -22,7 +22,7 @@ fn pick(
 	last+1
 }
 
-async fn forward(
+pub async fn forward(
 	tx: Request<hyper::body::Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     

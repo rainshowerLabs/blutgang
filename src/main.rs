@@ -1,6 +1,7 @@
 mod balancer;
 mod rpc;
 
+use crate::balancer::balancer::forward;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
@@ -52,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Finally, we bind the incoming connection to our `hello` service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
-                .serve_connection(io, service_fn(hello))
+                .serve_connection(io, service_fn(move |req| forward(req)))
                 .await
             {
                 println!("Error serving connection: {:?}", err);
