@@ -3,16 +3,11 @@ mod rpc;
 
 use crate::{
     rpc::types::Rpc,
-    balancer::balancer::forward,
+    balancer::balancer::*,
 };
-use std::convert::Infallible;
 use std::net::SocketAddr;
 
-use http_body_util::Full;
 use hyper::{
-    Request,
-    Response,
-    body::Bytes,
     server::conn::http1,
     service::service_fn,
 };
@@ -20,7 +15,7 @@ use hyper_util::rt::TokioIo;
 use tokio::net::TcpListener;
 
 use clap::{Command, Arg};
-
+#[allow(arithmetic_overflow)]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = Command::new("blutgang")
@@ -32,6 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .short('r')
             .num_args(1..)
             .default_value("")
+            .required(true)
             .help("CSV list of rpcs"))
         .arg(Arg::new("port")
             .long("port")
@@ -49,13 +45,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_list: Vec<Rpc> = rpc_list.iter().map(|rpc| Rpc::new(rpc.to_string())).collect();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("Bound to: {}", addr);
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
 
+    // Create a counter to keep track of the last rpc, max so it overflows
+    let mut last: usize = 0;
+
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, _) = listener.accept().await?;
+
+        // Get the next Rpc in line
+        let (rpc, now) = pick(&rpc_list, last);
+        last = now;
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.
@@ -63,10 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            // Finally, we bind the incoming connection to our `hello` service
+            // Finally, we bind the incoming connection to our service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
-                .serve_connection(io, service_fn(move |req| forward(req,rpc_list)))
+                .serve_connection(io, service_fn(move |req| forward(req,rpc.clone())))
                 .await
             {
                 println!("Error serving connection: {:?}", err);
@@ -74,3 +78,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 }
+

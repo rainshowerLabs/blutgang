@@ -1,5 +1,5 @@
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Copy)]
 pub struct Status {
 	pub is_erroring: bool,
 	pub latency: f64,
