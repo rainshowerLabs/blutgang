@@ -19,11 +19,13 @@ pub fn pick(
 	list: &Vec<Rpc>,
 	last: usize,
 ) -> (Rpc, usize) {
+	println!("{:?}", last);
+	println!("{:?}", list.len());
 	let now = last + 1;
 	if now >= list.len() {
-		return (list[0].clone(), 0)
+		return (list[last].clone(), 0)
 	}
-	(list[now].clone(), now)
+	(list[last].clone(), now)
 }
 
 pub async fn forward(
@@ -35,4 +37,3 @@ pub async fn forward(
 	println!("Request: {:?}", tx);
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
-
