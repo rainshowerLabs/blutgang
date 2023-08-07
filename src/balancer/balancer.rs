@@ -1,18 +1,6 @@
-use std::convert::Infallible;
-use http_body_util::Full;
-use hyper::{
-	Request,
-	Response,
-	body::Bytes,
-};
-
-use crate::{
-	rpc::{
-		types::{
-			Rpc,
-		},
-	},
-};
+use hyper::Request;
+use reqwest::Response;
+use crate::rpc::types::Rpc;
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
 pub fn pick(
@@ -31,9 +19,8 @@ pub fn pick(
 pub async fn forward(
 	tx: Request<hyper::body::Incoming>,
 	rpc: Rpc,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response, hyper::Error> {
     
 	println!("Forwarding to: {}", rpc.url);
-	println!("Request: {:?}", tx);
-    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+    Ok(rpc.send_request(tx).await.unwrap())
 }

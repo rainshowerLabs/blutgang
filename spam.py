@@ -1,13 +1,27 @@
 import multiprocessing as mp
 import requests
+import json
+
+def get_block_number():
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "eth_getBlockByNumber",
+        "params": ["latest", False],
+        "id": 1,
+    }
+    response = requests.post("http://127.0.0.1:3000", json=payload)
+    result = response.json()
+    block_number = int(result["result"]["number"], 16)
+    return block_number
 
 def my_func(x):
     for i in range(x): 
-        print(requests.get("http://127.0.0.1:3000"))
+        block_number = get_block_number()
+        print(f"Block Number: {block_number}")
 
 def main():
     pool = mp.Pool(mp.cpu_count())
     pool.map(my_func, range(0, 1000))
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     main()
