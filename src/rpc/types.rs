@@ -1,7 +1,3 @@
-use http_body_util::BodyExt;
-use hyper::Request;
-use std::str::from_utf8;
-
 use reqwest::{
 	Client,
 	Response,

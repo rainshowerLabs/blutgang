@@ -4,7 +4,7 @@ use std::str::from_utf8;
 use hyper::body::Incoming;
 use serde_json::Value;
 
-pub async fn incoming_to_Value(
+pub async fn incoming_to_value(
 	tx: Request<Incoming>,
 ) -> Result<Value, Box<dyn std::error::Error>> {
     let tx = tx.collect().await?.to_bytes().clone();
