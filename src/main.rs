@@ -12,6 +12,7 @@ use hyper::{
     server::conn::http1,
     service::service_fn,
 };
+
 use hyper_util::rt::TokioIo;
 use tokio::{
     net::TcpListener,
@@ -61,6 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Bound to: {}", addr);
 
+    // Create/Open sled DB
+    let cache: Arc<sled::Db> = Arc::new(sled::open("/etc/blutgang-cache").unwrap());
+
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
 
@@ -78,13 +82,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Clone the shared `rpc_list_mtx` and `last_mtx` for use in the closure
         let rpc_list_mtx_clone = Arc::clone(&rpc_list_mtx);
         let last_mtx_clone = Arc::clone(&last_mtx);
-        
+        let cache_clone = Arc::clone(&cache);
+
+
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             // Finally, we bind the incoming connection to our service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
-                .serve_connection(io, service_fn(move |req| forward(req, Arc::clone(&rpc_list_mtx_clone), Arc::clone(&last_mtx_clone))))
+                .serve_connection(io, service_fn(move |req| forward(req, Arc::clone(&rpc_list_mtx_clone), Arc::clone(&last_mtx_clone), Arc::clone(&cache_clone))))
                 .await
             {
                 println!("Error serving connection: {:?}", err);

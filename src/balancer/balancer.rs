@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Request;
+use sled::Db;
 
 use crate::rpc::types::Rpc;
 use std::convert::Infallible;
@@ -25,6 +26,7 @@ pub async fn forward(
     tx: Request<hyper::body::Incoming>,
     rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
+    cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Get the next Rpc in line
     let rpc;
@@ -41,7 +43,22 @@ pub async fn forward(
     println!("Forwarding to: {}", rpc.url);
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
-    let rx: reqwest::Response = rpc.send_request(tx).await.unwrap();
+
+    // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
+    // TODO: make this faster
+    if tx.as_str().expect("REASON").contains("latest") {
+    	let rx: reqwest::Response = rpc.send_request(tx).await.unwrap();
+    } else {
+    	let rx = match cache.get(tx.as_bytes()) {
+    		Ok(_) => rx,
+    		Err(_) => {
+    			let rx = rpc.send_request(tx).await.unwrap();
+    			cache.insert(tx.as_bytes(), rx.clone());
+    			rx
+    		},
+    	};
+    }
+
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rx.bytes().await.unwrap());
