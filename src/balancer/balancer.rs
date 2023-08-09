@@ -1,4 +1,5 @@
 use crate::balancer::format::incoming_to_value;
+use std::sync::{Arc, Mutex};
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Request;
@@ -7,7 +8,10 @@ use crate::rpc::types::Rpc;
 use std::convert::Infallible;
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
-pub fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
+fn pick(
+	list: &Vec<Rpc>, 
+	last: usize,
+) -> (Rpc, usize) {
     println!("{:?}", last);
     println!("{:?}", list.len());
     let now = last + 1;
@@ -19,8 +23,21 @@ pub fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
 
 pub async fn forward(
     tx: Request<hyper::body::Incoming>,
-    rpc: Rpc,
+    rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
+    last_mtx: Arc<Mutex<usize>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Get the next Rpc in line
+    let rpc;
+    {
+        let mut last = last_mtx.lock().unwrap();
+        let rpc_list = rpc_list_mtx.lock().unwrap();
+
+        println!("last: {:?}", last);
+        let now;
+        (rpc, now) = pick(&rpc_list, *last);
+        *last = now;
+    }
+
     println!("Forwarding to: {}", rpc.url);
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();

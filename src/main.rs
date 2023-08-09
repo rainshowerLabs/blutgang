@@ -78,25 +78,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Clone the shared `rpc_list_mtx` and `last_mtx` for use in the closure
         let rpc_list_mtx_clone = Arc::clone(&rpc_list_mtx);
         let last_mtx_clone = Arc::clone(&last_mtx);
-
+        
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            // Get the next Rpc in line
-            let rpc;
-            {
-                let mut last = last_mtx_clone.lock().unwrap();
-                let rpc_list = rpc_list_mtx_clone.lock().unwrap();
-
-                println!("last: {:?}", last);
-                let now;
-                (rpc, now) = pick(&rpc_list, *last);
-                *last = now;
-            }
-
             // Finally, we bind the incoming connection to our service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
-                .serve_connection(io, service_fn(move |req| forward(req, rpc)))
+                .serve_connection(io, service_fn(move |req| forward(req, Arc::clone(&rpc_list_mtx_clone), Arc::clone(&last_mtx_clone))))
                 .await
             {
                 println!("Error serving connection: {:?}", err);
