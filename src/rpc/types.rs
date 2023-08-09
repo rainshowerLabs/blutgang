@@ -39,16 +39,12 @@ impl Rpc {
     // Generic fn to send rpc
     pub async fn send_request(
         &self,
-        tx: Request<hyper::body::Incoming>,
+        tx: Value,
     ) -> Result<Response, Box<dyn std::error::Error>> {
 
         // #[cfg(debug_assertions)] {
         //     println!("Sending request: {}", request.clone());
         // }
-
-        let tx = tx.collect().await?.to_bytes().clone();
-        let tx = from_utf8(&tx).unwrap().clone();
-        let tx: Value = serde_json::from_str(tx).unwrap();
 
         let response = match self.client.post(&self.url).json(&tx).send().await {
             Ok(response) => response,
