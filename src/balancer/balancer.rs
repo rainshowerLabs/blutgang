@@ -47,21 +47,20 @@ pub async fn forward(
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: make this faster
     if tx.as_str().expect("REASON").contains("latest") {
-    	let rx: reqwest::Response = rpc.send_request(tx).await.unwrap();
+    	let rx = rpc.send_request(tx).await.unwrap();
     } else {
-    	let rx = match cache.get(tx.as_bytes()) {
-    		Ok(_) => rx,
+    	let rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
+    		Ok(rax) => rax.unwrap(),
     		Err(_) => {
     			let rx = rpc.send_request(tx).await.unwrap();
-    			cache.insert(tx.as_bytes(), rx.clone());
+    			cache.insert(tx.clone().as_str().unwrap().as_bytes(), rx.clone());
     			rx
     		},
     	};
     }
 
-
     // Convert rx to bytes and but it in a Buf
-    let body = hyper::body::Bytes::from(rx.bytes().await.unwrap());
+    let body = hyper::body::Bytes::from(rax.bytes().await.unwrap());
 
     // Put it in a http_body_util::Full
     let body = Full::new(body);
