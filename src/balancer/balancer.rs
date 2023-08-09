@@ -34,7 +34,6 @@ pub async fn forward(
 
     //Build the response
     let res = hyper::Response::builder().status(200).body(body).unwrap();
-    println!("Response: {:?}", res);
 
     Ok(res)
 }

@@ -6,19 +6,22 @@ use crate::{
     rpc::types::Rpc,
 };
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 
 use hyper::{
     server::conn::http1,
     service::service_fn,
 };
 use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
+use tokio::{
+    net::TcpListener,
+};
 
 use clap::{
     Arg,
     Command,
 };
-#[allow(arithmetic_overflow)]
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let matches = Command::new("blutgang")
@@ -41,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .get_matches();
 
     let rpc_list: String = matches
-        .get_one::<String>("rpc_list")
+        .value_of("rpc_list")
         .expect("Invalid rpc_list")
         .to_string();
     // turn the rpc_list into a csv vec
@@ -52,6 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .map(|rpc| Rpc::new(rpc.to_string()))
         .collect();
+    // Make the list a mutex
+    let rpc_list_mtx = Arc::new(Mutex::new(rpc_list));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Bound to: {}", addr);
@@ -60,26 +65,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(addr).await?;
 
     // Create a counter to keep track of the last rpc, max so it overflows
-    let mut last: usize = 0;
+    let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, _) = listener.accept().await?;
 
-        // Get the next Rpc in line
-        let (rpc, now) = pick(&rpc_list, last);
-        last = now;
-
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
+        // Clone the shared `rpc_list_mtx` and `last_mtx` for use in the closure
+        let rpc_list_mtx_clone = Arc::clone(&rpc_list_mtx);
+        let last_mtx_clone = Arc::clone(&last_mtx);
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
+            // Get the next Rpc in line
+            let rpc;
+            {
+                let mut last = last_mtx_clone.lock().await;
+                let mut rpc_list = rpc_list_mtx_clone.lock().await;
+
+                println!("last: {:?}", last);
+                let now;
+                (rpc, now) = pick(&rpc_list, last);
+                *last = now;
+            }
+
             // Finally, we bind the incoming connection to our service
             if let Err(err) = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
-                .serve_connection(io, service_fn(move |req| forward(req, rpc.clone())))
+                .serve_connection(io, service_fn(move |req| forward(req, rpc)))
                 .await
             {
                 println!("Error serving connection: {:?}", err);
