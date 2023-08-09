@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .get_matches();
 
     let rpc_list: String = matches
-        .value_of("rpc_list")
+        .get_one::<String>("rpc_list")
         .expect("Invalid rpc_list")
         .to_string();
     // turn the rpc_list into a csv vec
@@ -84,12 +84,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Get the next Rpc in line
             let rpc;
             {
-                let mut last = last_mtx_clone.lock().await;
-                let mut rpc_list = rpc_list_mtx_clone.lock().await;
+                let mut last = last_mtx_clone.lock().unwrap();
+                let rpc_list = rpc_list_mtx_clone.lock().unwrap();
 
                 println!("last: {:?}", last);
                 let now;
-                (rpc, now) = pick(&rpc_list, last);
+                (rpc, now) = pick(&rpc_list, *last);
                 *last = now;
             }
 
