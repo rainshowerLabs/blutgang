@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .long("db")
             .short('d')
             .num_args(1..)
-            .default_value("/var/blutgang-cache")
+            .default_value("blutgang-cache")
             .help("Database path"))
         .arg(Arg::new("clear")
             .long("clear")
@@ -70,9 +70,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(rpc_list));
 
-    let port = matches.get_one::<u16>("port").expect("Invalid port");
+    let port = matches.get_one::<String>("port").expect("Invalid port");
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], *port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port.parse::<u16>().unwrap()));
+    
     println!("Bound to: {}", addr);
 
     // Create/Configure/Open sled DB

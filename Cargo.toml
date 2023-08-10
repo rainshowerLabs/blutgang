@@ -25,3 +25,4 @@ serde_json = "1.0.96"
 sled = { version = "0.34.7" }
 tokio = { version = "1.28.1", features = ["full"] }
 url = "2.4.0"
+blake3 = "1.4.1"

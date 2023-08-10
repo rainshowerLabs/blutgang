@@ -3,7 +3,8 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Request;
 use sled::Db;
-use std::str::from_utf8;
+use std::{str::from_utf8, print};
+use blake3::hash;
 use std::sync::{
     Arc,
     Mutex,
@@ -48,16 +49,34 @@ pub async fn forward(
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: make this faster
     let rax;
-    if tx.as_str().expect("REASON").contains("latest") {
+    let tx_string = format!("{}", tx);
+
+    if tx_string.contains("latest") || tx_string.contains("blockNumber") {
         rax = rpc.send_request(tx).await.unwrap();
     } else {
-        rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
-            Ok(rax) => from_utf8(rax.unwrap().as_ref()).unwrap().to_string(),
+    	let tx_hash = hash(tx_string.as_bytes());
+    	let tx_hash_bytes: [u8; 32] = *tx_hash.as_bytes();
+
+        rax = match cache.get(tx_hash_bytes) {
+            Ok(rax) => {
+            	// TODO: This is poverty
+            	if let Some(rax) = rax {
+            		println!("Cache hit: {:?}", tx_hash_bytes);
+					from_utf8(&rax).unwrap().to_string()
+				} else {
+					let rx = rpc.send_request(tx.clone()).await.unwrap();
+					let rx_str = rx.as_str().to_string();
+					cache
+						.insert(tx_hash_bytes, rx.as_bytes())
+						.unwrap();
+					rx_str
+				}
+            },
             Err(_) => {
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
                 let rx_str = rx.as_str().to_string();
                 cache
-                    .insert(tx.as_str().unwrap().as_bytes(), rx.as_bytes())
+                    .insert(tx_hash_bytes, rx.as_bytes())
                     .unwrap();
                 rx_str
             }
