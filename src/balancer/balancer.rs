@@ -1,18 +1,19 @@
 use crate::balancer::format::incoming_to_value;
-use std::sync::{Arc, Mutex};
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Request;
 use sled::Db;
+use std::str::from_utf8;
+use std::sync::{
+    Arc,
+    Mutex,
+};
 
 use crate::rpc::types::Rpc;
 use std::convert::Infallible;
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
-fn pick(
-	list: &Vec<Rpc>, 
-	last: usize,
-) -> (Rpc, usize) {
+fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
     println!("{:?}", last);
     println!("{:?}", list.len());
     let now = last + 1;
@@ -46,17 +47,24 @@ pub async fn forward(
 
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: make this faster
+    let rax;
     if tx.as_str().expect("REASON").contains("latest") {
-    	let rx = rpc.send_request(tx).await.unwrap();
+        rax = rpc.send_request(tx).await.unwrap();
     } else {
-    	let rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
-    		Ok(rax) => rax.unwrap(),
-    		Err(_) => {
-    			let rx = rpc.send_request(tx).await.unwrap();
-    			cache.insert(tx.clone().as_str().unwrap().as_bytes(), rx.clone());
-    			rx
-    		},
-    	};
+        let rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
+            Ok(rax) => from_utf8(rax.as_ref()).unwrap(),
+            Err(_) => {
+                let rx = rpc.send_request(tx).await.unwrap();
+                cache
+                    .insert(
+                        tx.clone().as_str().unwrap().as_bytes(),
+                        rx.text().await.unwrap().as_bytes(),
+                    )
+                    .unwrap();
+
+                rx.text().await.unwrap().as_str()
+            }
+        };
     }
 
     // Convert rx to bytes and but it in a Buf
