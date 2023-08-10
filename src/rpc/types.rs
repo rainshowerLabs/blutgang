@@ -1,7 +1,4 @@
-use reqwest::{
-    Client,
-    Response,
-};
+use reqwest::Client;
 
 use serde_json::Value;
 
@@ -33,7 +30,7 @@ impl Rpc {
     }
 
     // Generic fn to send rpc
-    pub async fn send_request(&self, tx: Value) -> Result<Response, Box<dyn std::error::Error>> {
+    pub async fn send_request(&self, tx: Value) -> Result<String, Box<dyn std::error::Error>> {
         // #[cfg(debug_assertions)] {
         //     println!("Sending request: {}", request.clone());
         // }
@@ -43,6 +40,6 @@ impl Rpc {
             Err(err) => return Err(err.to_string().into()),
         };
 
-        Ok(response)
+        Ok(response.text().await?)
     }
 }

@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .long("db")
             .short('d')
             .num_args(1..)
-            .default_value("/etc/blutgang-cache")
+            .default_value("/var/blutgang-cache")
             .help("Database path"))
         .arg(Arg::new("clear")
             .long("clear")
@@ -82,6 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .path(db_path)
         .mode(sled::Mode::HighThroughput)
         .cache_capacity(1_000_000_000)
+        .print_profile_on_drop(true)
         .flush_every_ms(Some(1000));
     let cache: Arc<sled::Db> = Arc::new(_config.open().unwrap());
 

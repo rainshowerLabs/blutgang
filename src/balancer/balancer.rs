@@ -51,24 +51,21 @@ pub async fn forward(
     if tx.as_str().expect("REASON").contains("latest") {
         rax = rpc.send_request(tx).await.unwrap();
     } else {
-        let rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
-            Ok(rax) => from_utf8(rax.as_ref()).unwrap(),
+        rax = match cache.get(tx.as_str().unwrap().as_bytes()) {
+            Ok(rax) => from_utf8(rax.unwrap().as_ref()).unwrap().to_string(),
             Err(_) => {
-                let rx = rpc.send_request(tx).await.unwrap();
+                let rx = rpc.send_request(tx.clone()).await.unwrap();
+                let rx_str = rx.as_str().to_string();
                 cache
-                    .insert(
-                        tx.clone().as_str().unwrap().as_bytes(),
-                        rx.text().await.unwrap().as_bytes(),
-                    )
+                    .insert(tx.as_str().unwrap().as_bytes(), rx.as_bytes())
                     .unwrap();
-
-                rx.text().await.unwrap().as_str()
+                rx_str
             }
         };
     }
 
     // Convert rx to bytes and but it in a Buf
-    let body = hyper::body::Bytes::from(rax.bytes().await.unwrap());
+    let body = hyper::body::Bytes::from(rax);
 
     // Put it in a http_body_util::Full
     let body = Full::new(body);
