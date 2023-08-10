@@ -73,7 +73,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let port = matches.get_one::<String>("port").expect("Invalid port");
 
     let addr = SocketAddr::from(([127, 0, 0, 1], port.parse::<u16>().unwrap()));
-    
+
     println!("Bound to: {}", addr);
 
     // Create/Configure/Open sled DB
