@@ -30,6 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
 
+    // Bind
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     println!("Bound to: {}", addr);
 
