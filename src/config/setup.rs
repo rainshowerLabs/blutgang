@@ -1,8 +1,8 @@
 use crate::config::types::Settings;
 use crate::Rpc;
 
-use sled::Config;
 use clap::Command;
+use sled::Config;
 use std::net::SocketAddr;
 
 // Sets the cli args
@@ -42,13 +42,21 @@ pub fn set_args(matches: Command) -> Settings {
     // DB options
     let db_path = matches.get_one::<String>("db").expect("Invalid db path");
 
-    let cache_capacity = matches.get_one::<String>("cache_capacity").expect("Invalid cache_capacity");
-    let cache_capacity = cache_capacity.parse::<u64>().expect("Invalid cache_capacity");
+    let cache_capacity = matches
+        .get_one::<String>("cache_capacity")
+        .expect("Invalid cache_capacity");
+    let cache_capacity = cache_capacity
+        .parse::<u64>()
+        .expect("Invalid cache_capacity");
 
     let print_profile = matches.get_occurrences::<String>("print_profile").is_some();
 
-    let flush_every_ms = matches.get_one::<String>("flush_every_ms").expect("Invalid flush_every_ms");
-    let flush_every_ms = flush_every_ms.parse::<u64>().expect("Invalid flush_every_ms");
+    let flush_every_ms = matches
+        .get_one::<String>("flush_every_ms")
+        .expect("Invalid flush_every_ms");
+    let flush_every_ms = flush_every_ms
+        .parse::<u64>()
+        .expect("Invalid flush_every_ms");
 
     let clear = matches.get_occurrences::<String>("clear").is_some();
 
