@@ -17,7 +17,7 @@ use std::{
     sync::{
         Arc,
         Mutex,
-    },
+    }, print,
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
@@ -82,6 +82,8 @@ pub async fn forward(
                 }
             }
             Err(_) => {
+                // If anything errors send an rpc request and see if it works, if not then gg
+                print!("oopsies error!");
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
                 // cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
                 let rx_str = rx.as_str().to_string();
