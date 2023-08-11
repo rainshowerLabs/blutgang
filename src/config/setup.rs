@@ -59,12 +59,14 @@ pub fn set_args(matches: Command) -> Settings {
         .expect("Invalid flush_every_ms");
 
     let clear = matches.get_occurrences::<String>("clear").is_some();
+    let compression = matches.get_occurrences::<String>("compression").is_some();
 
     // Set config for sled
     let sled_config = Config::default()
         .path(db_path)
         .mode(sled::Mode::HighThroughput)
         .cache_capacity(cache_capacity)
+        .use_compression(compression)
         .print_profile_on_drop(print_profile)
         .flush_every_ms(Some(flush_every_ms));
 

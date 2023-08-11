@@ -22,7 +22,7 @@ ratatui = { version = "0.22.0", features = ["all-widgets"] }
 reqwest = { version = "0.11.18", features = ["blocking", "json"] }
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
-sled = { version = "0.34.7" }
+sled = { version = "0.34.7", features = ["compression"] }
 tokio = { version = "1.28.1", features = ["full"] }
 url = "2.4.0"
 blake3 = "1.4.1"
