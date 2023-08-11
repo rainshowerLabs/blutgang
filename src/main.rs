@@ -29,14 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
 
-    // Create/Configure/Open sled DB
-    let sled_config = sled::Config::default()
-        .path(config.db_path)
-        .mode(sled::Mode::HighThroughput)
-        .cache_capacity(config.cache_capacity)
-        .print_profile_on_drop(config.print_profile)
-        .flush_every_ms(config.flush_time);
-    let cache: Arc<sled::Db> = Arc::new(sled_config.open().unwrap());
+    // Create/Open sled DB
+    let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
 
     // Clear database if specified
     if config.do_clear {
