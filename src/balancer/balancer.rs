@@ -65,7 +65,12 @@ pub async fn forward(
                 } else {
                     let rx = rpc.send_request(tx.clone()).await.unwrap();
                     let rx_str = rx.as_str().to_string();
-                    cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
+
+                    // Don't cache responses that contain errors or missing trie nodes
+                    if !rx_str.contains("missing") || !rx_str.contains("error") {
+                        cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
+                    }
+
                     rx_str
                 }
             }
