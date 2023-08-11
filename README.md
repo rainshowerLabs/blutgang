@@ -1,4 +1,4 @@
-# Blutgang - the wd40 of ethereum load balancers
+# Blutgang - the wd40 of alpha ethereum load balancers
 ![blutgang](https://github.com/rainshowerLabs/blutgang/assets/55022497/06fe1dd3-0bc4-4b5d-bfc8-5573d6f78db3)
 
 ## What?
