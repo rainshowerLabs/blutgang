@@ -1,6 +1,7 @@
 use crate::Rpc;
+use std::net::SocketAddr;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
     pub port: u16,
@@ -9,4 +10,5 @@ pub struct Settings {
     pub print_profile: bool,
     pub flush_time: Option<u64>,
     pub do_clear: bool,
+    pub address: SocketAddr,
 }

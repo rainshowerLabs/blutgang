@@ -9,7 +9,6 @@ use crate::{
     rpc::types::Rpc,
 };
 
-use std::net::SocketAddr;
 use std::sync::{
     Arc,
     Mutex,
@@ -30,10 +29,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
 
-    // Bind
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
-    println!("Bound to: {}", addr);
-
     // Create/Configure/Open sled DB
     let sled_config = sled::Config::default()
         .path(config.db_path)
@@ -50,7 +45,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
-    let listener = TcpListener::bind(addr).await?;
+    let listener = TcpListener::bind(config.address).await?;
+    println!("Bound to: {}", config.address);
 
     // Create a counter to keep track of the last rpc, max so it overflows
     let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));

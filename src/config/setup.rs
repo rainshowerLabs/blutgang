@@ -2,6 +2,7 @@ use crate::config::types::Settings;
 use crate::Rpc;
 
 use clap::Command;
+use std::net::SocketAddr;
 
 // Sets the cli args
 pub fn set_args(matches: Command) -> Settings {
@@ -20,7 +21,22 @@ pub fn set_args(matches: Command) -> Settings {
         .map(|rpc| Rpc::new(rpc.to_string()))
         .collect();
 
+    // Build the SocketAddr
+    let address = matches
+        .get_one::<String>("address")
+        .expect("Invalid address");
     let port = matches.get_one::<String>("port").expect("Invalid port");
+    // If the address contains `:` dont concatanate the port and just pass the address
+    let address = if address.contains(":") {
+        address.to_string()
+    } else {
+        format!("{}:{}", address, port)
+    };
+
+    let address = address
+        .parse::<SocketAddr>()
+        .expect("Invalid address or port!");
+
     let db_path = matches.get_one::<String>("db").expect("Invalid db path");
     let clear = matches.get_occurrences::<String>("clear").is_some();
 
@@ -32,6 +48,7 @@ pub fn set_args(matches: Command) -> Settings {
         print_profile: true,
         flush_time: Some(1000),
         do_clear: clear,
+        address: address,
     };
 
     settings
