@@ -1,23 +1,23 @@
 use crate::{
-	rpc::types::Rpc,
-	balancer::format::incoming_to_value,
+    balancer::format::incoming_to_value,
+    rpc::types::Rpc,
 };
 
 use blake3::hash;
 use http_body_util::Full;
 use hyper::{
-	Request,
-	body::Bytes,
+    body::Bytes,
+    Request,
 };
 use sled::Db;
 
 use std::{
-	sync::{
-    	Arc,
-    	Mutex,
-	},
-	str::from_utf8,
-	convert::Infallible,
+    convert::Infallible,
+    str::from_utf8,
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
@@ -83,8 +83,8 @@ pub async fn forward(
             }
             Err(_) => {
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
+                // cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
                 let rx_str = rx.as_str().to_string();
-                cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
                 rx_str
             }
         };

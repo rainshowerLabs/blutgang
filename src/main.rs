@@ -1,96 +1,49 @@
 mod balancer;
+mod config;
 mod rpc;
 
 use crate::{
     balancer::balancer::forward,
+    config::cli_args::create_match,
+    config::setup::set_args,
     rpc::types::Rpc,
 };
+
 use std::net::SocketAddr;
 use std::sync::{
     Arc,
     Mutex,
 };
+use tokio::net::TcpListener;
 
 use hyper::{
     server::conn::http1,
     service::service_fn,
 };
-
 use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
-
-use clap::{
-    Arg,
-    Command,
-};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let matches = Command::new("blutgang")
-        .version("0.1.0")
-        .author("makemake <vukasin@gostovic.me>")
-        .about("Tool for replaying historical transactions. Designed to be used with anvil or hardhat.")
-        .arg(Arg::new("rpc_list")
-            .long("rpc_list")
-            .short('r')
-            .num_args(1..)
-            .default_value("")
-            .required(true)
-            .help("CSV list of rpcs"))
-        .arg(Arg::new("port")
-            .long("port")
-            .short('p')
-            .num_args(1..)
-            .default_value("3000")
-            .help("port to listen to"))
-        .arg(Arg::new("db")
-            .long("db")
-            .short('d')
-            .num_args(1..)
-            .default_value("blutgang-cache")
-            .help("Database path"))
-        .arg(Arg::new("clear")
-            .long("clear")
-            .num_args(0..)
-            .help("Clear cache"))
-    .get_matches();
+    // Get all the cli args amd set them
+    let config = set_args(create_match());
 
-    let rpc_list: String = matches
-        .get_one::<String>("rpc_list")
-        .expect("Invalid rpc_list")
-        .to_string();
-    // turn the rpc_list into a csv vec
-    let rpc_list: Vec<&str> = rpc_list.split(",").collect();
-    let rpc_list: Vec<String> = rpc_list.iter().map(|rpc| rpc.to_string()).collect();
-    // Make a list of Rpc structs
-    let rpc_list: Vec<Rpc> = rpc_list
-        .iter()
-        .map(|rpc| Rpc::new(rpc.to_string()))
-        .collect();
     // Make the list a mutex
-    let rpc_list_mtx = Arc::new(Mutex::new(rpc_list));
+    let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
 
-    let port = matches.get_one::<String>("port").expect("Invalid port");
-
-    let addr = SocketAddr::from(([127, 0, 0, 1], port.parse::<u16>().unwrap()));
-
+    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
     println!("Bound to: {}", addr);
 
     // Create/Configure/Open sled DB
-    let db_path = matches.get_one::<String>("db").expect("Invalid db path");
-
-    let _config = sled::Config::default()
-        .path(db_path)
+    let sled_config = sled::Config::default()
+        .path(config.db_path)
         .mode(sled::Mode::HighThroughput)
-        .cache_capacity(1_000_000_000)
-        .print_profile_on_drop(true)
-        .flush_every_ms(Some(1000));
-    let cache: Arc<sled::Db> = Arc::new(_config.open().unwrap());
+        .cache_capacity(config.cache_capacity)
+        .print_profile_on_drop(config.print_profile)
+        .flush_every_ms(config.flush_time);
+    let cache: Arc<sled::Db> = Arc::new(sled_config.open().unwrap());
 
-    // Check if the clear flag is set
-    let clear = matches.get_occurrences::<String>("clear").is_some();
-
-    if clear {
+    // Clear database if specified
+    if config.do_clear {
         cache.clear().unwrap();
         println!("All data cleared from the database.");
     }
