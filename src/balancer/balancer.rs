@@ -1,17 +1,24 @@
-use crate::balancer::format::incoming_to_value;
-use blake3::hash;
-use http_body_util::Full;
-use hyper::body::Bytes;
-use hyper::Request;
-use sled::Db;
-use std::str::from_utf8;
-use std::sync::{
-    Arc,
-    Mutex,
+use crate::{
+	rpc::types::Rpc,
+	balancer::format::incoming_to_value,
 };
 
-use crate::rpc::types::Rpc;
-use std::convert::Infallible;
+use blake3::hash;
+use http_body_util::Full;
+use hyper::{
+	Request,
+	body::Bytes,
+};
+use sled::Db;
+
+use std::{
+	sync::{
+    	Arc,
+    	Mutex,
+	},
+	str::from_utf8,
+	convert::Infallible,
+};
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
 fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
