@@ -4,8 +4,10 @@ mod rpc;
 
 use crate::{
     balancer::balancer::forward,
-    config::cli_args::create_match,
-    config::types::Settings,
+    config::{
+        cli_args::create_match,
+        types::Settings,
+    },
     rpc::types::Rpc,
 };
 
