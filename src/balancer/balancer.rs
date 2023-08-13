@@ -13,11 +13,12 @@ use sled::Db;
 
 use std::{
     convert::Infallible,
+    print,
     str::from_utf8,
     sync::{
         Arc,
         Mutex,
-    }, print,
+    },
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now

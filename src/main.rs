@@ -5,7 +5,7 @@ mod rpc;
 use crate::{
     balancer::balancer::forward,
     config::cli_args::create_match,
-    config::setup::set_args,
+    config::types::Settings,
     rpc::types::Rpc,
 };
 
@@ -24,7 +24,7 @@ use hyper_util::rt::TokioIo;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
-    let config = set_args(create_match());
+    let config = Settings::new(create_match());
 
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
