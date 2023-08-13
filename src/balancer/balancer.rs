@@ -63,9 +63,8 @@ pub async fn forward(
         rax = rpc.send_request(tx).await.unwrap();
     } else {
         let tx_hash = hash(tx_string.as_bytes());
-        let tx_hash_bytes: [u8; 32] = *tx_hash.as_bytes();
 
-        rax = match cache.get(tx_hash_bytes) {
+        rax = match cache.get(*tx_hash.as_bytes()) {
             Ok(rax) => {
                 // TODO: This is poverty
                 if let Some(rax) = rax {
@@ -76,7 +75,7 @@ pub async fn forward(
 
                     // Don't cache responses that contain errors or missing trie nodes
                     if !rx_str.contains("missing") || !rx_str.contains("error") {
-                        cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
+                        cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                     }
 
                     rx_str
