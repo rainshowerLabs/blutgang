@@ -26,3 +26,4 @@ sled = { version = "0.34.7", features = ["compression"] }
 tokio = { version = "1.28.1", features = ["full"] }
 url = "2.4.0"
 blake3 = "1.4.1"
+jemallocator = "0.5.4"

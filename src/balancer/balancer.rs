@@ -19,6 +19,7 @@ use std::{
         Arc,
         Mutex,
     },
+    time::Instant,
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
@@ -110,10 +111,9 @@ pub async fn accept_request(
     last_mtx: Arc<Mutex<usize>>,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    forward_body(
-        tx,
-        rpc_list_mtx,
-        last_mtx,
-        cache,
-    ).await
+    let time = Instant::now();
+    let response = forward_body(tx, rpc_list_mtx, last_mtx, cache).await;
+    let time = time.elapsed();
+
+    response
 }

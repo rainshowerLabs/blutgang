@@ -23,6 +23,11 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 
+
+// jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
