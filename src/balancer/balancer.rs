@@ -23,11 +23,19 @@ use std::{
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
-fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
+fn pick(
+    list: &Vec<Rpc>,
+    now: usize,
+    last: usize,
+) -> (Rpc, usize) {
+    // Dont touch these next 4 lines
     let now = last + 1;
     if now >= list.len() {
         return (list[last].clone(), 0);
     }
+
+    // Go Check which rpc has the lower latency
+
     (list[last].clone(), now)
 }
 
@@ -35,10 +43,13 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc: Rpc,
     cache: Arc<Db>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, bool) {
     println!("Forwarding to: {}", rpc.url);
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
+
+    // Flag that lets us know if we used the cache so we know if to rank the rpcs
+    let mut cache_hit = false;
 
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: make this faster
@@ -54,6 +65,7 @@ async fn forward_body(
             Ok(rax) => {
                 // TODO: This is poverty
                 if let Some(rax) = rax {
+                    cache_hit = true;
                     from_utf8(&rax).unwrap().to_string()
                 } else {
                     let rx = rpc.send_request(tx.clone()).await.unwrap();
@@ -87,30 +99,43 @@ async fn forward_body(
     //Build the response
     let res = hyper::Response::builder().status(200).body(body).unwrap();
 
-    Ok(res)
+    (Ok(res), cache_hit)
 }
 
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
+    ma_lenght: f64,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Get the next Rpc in line
     let rpc;
+    let now;
     {
         let mut last = last_mtx.lock().unwrap();
         let rpc_list = rpc_list_mtx.lock().unwrap();
 
-        let now;
         (rpc, now) = pick(&rpc_list, *last);
-        *last = now;
+        *last += 1;
     }
 
+    println!("LB {}", rpc.status.latency);
+
+    // Send request and measure time
     let time = Instant::now();
-    let response = forward_body(tx, rpc, cache).await;
+    let response;
+    let hit_cache;
+    (response, hit_cache) = forward_body(tx, rpc, cache).await;
     let time = time.elapsed();
+
     println!("Request time: {:?}", time);
-    
+    // Get lock for the rpc list and add it to the moving average
+    if !hit_cache {
+        let mut rpc_list = rpc_list_mtx.lock().unwrap();
+        rpc_list[now].update_latency(time.as_nanos() as f64, ma_lenght);
+        println!("LA {}", rpc_list[now].status.latency);
+    }
+
     response
 }

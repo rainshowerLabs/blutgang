@@ -77,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             req,
                             Arc::clone(&rpc_list_mtx_clone),
                             Arc::clone(&last_mtx_clone),
+                            config.ma_lenght.clone(),
                             Arc::clone(&cache_clone),
                         )
                     }),

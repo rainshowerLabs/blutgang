@@ -8,6 +8,7 @@ pub struct Settings {
     pub rpc_list: Vec<Rpc>,
     pub do_clear: bool,
     pub address: SocketAddr,
+    pub ma_lenght: f64,
     pub sled_config: Config,
 }
 
@@ -64,6 +65,13 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid flush_every_ms");
 
+        let ma_lenght = matches
+            .get_one::<String>("ma_lenght")
+            .expect("Invalid ma_lenght");
+        let ma_lenght = ma_lenght
+            .parse::<f64>()
+            .expect("Invalid ma_lenght");
+
         let clear = matches.get_occurrences::<String>("clear").is_some();
         let compression = matches.get_occurrences::<String>("compression").is_some();
 
@@ -80,6 +88,7 @@ impl Settings {
             rpc_list,
             do_clear: clear,
             address: address,
+            ma_lenght: ma_lenght,
             sled_config: sled_config,
         }
     }
