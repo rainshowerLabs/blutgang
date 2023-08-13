@@ -3,7 +3,7 @@ mod config;
 mod rpc;
 
 use crate::{
-    balancer::balancer::forward,
+    balancer::balancer::accept_request,
     config::{
         cli_args::create_match,
         types::Settings,
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .serve_connection(
                     io,
                     service_fn(move |req| {
-                        forward(
+                        accept_request(
                             req,
                             Arc::clone(&rpc_list_mtx_clone),
                             Arc::clone(&last_mtx_clone),

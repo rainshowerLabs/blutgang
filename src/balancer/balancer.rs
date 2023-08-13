@@ -32,7 +32,7 @@ fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
     (list[last].clone(), now)
 }
 
-pub async fn forward(
+async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
@@ -102,4 +102,18 @@ pub async fn forward(
     let res = hyper::Response::builder().status(200).body(body).unwrap();
 
     Ok(res)
+}
+
+pub async fn accept_request(
+    tx: Request<hyper::body::Incoming>,
+    rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
+    last_mtx: Arc<Mutex<usize>>,
+    cache: Arc<Db>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    forward_body(
+        tx,
+        rpc_list_mtx,
+        last_mtx,
+        cache,
+    ).await
 }
