@@ -33,21 +33,9 @@ fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
-    last_mtx: Arc<Mutex<usize>>,
+    rpc: Rpc,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Get the next Rpc in line
-    let rpc;
-    {
-        let mut last = last_mtx.lock().unwrap();
-        let rpc_list = rpc_list_mtx.lock().unwrap();
-
-        let now;
-        (rpc, now) = pick(&rpc_list, *last);
-        *last = now;
-    }
-
     println!("Forwarding to: {}", rpc.url);
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
@@ -108,9 +96,21 @@ pub async fn accept_request(
     last_mtx: Arc<Mutex<usize>>,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Get the next Rpc in line
+    let rpc;
+    {
+        let mut last = last_mtx.lock().unwrap();
+        let rpc_list = rpc_list_mtx.lock().unwrap();
+
+        let now;
+        (rpc, now) = pick(&rpc_list, *last);
+        *last = now;
+    }
+
     let time = Instant::now();
-    let response = forward_body(tx, rpc_list_mtx, last_mtx, cache).await;
+    let response = forward_body(tx, rpc, cache).await;
     let time = time.elapsed();
     println!("Request time: {:?}", time);
+    
     response
 }
