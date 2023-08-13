@@ -24,8 +24,6 @@ use std::{
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
 fn pick(list: &Vec<Rpc>, last: usize) -> (Rpc, usize) {
-    println!("{:?}", last);
-    println!("{:?}", list.len());
     let now = last + 1;
     if now >= list.len() {
         return (list[last].clone(), 0);
@@ -45,7 +43,6 @@ async fn forward_body(
         let mut last = last_mtx.lock().unwrap();
         let rpc_list = rpc_list_mtx.lock().unwrap();
 
-        println!("last: {:?}", last);
         let now;
         (rpc, now) = pick(&rpc_list, *last);
         *last = now;
@@ -114,6 +111,6 @@ pub async fn accept_request(
     let time = Instant::now();
     let response = forward_body(tx, rpc_list_mtx, last_mtx, cache).await;
     let time = time.elapsed();
-
+    println!("Request time: {:?}", time);
     response
 }
