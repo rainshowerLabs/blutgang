@@ -27,18 +27,28 @@ fn pick(
     list: &Vec<Rpc>,
 ) -> (Rpc, usize) {
     let mut lowest = f64::MAX;
+    let mut fallback_latency = f64::MAX; // Second lowest latency
     let mut now = 0;
+    let mut fallback = 0; // second lowest index
+    
     // Find the RPC with the lowest average latency from the Vec
     for i in 0..list.len() {
-        println!("index {} ", i);
         if list[i].status.latency < lowest {
+            fallback_latency = lowest;
+            fallback = now;
+
             lowest = list[i].status.latency;
             now = i;
-            println!("now {:?}", now);
         }
     }
-    println!("now adasd {:?}", now);
-    (list[now].clone(), now)
+
+    if list[now].max_consecutive <= list[now].consecutive {
+        list[fallback].consecutive = 1;
+        return (list[fallback], fallback);
+    }
+
+    list[now].consecutive += 1;
+    (list[now], now)
 }
 
 async fn forward_body(

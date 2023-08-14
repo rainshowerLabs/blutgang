@@ -13,6 +13,7 @@ pub struct Status {
     pub latency: f64,
     pub latency_data: Vec<f64>,
 
+    // ???
     pub throughput: f64,
 }
 
@@ -20,8 +21,9 @@ pub struct Status {
 pub struct Rpc {
     pub url: String,    // url of the rpc we're forwarding requests to.
     client: Client,     // Reqwest client
-    pub rank: i32,      // rank of the rpc, higer is better.
     pub status: Status, // stores stats related to the rpc.
+    pub max_consecutive: u32,
+    pub consecutive: u32,
 }
 
 // implement new for rpc
@@ -30,8 +32,9 @@ impl Rpc {
         Self {
             url: url,
             client: Client::new(),
-            rank: 0,
             status: Status::default(),
+            max_consecutive: 10,
+            consecutive: 0,
         }
     }
 
