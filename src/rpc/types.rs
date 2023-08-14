@@ -33,7 +33,7 @@ impl Rpc {
             url: url,
             client: Client::new(),
             status: Status::default(),
-            max_consecutive: 10,
+            max_consecutive: 6,
             consecutive: 0,
         }
     }
