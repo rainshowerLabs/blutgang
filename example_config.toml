@@ -1,3 +1,6 @@
+# CONFIG FILES NOT IMPLEMENTED
+# THIS IS A WIP OF HOW THEY MIGHT LOOK LIKE
+
 # Config for blutgang goes here
 [blutgang]
 do_clear = false # Clear the cache DB on startup
