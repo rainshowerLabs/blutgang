@@ -2,3 +2,4 @@
 /.venv
 /blutgang-cache
 /benchmarks.txt
+/config.toml

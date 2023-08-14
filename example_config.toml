@@ -1,0 +1,22 @@
+# Config for blutgang goes here
+[blutgang]
+do_clear = false # Clear the cache DB on startup
+address = "localhost:3000" # Where to bind blutgang to
+ma_lenght = 200 # Moving average lenght for the latency
+
+# Sled config
+# Sled is the database we use for our cache, for more info check their docs
+[sled]
+db_path = "./blutgang-cache" # Path to db
+mode = "HighThroughput" # sled mode
+cache_capacity = # Cache size in bytes
+compression = false # Use zstd compression. Increases CPU and latency by around 10% for db writes and 2% for reads
+print_profile = false # Print DB profile when dropped
+flush_every_ms # Frequency of flushes
+
+# Add seperate RPCs as TOML tables
+# Do not name an rpc `blutgang` or `sled`
+[llama]
+url = "https://eth.llamarpc.com" # RPC url
+max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row
+max_per_second = 0 # Max ammount of querries per second
