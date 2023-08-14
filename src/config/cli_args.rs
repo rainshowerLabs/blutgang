@@ -30,7 +30,7 @@ pub fn create_match() -> clap::Command {
         .arg(Arg::new("ma_lenght")
             .long("ma_lenght")
             .num_args(1..)
-            .default_value("200")
+            .default_value("40")
             .help("Latency moving average lenght"))
         .arg(Arg::new("db")
             .long("db")
