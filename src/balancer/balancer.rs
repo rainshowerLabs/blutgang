@@ -24,32 +24,21 @@ use std::{
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
 fn pick(
-    list: &Vec<Rpc>,
+    list: &mut Vec<Rpc>,
 ) -> (Rpc, usize) {
-    let mut lowest = f64::MAX;
-    let mut fallback_latency = f64::MAX; // Second lowest latency
-    let mut now = 0;
-    let mut fallback = 0; // second lowest index
+    // Sort by latency
+    list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
     
-    // Find the RPC with the lowest average latency from the Vec
-    for i in 0..list.len() {
-        if list[i].status.latency < lowest {
-            fallback_latency = lowest;
-            fallback = now;
-
-            lowest = list[i].status.latency;
-            now = i;
-        }
+    if list[0].max_consecutive <= list[0].consecutive {
+        list[1].consecutive = 1;
+        list[0].consecutive = 0;
+        return (list[1].clone(), 1);
     }
 
-    if list[now].max_consecutive <= list[now].consecutive {
-        list[fallback].consecutive = 1;
-        return (list[fallback], fallback);
-    }
-
-    list[now].consecutive += 1;
-    (list[now], now)
+    list[0].consecutive += 1;
+    (list[0].clone(), 0)
 }
+
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
@@ -126,9 +115,9 @@ pub async fn accept_request(
     let now;
     {
         let mut last = last_mtx.lock().unwrap();
-        let rpc_list = rpc_list_mtx.lock().unwrap();
+        let mut rpc_list = rpc_list_mtx.lock().unwrap();
 
-        (rpc, now) = pick(&rpc_list);
+        (rpc, now) = pick(&mut rpc_list);
         *last += now;
     }
 
