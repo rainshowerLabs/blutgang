@@ -25,18 +25,20 @@ use std::{
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
 fn pick(
     list: &Vec<Rpc>,
-    now: usize,
-    last: usize,
 ) -> (Rpc, usize) {
-    // Dont touch these next 4 lines
-    let now = last + 1;
-    if now >= list.len() {
-        return (list[last].clone(), 0);
+    let mut lowest = f64::MAX;
+    let mut now = 0;
+    // Find the RPC with the lowest average latency from the Vec
+    for i in 0..list.len() {
+        println!("index {} ", i);
+        if list[i].status.latency < lowest {
+            lowest = list[i].status.latency;
+            now = i;
+            println!("now {:?}", now);
+        }
     }
-
-    // Go Check which rpc has the lower latency
-
-    (list[last].clone(), now)
+    println!("now adasd {:?}", now);
+    (list[now].clone(), now)
 }
 
 async fn forward_body(
@@ -116,8 +118,8 @@ pub async fn accept_request(
         let mut last = last_mtx.lock().unwrap();
         let rpc_list = rpc_list_mtx.lock().unwrap();
 
-        (rpc, now) = pick(&rpc_list, *last);
-        *last += 1;
+        (rpc, now) = pick(&rpc_list);
+        *last += now;
     }
 
     println!("LB {}", rpc.status.latency);
