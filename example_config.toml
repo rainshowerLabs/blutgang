@@ -9,10 +9,10 @@ ma_lenght = 200 # Moving average lenght for the latency
 [sled]
 db_path = "./blutgang-cache" # Path to db
 mode = "HighThroughput" # sled mode
-cache_capacity = # Cache size in bytes
+cache_capacity = 1000000000 # Cache size in bytes
 compression = false # Use zstd compression. Increases CPU and latency by around 10% for db writes and 2% for reads
 print_profile = false # Print DB profile when dropped
-flush_every_ms # Frequency of flushes
+flush_every_ms = 1000 # Frequency of flushes
 
 # Add seperate RPCs as TOML tables
 # Do not name an rpc `blutgang` or `sled`
