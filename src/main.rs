@@ -1,7 +1,7 @@
 mod balancer;
 mod config;
 mod rpc;
-//#[cfg(feature="tui")]
+#[cfg(feature="tui")]
 mod tui;
 
 use crate::{
