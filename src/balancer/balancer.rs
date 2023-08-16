@@ -62,6 +62,7 @@ async fn forward_body(
         Ok(rax) => {
             // TODO: This is poverty
             if let Some(rax) = rax {
+            	println!("cache_hit");
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
@@ -73,7 +74,7 @@ async fn forward_body(
 			        let mut rpc_list = rpc_list_mtx.lock().unwrap();
 
 			        (rpc, now) = pick(&mut rpc_list);
-			        *last += now;
+			        *last = now;
 			    }
 			    println!("Forwarding to: {}", rpc.url);
 
@@ -81,8 +82,8 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if (!rx_str.contains("missing") || !rx_str.contains("error"))
-                && (tx_string.contains("latest") || tx_string.contains("blockNumber")) {
+                if (!rx_str.contains("missing") && !rx_str.contains("error"))
+                && (!tx_string.contains("latest") && !tx_string.contains("blockNumber")) {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 
