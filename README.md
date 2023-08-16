@@ -23,7 +23,4 @@ It's lightweight, embedded design also allows it to be used with just one node. 
 
 Blutgang is libre software licensed under the AGPL-3.0 license. It will *always* be free for non-commerical use.   
 
-If you want to use blutgang in a comercial setting, please [reach out](https://rainshower.cloud/about) for alternative licensing agreements.   
-
-Due to this arangement, external contributors are required to accept a CLA before having their changes merged.
-
+If you want to use blutgang in a comercial setting, please [reach out](https://rainshower.cloud/).
