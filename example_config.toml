@@ -1,6 +1,3 @@
-# CONFIG FILES NOT IMPLEMENTED
-# THIS IS A WIP OF HOW THEY MIGHT LOOK LIKE
-
 # Config for blutgang goes here
 [blutgang]
 do_clear = false # Clear the cache DB on startup
@@ -21,5 +18,5 @@ flush_every_ms = 1000 # Frequency of flushes
 # Do not name an rpc `blutgang` or `sled`
 [llama]
 url = "https://eth.llamarpc.com" # RPC url
-max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row
-max_per_second = 0 # Max ammount of querries per second
+max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row. Note: Does nothing ATM. Currently an RPC can be used max 6 times in a row consecutively 
+max_per_second = 0 # Max ammount of querries per second. Note: Does nothing ATM
