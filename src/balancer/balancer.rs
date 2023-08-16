@@ -13,7 +13,6 @@ use sled::Db;
 
 use std::{
     convert::Infallible,
-    print,
     str::from_utf8,
     sync::{
         Arc,
@@ -42,10 +41,10 @@ fn pick(
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    rpc: Rpc,
+    rpc_list_mtx: &Arc<Mutex<Vec<Rpc>>>,
+    last_mtx: &Arc<Mutex<usize>>,
     cache: Arc<Db>,
 ) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, bool) {
-    println!("Forwarding to: {}", rpc.url);
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
 
@@ -57,39 +56,44 @@ async fn forward_body(
     let rax;
     let tx_string = format!("{}", tx);
 
-    if tx_string.contains("latest") || tx_string.contains("blockNumber") {
-        rax = rpc.send_request(tx).await.unwrap();
-    } else {
-        let tx_hash = hash(tx_string.as_bytes());
+    let tx_hash = hash(tx_string.as_bytes());
 
-        rax = match cache.get(*tx_hash.as_bytes()) {
-            Ok(rax) => {
-                // TODO: This is poverty
-                if let Some(rax) = rax {
-                    cache_hit = true;
-                    from_utf8(&rax).unwrap().to_string()
-                } else {
-                    let rx = rpc.send_request(tx.clone()).await.unwrap();
-                    let rx_str = rx.as_str().to_string();
+    rax = match cache.get(*tx_hash.as_bytes()) {
+        Ok(rax) => {
+            // TODO: This is poverty
+            if let Some(rax) = rax {
+                cache_hit = true;
+                from_utf8(&rax).unwrap().to_string()
+            } else {
+			    // Get the next Rpc in line
+			    let rpc;
+			    let now;
+			    {
+			        let mut last = last_mtx.lock().unwrap();
+			        let mut rpc_list = rpc_list_mtx.lock().unwrap();
 
-                    // Don't cache responses that contain errors or missing trie nodes
-                    if !rx_str.contains("missing") || !rx_str.contains("error") {
-                        cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
-                    }
+			        (rpc, now) = pick(&mut rpc_list);
+			        *last += now;
+			    }
+			    println!("Forwarding to: {}", rpc.url);
 
-                    rx_str
-                }
-            }
-            Err(_) => {
-                // If anything errors send an rpc request and see if it works, if not then gg
-                print!("oopsies error!");
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
-                // cache.insert(tx_hash_bytes, rx.as_bytes()).unwrap();
                 let rx_str = rx.as_str().to_string();
+
+                // Don't cache responses that contain errors or missing trie nodes
+                if (!rx_str.contains("missing") || !rx_str.contains("error"))
+                && (tx_string.contains("latest") || tx_string.contains("blockNumber")) {
+                    cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
+                }
+
                 rx_str
             }
-        };
-    }
+        }
+        Err(_) => {
+            // If anything errors send an rpc request and see if it works, if not then gg
+            "oopsies error!".to_string()
+        }
+    };
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -110,33 +114,21 @@ pub async fn accept_request(
     ma_lenght: f64,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Get the next Rpc in line
-    let rpc;
-    let now;
-    {
-        let mut last = last_mtx.lock().unwrap();
-        let mut rpc_list = rpc_list_mtx.lock().unwrap();
-
-        (rpc, now) = pick(&mut rpc_list);
-        *last += now;
-    }
-
-    println!("LB {}", rpc.status.latency);
-
     // Send request and measure time
     let time = Instant::now();
     let response;
     let hit_cache;
-    (response, hit_cache) = forward_body(tx, rpc, cache).await;
+    (response, hit_cache) = forward_body(tx, &rpc_list_mtx, &last_mtx, cache).await;
     let time = time.elapsed();
 
     println!("Request time: {:?}", time);
     // Get lock for the rpc list and add it to the moving average
     if !hit_cache {
         let mut rpc_list = rpc_list_mtx.lock().unwrap();
-        rpc_list[now].update_latency(time.as_nanos() as f64, ma_lenght);
-        println!("LA {}", rpc_list[now].status.latency);
-    }
+        let last = last_mtx.lock().unwrap();
 
+        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);
+        println!("LA {}", rpc_list[*last].status.latency);
+    }
     response
 }
