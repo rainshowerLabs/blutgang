@@ -3,9 +3,7 @@
 
 [Join the discussion on our discord!]()
 
-## What
-
-**Note:** Blutgang is alpha software. Unexpected behavior and bugs are to be expected. Please report any issues you encounter.   
+**Note: Blutgang is alpha software. Unexpected behavior and bugs are to be expected. Please report any issues you encounter.**   
 
 Blutgang is a blazing fast, caching, minimalistic load balancer designed with Ethereum's json-rpc in mind.
 
