@@ -88,6 +88,7 @@ impl Settings {
                 rpc_list.push(rpc);
             }
         }
+        
         Settings {
             rpc_list,
             do_clear: do_clear,
