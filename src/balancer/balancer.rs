@@ -62,7 +62,6 @@ async fn forward_body(
         Ok(rax) => {
             // TODO: This is poverty
             if let Some(rax) = rax {
-            	println!("cache_hit");
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
@@ -92,7 +91,8 @@ async fn forward_body(
         }
         Err(_) => {
             // If anything errors send an rpc request and see if it works, if not then gg
-            "oopsies error!".to_string()
+            println!("Cache error! Check the DB!");
+            "".to_string()
         }
     };
 
