@@ -29,8 +29,10 @@ impl Settings {
         };
 
         if file.is_some() {
+            println!("Using config file at {}...", path);
             return Settings::create_from_file(file.unwrap());
         }
+        println!("Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
 
