@@ -1,7 +1,7 @@
 mod balancer;
 mod config;
 mod rpc;
-#[cfg(feature="tui")]
+#[cfg(feature = "tui")]
 mod tui;
 
 use crate::{
@@ -24,7 +24,6 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util::rt::TokioIo;
-
 
 // jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
@@ -54,12 +53,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a counter to keep track of the last rpc, max so it overflows
     let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
-
     // Spawn tui if feature is enabled
-    #[cfg(feature="tui")]
-    tokio::task::spawn(async move {
-
-    });
+    #[cfg(feature = "tui")]
+    tokio::task::spawn(async move {});
 
     // We start a loop to continuously accept incoming connections
     loop {

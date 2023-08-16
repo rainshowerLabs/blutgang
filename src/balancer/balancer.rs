@@ -22,12 +22,10 @@ use std::{
 };
 
 // TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
-fn pick(
-    list: &mut Vec<Rpc>,
-) -> (Rpc, usize) {
+fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
     // Sort by latency
     list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
-    
+
     if list[0].max_consecutive <= list[0].consecutive {
         list[1].consecutive = 1;
         list[0].consecutive = 0;
@@ -37,7 +35,6 @@ fn pick(
     list[0].consecutive += 1;
     (list[0].clone(), 0)
 }
-
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
@@ -65,24 +62,25 @@ async fn forward_body(
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
-			    // Get the next Rpc in line
-			    let rpc;
-			    let now;
-			    {
-			        let mut last = last_mtx.lock().unwrap();
-			        let mut rpc_list = rpc_list_mtx.lock().unwrap();
+                // Get the next Rpc in line
+                let rpc;
+                let now;
+                {
+                    let mut last = last_mtx.lock().unwrap();
+                    let mut rpc_list = rpc_list_mtx.lock().unwrap();
 
-			        (rpc, now) = pick(&mut rpc_list);
-			        *last = now;
-			    }
-			    println!("Forwarding to: {}", rpc.url);
+                    (rpc, now) = pick(&mut rpc_list);
+                    *last = now;
+                }
+                println!("Forwarding to: {}", rpc.url);
 
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
                 if (!rx_str.contains("missing") && !rx_str.contains("error"))
-                && (!tx_string.contains("latest") && !tx_string.contains("blockNumber")) {
+                    && (!tx_string.contains("latest") && !tx_string.contains("blockNumber"))
+                {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 

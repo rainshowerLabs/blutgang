@@ -8,7 +8,7 @@ pub struct Status {
     // Also set the last time it was called, so we can check again later
     pub is_erroring: bool,
     pub last_error: u64,
-    
+
     // The latency is a moving average of the last 200 calls
     pub latency: f64,
     pub latency_data: Vec<f64>,
@@ -60,7 +60,7 @@ impl Rpc {
 
         // Update latency
         self.status.latency_data.push(latest);
-        self.status.latency = self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
+        self.status.latency =
+            self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
     }
 }
-
