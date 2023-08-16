@@ -73,10 +73,20 @@ impl Settings {
             .as_integer()
             .unwrap();
 
+        // Parse sled mode
+        let sled_mode_str = sled_table.get("mode").unwrap().as_str().unwrap();
+        let mut sled_mode = sled::Mode::HighThroughput;
+
+        if sled_mode_str == "LowSpace" {
+            sled_mode = sled::Mode::LowSpace;
+        }
+
+
         // Create sled config
         let sled_config = Config::new()
             .path(db_path)
             .cache_capacity(cache_capacity.try_into().unwrap())
+            .mode(sled_mode)
             .flush_every_ms(Some(flush_every_ms as u64))
             .print_profile_on_drop(print_profile)
             .use_compression(compression);

@@ -11,7 +11,7 @@ ma_lenght = 200 # Moving average lenght for the latency
 # Sled is the database we use for our cache, for more info check their docs
 [sled]
 db_path = "./blutgang-cache" # Path to db
-mode = "HighThroughput" # sled mode
+mode = "HighThroughput" # sled mode. Can be HighThroughput/LowSpace
 cache_capacity = 1000000000 # Cache size in bytes
 compression = false # Use zstd compression. Increases CPU and latency by around 10% for db writes and 2% for reads
 print_profile = false # Print DB profile when dropped
