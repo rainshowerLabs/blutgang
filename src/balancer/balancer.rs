@@ -62,6 +62,11 @@ async fn forward_body(
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
+                // Quit blutgang if `tx_string` contains the word `quit_blutgang`
+                if tx_string.contains("quit_blutgang") {
+                    std::process::exit(0);
+                }
+
                 // Get the next Rpc in line
                 let rpc;
                 let now;

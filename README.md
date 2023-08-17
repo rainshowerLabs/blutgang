@@ -1,7 +1,7 @@
 # Blutgang - the wd40 of alpha ethereum load balancers
 ![blutgang](https://github.com/rainshowerLabs/blutgang/assets/55022497/06fe1dd3-0bc4-4b5d-bfc8-5573d6f78db3)
 
-[Join the discussion on our discord!]()
+[Join the discussion on our discord!](https://discord.gg/92TfQWdjEh)
 
 **Note: Blutgang is alpha software. Unexpected behavior and bugs are to be expected. Please report any issues you encounter.**   
 
@@ -19,8 +19,10 @@ It's lightweight, embedded design also allows it to be used with just one node. 
 
 *tba*
 
-## Notes on the license and contributing
+## Notes on the license
 
-Blutgang is libre software licensed under the AGPL-3.0 license. It will *always* be free for non-commerical use.   
+Blutgang is libre software licensed under the AGPL-3.0 license. This means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on the licensed software. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
 
-If you want to use blutgang in a comercial setting, please [reach out](https://rainshower.cloud/).
+### Commercial use
+
+If you want to use blutgang in a comercial setting without disclosing any source code, please [reach out](https://rainshower.cloud/).
