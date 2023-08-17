@@ -1,3 +1,5 @@
+# To use the config file, use the -c/--config option pointing to the path of a config file
+
 # Config for blutgang goes here
 [blutgang]
 do_clear = false # Clear the cache DB on startup
@@ -15,7 +17,7 @@ print_profile = false # Print DB profile when dropped
 flush_every_ms = 1000 # Frequency of flushes in ms
 
 # Add seperate RPCs as TOML tables
-# Do not name an rpc `blutgang` or `sled`
+# DO NOT name an rpc `blutgang` or `sled`
 [llama]
 url = "https://eth.llamarpc.com" # RPC url
 max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row. Note: Does nothing ATM. Currently an RPC can be used max 6 times in a row consecutively 
