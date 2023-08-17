@@ -31,9 +31,10 @@ Clone the repository, run
 time sothis --source_rpc http://localhost:3000 --mode call_track --contract_address 0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6 --origin_block 17885300 --terminal_block 17892269 --calldata 0x06f13056 --query_interval 20
 ```
 ![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/9d6727de-7001-464d-8d48-b7659c2644c8)
-![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/1e631a01-2772-49dc-af1f-8609b504544f)
+![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/4cf42b22-0805-4116-8649-dba5912c9775)
 
 ## Notes on the license
+
 
 Blutgang is libre software licensed under the AGPL-3.0 license. In practice, this means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on the licensed software. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
 
