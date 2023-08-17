@@ -49,25 +49,26 @@ async fn forward_body(
     let mut cache_hit = false;
 
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
-    // TODO: make this faster
+    // TODO: This is lazy and suboptimal
     let rax;
     let tx_string = format!("{}", tx);
 
     let tx_hash = hash(tx_string.as_bytes());
 
+    // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
     rax = match cache.get(*tx_hash.as_bytes()) {
         Ok(rax) => {
-            // TODO: This is poverty
             if let Some(rax) = rax {
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
-                // Quit blutgang if `tx_string` contains the word `quit_blutgang`
-                if tx_string.contains("quit_blutgang") {
+                // Quit blutgang if `tx_string` contains the word `blutgang_quit`
+                // Only for debugging, remove this for production builds.
+                if tx_string.contains("blutgang_quit") {
                     std::process::exit(0);
                 }
 
-                // Get the next Rpc in line
+                // Get the next Rpc in line.
                 let rpc;
                 let now;
                 {
@@ -79,6 +80,9 @@ async fn forward_body(
                 }
                 println!("Forwarding to: {}", rpc.url);
 
+                // Send the request.
+                //
+                // Check if it contains any errors or if its `latest` and insert it if it isn't
                 let rx = rpc.send_request(tx.clone()).await.unwrap();
                 let rx_str = rx.as_str().to_string();
 

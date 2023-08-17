@@ -21,7 +21,7 @@ It's lightweight, embedded design also allows it to be used with just one node. 
 
 ## Notes on the license
 
-Blutgang is libre software licensed under the AGPL-3.0 license. This means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on the licensed software. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
+Blutgang is libre software licensed under the AGPL-3.0 license. In practice, this means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on the licensed software. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
 
 ### Commercial use
 
