@@ -40,7 +40,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
     // Insert kv pair `blutgang_is_lb` `true` as a test to see if we have write permissions
-    cache.insert("blutgang_is_lb", "true").unwrap().expect("Couldn't write to DB!");
+    cache
+        .insert("blutgang_is_lb", "true")
+        .unwrap()
+        .expect("Couldn't write to DB!");
 
     // Clear database if specified
     if config.do_clear {

@@ -2,9 +2,7 @@ use crate::Rpc;
 use clap::ArgMatches;
 use clap::Command;
 use sled::Config;
-use std::fs::{
-    self,
-};
+use std::fs::{self,};
 use std::net::SocketAddr;
 use std::println;
 use toml::Value;
@@ -59,12 +57,20 @@ impl Settings {
         };
         let address = address.parse::<SocketAddr>().unwrap();
 
-        let ma_lenght = blutgang_table.get("ma_lenght").unwrap().as_integer().unwrap() as f64;
+        let ma_lenght = blutgang_table
+            .get("ma_lenght")
+            .unwrap()
+            .as_integer()
+            .unwrap() as f64;
 
         // Parse `sled` table
         let sled_table = parsed_toml.get("sled").unwrap().as_table().unwrap();
         let db_path = sled_table.get("db_path").unwrap().as_str().unwrap();
-        let cache_capacity = sled_table.get("cache_capacity").unwrap().as_integer().unwrap() as usize;
+        let cache_capacity = sled_table
+            .get("cache_capacity")
+            .unwrap()
+            .as_integer()
+            .unwrap() as usize;
         let compression = sled_table.get("compression").unwrap().as_bool().unwrap();
         let print_profile = sled_table.get("print_profile").unwrap().as_bool().unwrap();
         let flush_every_ms = sled_table
@@ -80,7 +86,6 @@ impl Settings {
         if sled_mode_str == "LowSpace" {
             sled_mode = sled::Mode::LowSpace;
         }
-
 
         // Create sled config
         let sled_config = Config::new()
@@ -109,7 +114,6 @@ impl Settings {
             sled_config: sled_config,
         }
     }
-
 
     fn create_from_matches(matches: ArgMatches) -> Settings {
         // Build the rpc_list
