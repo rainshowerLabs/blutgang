@@ -16,8 +16,12 @@ Blutgang is designed to be used in front of a cluster of Ethereum RPC nodes, dis
 It's lightweight, embedded design also allows it to be used with just one node. This way, the cache can be utilized to speed up the access of historic data. This can be very useful for developers and power users, especially if using remote nodes.
 
 ## Benchmarks
-
-*tba*
+*Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
+```bash
+time sothis --source_rpc http://localhost:3000 --mode call_track --contract_address 0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6 --origin_block 17885300 --terminal_block 17892269 --calldata 0x06f13056 --query_interval 20
+```
+![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/9d6727de-7001-464d-8d48-b7659c2644c8)
+![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/1e631a01-2772-49dc-af1f-8609b504544f)
 
 ## Notes on the license
 
