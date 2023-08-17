@@ -32,8 +32,9 @@ If you want to use command line arguments instead, please run `cargo run --relea
 ```bash
 time sothis --source_rpc http://localhost:3000 --mode call_track --contract_address 0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6 --origin_block 17885300 --terminal_block 17892269 --calldata 0x06f13056 --query_interval 20
 ```
-![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/9d6727de-7001-464d-8d48-b7659c2644c8)
-![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/1e631a01-2772-49dc-af1f-8609b504544f)
+![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/8ce9a690-d2eb-4910-9a5d-807c2bdd4649)
+![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/50d78e5f-2209-488d-82fc-8018388a82e7)
+
 
 ## Notes on the license
 
