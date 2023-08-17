@@ -23,7 +23,9 @@ For detailed instructions on how to use blutgang, please read the [wiki]().
 
 ### Tldr
 
-Clone the repository, run 
+Clone the repository, and fint the `example_config.toml` file. Edit it to your liking, and run `cargo run --release -- -c example_config.toml`.   
+
+If you want to use command line arguments instead, please run `cargo run --release -- --help` for more info. Keep in mind that the recommended way to run blutgang is via a config file.
 
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
@@ -35,7 +37,7 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 
 ## Notes on the license
 
-Blutgang is libre software licensed under the AGPL-3.0 license. In practice, this means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on the licensed software. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
+Blutgang is libre software licensed under the AGPL-3.0 license. In practice, this means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users will *always* be free for non-commerical use.   
 
 ### Commercial use and support
 
