@@ -2,7 +2,7 @@
 [blutgang]
 do_clear = false # Clear the cache DB on startup
 address = "localhost:3000" # Where to bind blutgang to
-ma_lenght = 200 # Moving average lenght for the latency
+ma_lenght = 20 # Moving average lenght for the latency
 
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
@@ -12,7 +12,7 @@ mode = "HighThroughput" # sled mode. Can be HighThroughput/LowSpace
 cache_capacity = 1000000000 # Cache size in bytes
 compression = false # Use zstd compression. Increases CPU and latency by around 10% for db writes and 2% for reads
 print_profile = false # Print DB profile when dropped
-flush_every_ms = 1000 # Frequency of flushes
+flush_every_ms = 1000 # Frequency of flushes in ms
 
 # Add seperate RPCs as TOML tables
 # Do not name an rpc `blutgang` or `sled`
