@@ -13,7 +13,17 @@ Blutgang's main advantage compared to other load balancers is the speed of its c
 
 Blutgang is designed to be used in front of a cluster of Ethereum RPC nodes, distributing the load between them. By default, the load is balanced in a weighted round-robin configuration. Thanks to its modularity, the load balancing algorithm can be customized to support any load balancing schema.
 
-It's lightweight, embedded design also allows it to be used with just one node. This way, the cache can be utilized to speed up the access of historic data. This can be very useful for developers and power users, especially if using remote nodes.
+### Local usage
+
+If you are a developer or a power user, you can use blutgang as an intermediary between you and your RPC endpoint to cache historical querries. This speeds up usage dramatically, as well as increasing privacy.
+
+## How to run 
+
+For detailed instructions on how to use blutgang, please read the [wiki]().
+
+### Tldr
+
+Clone the repository, run 
 
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
