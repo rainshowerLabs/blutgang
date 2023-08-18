@@ -1,0 +1,15 @@
+version: '3'
+services:
+  load_balancer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000-4000:3000-4000"  # Expose a range of ports from 3000 to 4000 (adjust as needed)
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+networks:
+  blutgang_net:
+    driver: bridge
