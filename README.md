@@ -29,7 +29,7 @@ If you want to use command line arguments instead, please run `cargo run --relea
 
 ### Docker
 
-*Note: The overhead of running blutgang inside of docker reduces cache read performance by 10-20%.*
+*Note: The overhead of running blutgang inside of docker reduces cache read performance by 10-20%.*   
 
 The official docker image is available on [dockerhub](https://hub.docker.com/r/makemake1337/blutgang).  
 You must provide a config file to the docker container, as well as expose the port specified. Example:   
