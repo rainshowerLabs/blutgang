@@ -24,7 +24,7 @@ impl Settings {
         let path = matches.get_one::<String>("config").unwrap();
         let file: Option<String> = match fs::read_to_string(&path) {
             Ok(file) => Some(file),
-            Err(_) => None,
+            Err(_) => panic!("Error opening config file at {}", path),
         };
 
         if file.is_some() {
