@@ -7,8 +7,18 @@ WORKDIR /app
 # Copy the project files into the container
 COPY / /app
 
-# Pull the latest changes from the master branch
+# Remove all existing remotes
+RUN git remote | xargs -L1 git remote remove
+
+# Add a new HTTPS GitHub remote
+RUN git remote add origin https://github.com/rainshowerLabs/blutgang.git
+
+# Update the repository (pull the latest changes)
 RUN git pull origin master
 
+RUN pwd
+
+RUN ls -la
+
 # Build and run the Rust project
-CMD ["cargo", "run", "--", "-c", "config.toml"]
+CMD ["cargo", "run", "--release", "--", "-c", "config.toml"]
