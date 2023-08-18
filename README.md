@@ -27,6 +27,16 @@ Clone the repository, and fint the `example_config.toml` file. Edit it to your l
 
 If you want to use command line arguments instead, please run `cargo run --release -- --help` for more info. Keep in mind that the recommended way to run blutgang is via a config file.
 
+### Docker
+
+*Note: The overhead of running blutgang inside of docker reduces cache read performance by 10-20%.*
+
+The official docker image is available on [dockerhub](https://hub.docker.com/r/makemake1337/blutgang).  
+You must provide a config file to the docker container, as well as expose the port specified. Example:   
+```bash
+docker run -v /full/path/to/config.toml:/app/config.toml --network host makemake1337/blutgang
+```
+
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
 ```bash
