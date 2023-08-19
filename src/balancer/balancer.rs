@@ -74,7 +74,7 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if !is_method_blacklisted(&rx_str) {
+                if !is_method_blacklisted(&tx_string) {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 
