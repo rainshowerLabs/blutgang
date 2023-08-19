@@ -7,19 +7,13 @@ pub async fn sort_by_latency(
 	ma_lenght: f64,
 ) -> Vec<Rpc> {
 	for rpc in rpc_list.iter_mut() {
-		let mut times = Vec::new();
 		for _ in 0..ma_lenght as u32 {
 			let start = Instant::now();
 			let _ = rpc.send_request("{\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1,\"jsonrpc\":\"2.0\"}".into()).await.unwrap();
 			let end = Instant::now();
-			times.push(end.duration_since(start));
-		}
-		let mut sum = 0;
-		for time in times {
-			sum += time.as_nanos();
+			rpc.update_latency(end.duration_since(start).as_nanos() as f64, ma_lenght);
 		}
 
-		rpc.status.latency = (sum / ma_lenght as u128) as f64;
 		println!("{}: {}ns", rpc.url, rpc.status.latency);
 	}
 	rpc_list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
