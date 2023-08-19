@@ -111,6 +111,7 @@ impl Settings {
         }
 
         if sort_on_startup {
+            println!("Sorting RPCs by latency...");
             rpc_list = sort_by_latency(rpc_list, ma_lenght).await;
         }
 
