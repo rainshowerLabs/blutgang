@@ -5,7 +5,6 @@ use clap::Command;
 use sled::Config;
 use std::fs::{self,};
 use std::net::SocketAddr;
-use std::println;
 use toml::Value;
 
 #[derive(Debug, Clone)]
@@ -45,7 +44,11 @@ impl Settings {
         let blutgang_table = parsed_toml.get("blutgang").unwrap().as_table().unwrap();
         let do_clear = blutgang_table.get("do_clear").unwrap().as_bool().unwrap();
         let address = blutgang_table.get("address").unwrap().as_str().unwrap();
-        let sort_on_startup = blutgang_table.get("sort_on_startup").unwrap().as_bool().unwrap();
+        let sort_on_startup = blutgang_table
+            .get("sort_on_startup")
+            .unwrap()
+            .as_bool()
+            .unwrap();
 
         // Build the SocketAddr
         let port = 3000;

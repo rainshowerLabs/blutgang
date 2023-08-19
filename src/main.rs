@@ -37,12 +37,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
 
-
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
-    let _ = cache.insert("172cf910abc64d0fe6b243766b3ae9f56f32978d7c144ddadde9c615ea38891d", "true");
+    let _ = cache.insert(
+        "172cf910abc64d0fe6b243766b3ae9f56f32978d7c144ddadde9c615ea38891d",
+        "true",
+    );
 
     // Clear database if specified
     if config.do_clear {
