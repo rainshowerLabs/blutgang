@@ -64,6 +64,5 @@ impl Rpc {
         self.status.latency_data.push(latest);
         self.status.latency =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
-        println!("{}", self.status.latency);
     }
 }

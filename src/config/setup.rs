@@ -14,7 +14,6 @@ pub async fn sort_by_latency(
 			rpc.update_latency(end.duration_since(start).as_nanos() as f64, ma_lenght);
 		}
 
-		println!("{}: {}ns", rpc.url, rpc.status.latency);
 	}
 	rpc_list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
     rpc_list
