@@ -32,10 +32,11 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
-    let config = Settings::new(create_match());
+    let config = Settings::new(create_match()).await;
 
     // Make the list a mutex
     let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
+
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());

@@ -1,3 +1,4 @@
+use crate::config::setup::sort_by_latency;
 use crate::Rpc;
 use clap::ArgMatches;
 use clap::Command;
@@ -17,7 +18,7 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn new(matches: Command) -> Settings {
+    pub async fn new(matches: Command) -> Settings {
         let matches = matches.get_matches();
 
         // Try to open the file at the path specified in the args
@@ -29,13 +30,13 @@ impl Settings {
 
         if file.is_some() {
             println!("Using config file at {}...", path);
-            return Settings::create_from_file(file.unwrap());
+            return Settings::create_from_file(file.unwrap()).await;
         }
         println!("Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
 
-    fn create_from_file(conf_file: String) -> Settings {
+    async fn create_from_file(conf_file: String) -> Settings {
         let parsed_toml = conf_file.parse::<Value>().expect("Error parsing TOML");
 
         let table_names: Vec<&String> = parsed_toml.as_table().unwrap().keys().collect::<Vec<_>>();
@@ -44,6 +45,7 @@ impl Settings {
         let blutgang_table = parsed_toml.get("blutgang").unwrap().as_table().unwrap();
         let do_clear = blutgang_table.get("do_clear").unwrap().as_bool().unwrap();
         let address = blutgang_table.get("address").unwrap().as_str().unwrap();
+        let sort_on_startup = blutgang_table.get("sort_on_startup").unwrap().as_bool().unwrap();
 
         // Build the SocketAddr
         let port = 3000;
@@ -97,6 +99,8 @@ impl Settings {
             .use_compression(compression);
 
         // Parse all the other tables as RPCs and put them in a Vec<Rpc>
+        //
+        // Sort RPCs by latency if enabled
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" {
@@ -104,6 +108,10 @@ impl Settings {
                 let rpc = Rpc::new(rpc_table.get("url").unwrap().as_str().unwrap().to_string());
                 rpc_list.push(rpc);
             }
+        }
+
+        if sort_on_startup {
+            rpc_list = sort_by_latency(rpc_list, ma_lenght).await;
         }
 
         Settings {
