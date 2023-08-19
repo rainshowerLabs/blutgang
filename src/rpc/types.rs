@@ -1,5 +1,3 @@
-use std::println;
-
 use reqwest::Client;
 use serde_json::Value;
 

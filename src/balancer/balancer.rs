@@ -1,5 +1,6 @@
 use crate::{
     balancer::format::incoming_to_value,
+    balancer::selection::pick,
     rpc::types::Rpc,
 };
 
@@ -20,21 +21,6 @@ use std::{
     },
     time::Instant,
 };
-
-// TODO: Since we're not ranking RPCs properly, just pick the next one in line for now
-fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
-    // Sort by latency
-    list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
-
-    if list[0].max_consecutive <= list[0].consecutive {
-        list[1].consecutive = 1;
-        list[0].consecutive = 0;
-        return (list[1].clone(), 1);
-    }
-
-    list[0].consecutive += 1;
-    (list[0].clone(), 0)
-}
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
