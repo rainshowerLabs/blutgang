@@ -1,5 +1,6 @@
 use crate::{
     balancer::format::incoming_to_value,
+    balancer::selection::is_method_blacklisted,
     balancer::selection::pick,
     rpc::types::Rpc,
 };
@@ -73,9 +74,7 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if (!rx_str.contains("missing") && !rx_str.contains("error"))
-                    && (!tx_string.contains("latest") && !tx_string.contains("blockNumber"))
-                {
+                if !is_method_blacklisted(&rx_str) {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 

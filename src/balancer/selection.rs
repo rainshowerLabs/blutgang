@@ -1,6 +1,7 @@
-// TODO: make this generic
 use crate::Rpc;
+use memchr::memmem;
 
+// TODO: make this generic
 pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
     // Sort by latency
     list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
@@ -15,6 +16,16 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
     (list[0].clone(), 0)
 }
 
-// pub fn () -> bool {
+// The default rust string contains does not use SIMD extension
+// memchr::memmem is apparently way faster because it uses them
+pub fn is_method_blacklisted(rx: &str) -> bool {
+    let blacklist = ["latest", "blockNumber", "missing", "error"];
 
-// }
+    for item in blacklist.iter() {
+        if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
+            return true;
+        }
+    }
+
+    false
+}
