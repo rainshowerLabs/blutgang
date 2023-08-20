@@ -1,7 +1,7 @@
 # Blutgang - the wd40 of alpha ethereum load balancers
 ![blutgang](https://github.com/rainshowerLabs/blutgang/assets/55022497/06fe1dd3-0bc4-4b5d-bfc8-5573d6f78db3)
 
-[Join the discussion on our discord!](https://discord.gg/92TfQWdjEh)
+[Join the discussion on our discord](https://discord.gg/92TfQWdjEh), or [matrix!](https://matrix.to/#/%23rainshower:matrix.org)
 
 **Note: Blutgang is alpha software. Unexpected behavior and bugs are to be expected. Please report any issues you encounter.**   
 
