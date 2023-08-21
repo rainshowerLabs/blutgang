@@ -65,6 +65,7 @@ async fn forward_body(
                     (rpc, now) = pick(&mut rpc_list);
                     *last = now;
                 }
+                #[cfg(not(feature = "tui"))]
                 println!("Forwarding to: {}", rpc.url);
 
                 // Send the request.
@@ -114,6 +115,7 @@ pub async fn accept_request(
     (response, hit_cache) = forward_body(tx, &rpc_list_mtx, &last_mtx, cache).await;
     let time = time.elapsed();
 
+    #[cfg(not(feature = "tui"))]
     println!("Request time: {:?}", time);
     // Get lock for the rpc list and add it to the moving average
     if !hit_cache {
@@ -121,6 +123,7 @@ pub async fn accept_request(
         let last = last_mtx.lock().unwrap();
 
         rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);
+        #[cfg(not(feature = "tui"))]
         println!("LA {}", rpc_list[*last].status.latency);
     }
     response
