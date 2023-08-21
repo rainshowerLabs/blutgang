@@ -21,5 +21,5 @@ flush_every_ms = 1000 # Frequency of flushes in ms
 # DO NOT name an rpc `blutgang` or `sled`
 [llama]
 url = "https://eth.llamarpc.com" # RPC url
-max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row. Note: Does nothing ATM. Currently an RPC can be used max 6 times in a row consecutively 
+max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row.
 max_per_second = 0 # Max ammount of querries per second. Note: Does nothing ATM

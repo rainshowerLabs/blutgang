@@ -108,7 +108,11 @@ impl Settings {
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
-                let rpc = Rpc::new(rpc_table.get("url").unwrap().as_str().unwrap().to_string());
+                
+                let max_consecutive = rpc_table.get("max_consecutive").unwrap().as_integer().unwrap() as u32;
+                let url = rpc_table.get("url").unwrap().as_str().unwrap().to_string();
+
+                let rpc = Rpc::new(url, max_consecutive);
                 rpc_list.push(rpc);
             }
         }
@@ -139,7 +143,7 @@ impl Settings {
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string()))
+            .map(|rpc| Rpc::new(rpc.to_string(), 6))
             .collect();
 
         // Build the SocketAddr

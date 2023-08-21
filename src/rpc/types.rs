@@ -28,12 +28,12 @@ pub struct Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String) -> Self {
+    pub fn new(url: String, max_consecutive: u32) -> Self {
         Self {
             url: url,
             client: Client::new(),
             status: Status::default(),
-            max_consecutive: 6,
+            max_consecutive: max_consecutive,
             consecutive: 0,
         }
     }
