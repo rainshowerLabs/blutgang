@@ -23,14 +23,14 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
 
 // The default rust string contains does not use SIMD extensions
 // memchr::memmem is apparently way faster because it uses them
-pub fn is_method_blacklisted(rx: &str) -> bool {
+pub fn cache_method(rx: &str) -> bool {
     let blacklist = ["latest", "blockNumber", "missing", "error"];
 
     for item in blacklist.iter() {
         if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
-            return true;
+            return false;
         }
     }
 
-    false
+    true
 }
