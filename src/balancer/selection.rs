@@ -26,6 +26,10 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
 pub fn cache_method(rx: &str) -> bool {
     let blacklist = ["latest", "blockNumber", "missing", "error"];
 
+    // If no-cache feature is on, return false
+    #[cfg(feature = "no-cache")]
+    return false;
+
     for item in blacklist.iter() {
         if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
             return false;

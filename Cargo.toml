@@ -18,7 +18,7 @@ clap = "4.3.0"
 hyper = { version = "1.0.0-rc.4", features = ["full"] }
 http-body-util = "0.1.0-rc.3"
 hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }
-ratatui = { version = "0.22.0", features = ["all-widgets"] }
+ratatui = { version = "0.22.0", features = ["all-widgets"], optional = true }
 reqwest = { version = "0.11.18", features = ["blocking", "json"] }
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
@@ -29,3 +29,8 @@ blake3 = "1.4.1"
 jemallocator = "0.5.4"
 toml = "0.7.6"
 memchr = "2.5.0"
+
+[features]
+default = []
+tui = ["ratatui"]
+no-cache = []
