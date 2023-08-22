@@ -1,25 +1,32 @@
-use std::{
-	io::Stdout,
-	error::Error,
+use crossterm::{
+    execute,
+    terminal::{
+        disable_raw_mode,
+        enable_raw_mode,
+    },
 };
 use ratatui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout},
-    Frame,
     backend::CrosstermBackend,
+    layout::{
+        Constraint,
+        Direction,
+        Layout,
+    },
     widgets::*,
+    Frame,
     Terminal,
 };
-use crossterm::{
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode},
+use std::{
+    error::Error,
+    io::Stdout,
 };
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Error>> {
     let mut stdout = std::io::stdout();
     enable_raw_mode()?;
     execute!(stdout)?;
-	println!("aads");
+    println!("aads");
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
 }
 
@@ -32,27 +39,21 @@ pub fn restore_terminal(
 }
 
 pub fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(), Box<dyn Error>> {
+    // Redraw the full terminal window since we are not doing the new screen thing
+    let _ =terminal.clear();
+
     let _ = terminal.draw(|f| ui(f))?;
     Ok(())
 }
 
 fn ui<B: Backend>(f: &mut Frame<B>) {
-   let chunks = Layout::default()
+    let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(1)
-        .constraints(
-            [
-                Constraint::Percentage(10),
-                Constraint::Percentage(80),
-            ].as_ref()
-        )
+        .constraints([Constraint::Percentage(10), Constraint::Percentage(90)].as_ref())
         .split(f.size());
-    let block = Block::default()
-         .title("Block")
-         .borders(Borders::ALL);
+    let block = Block::default().title("Blutgang").borders(Borders::ALL);
     f.render_widget(block, chunks[0]);
-    let block = Block::default()
-         .title("Block 2")
-         .borders(Borders::ALL);
+    let block = Block::default().title("Stats").borders(Borders::ALL);
     f.render_widget(block, chunks[1]);
 }
