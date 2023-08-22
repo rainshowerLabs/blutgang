@@ -1,7 +1,7 @@
 use std::{
 	io::Stdout,
+	error::Error,
 };
-use std::error::Error;
 use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
@@ -12,13 +12,14 @@ use ratatui::{
 };
 use crossterm::{
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{disable_raw_mode, enable_raw_mode},
 };
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Error>> {
     let mut stdout = std::io::stdout();
     enable_raw_mode()?;
-    execute!(stdout, EnterAlternateScreen)?;
+    execute!(stdout)?;
+	println!("aads");
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
 }
 
@@ -26,7 +27,7 @@ pub fn restore_terminal(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
 ) -> Result<(), Box<dyn Error>> {
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen,)?;
+    execute!(terminal.backend_mut())?;
     Ok(terminal.show_cursor()?)
 }
 
@@ -43,7 +44,6 @@ fn ui<B: Backend>(f: &mut Frame<B>) {
             [
                 Constraint::Percentage(10),
                 Constraint::Percentage(80),
-                Constraint::Percentage(10)
             ].as_ref()
         )
         .split(f.size());
