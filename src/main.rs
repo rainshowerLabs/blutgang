@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(feature = "tui")]
     tokio::task::spawn(async move {
         let mut terminal = setup_terminal().unwrap();
-        let _ = run_tui(&mut terminal);
+        let _ = run_tui(&mut terminal).await;
         let _ = restore_terminal(&mut terminal);
     });
 
