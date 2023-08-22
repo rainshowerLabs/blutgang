@@ -24,7 +24,7 @@ use std::{
 
 pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Error>> {
     let mut stdout = std::io::stdout();
-    enable_raw_mode()?;
+    //enable_raw_mode()?;
     execute!(stdout)?;
     println!("aads");
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
@@ -40,9 +40,14 @@ pub fn restore_terminal(
 
 pub fn run_tui(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<(), Box<dyn Error>> {
     // Redraw the full terminal window since we are not doing the new screen thing
-    let _ =terminal.clear();
+    let _ = terminal.clear();
 
-    let _ = terminal.draw(|f| ui(f))?;
+    // Draw the tui in a loop
+    loop {
+    	// Wait 350ms so we dont constantly block everything
+    	sleep(std::time::Duration::from_millis(350));
+    }
+    
     Ok(())
 }
 
