@@ -4,6 +4,9 @@ mod rpc;
 #[cfg(feature = "tui")]
 mod tui;
 
+#[cfg(feature = "tui")]
+use tui::terminal::*;
+
 use crate::{
     balancer::balancer::accept_request,
     config::{
@@ -61,7 +64,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn tui if feature is enabled
     #[cfg(feature = "tui")]
-    tokio::task::spawn(async move {});
+    tokio::task::spawn(async move {
+        let mut terminal = setup_terminal().unwrap();
+        let _ = run_tui(&mut terminal);
+        let _ = restore_terminal(&mut terminal);
+    });
 
     // We start a loop to continuously accept incoming connections
     loop {
