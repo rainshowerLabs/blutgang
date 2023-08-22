@@ -126,5 +126,6 @@ pub async fn accept_request(
         #[cfg(not(feature = "tui"))]
         println!("LA {}", rpc_list[*last].status.latency);
     }
+
     response
 }

@@ -108,8 +108,12 @@ impl Settings {
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
-                
-                let max_consecutive = rpc_table.get("max_consecutive").unwrap().as_integer().unwrap() as u32;
+
+                let max_consecutive = rpc_table
+                    .get("max_consecutive")
+                    .unwrap()
+                    .as_integer()
+                    .unwrap() as u32;
                 let url = rpc_table.get("url").unwrap().as_str().unwrap().to_string();
 
                 let rpc = Rpc::new(url, max_consecutive);
