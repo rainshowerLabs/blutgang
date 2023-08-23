@@ -51,6 +51,22 @@ pub async fn run_tui(
     }
 }
 
+fn format_rpc_text(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Vec<Line<'static>> {
+    let mut rpc_text = Vec::new();
+    let rpc_list = rpc_list.read().unwrap();
+    for rpc in rpc_list.iter() {
+        rpc_text.push(Line::from(format!(
+            "RPC URL: {}",
+            rpc.url
+        )));
+        rpc_text.push(Line::from(format!(
+            "Latency (avg): {:.2} ms | Consecutive: {} | Is erroring: {}",
+            rpc.status.latency / 1_000_000.0, rpc.consecutive, rpc.status.is_erroring
+        )));
+    }
+    rpc_text
+}
+
 fn ui<B: Backend>(f: &mut Frame<B>, config: &Settings, rpc_list: &Arc<RwLock<Vec<Rpc>>>) {
     // Get address we're bound to from the config
     let address = config.address.to_string();
@@ -76,12 +92,15 @@ fn ui<B: Backend>(f: &mut Frame<B>, config: &Settings, rpc_list: &Arc<RwLock<Vec
         .split(f.size());
 
     let block = Paragraph::new(blutgang_text)
-        .block(Block::default().title("Paragraph").borders(Borders::ALL))
+        .block(Block::default().title("Blutgang").borders(Borders::ALL))
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true });
     f.render_widget(block, chunks[0]);
     let stats = Block::default().title("Stats").borders(Borders::ALL);
     f.render_widget(stats, chunks[1]);
-    let rpcs = Block::default().title("RPCs").borders(Borders::ALL);
+    let rpcs = Paragraph::new(format_rpc_text(rpc_list))
+        .block(Block::default().title("RPCs").borders(Borders::ALL))
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: true });
     f.render_widget(rpcs, chunks[2]);
 }

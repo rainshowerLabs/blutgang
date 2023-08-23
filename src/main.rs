@@ -63,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a counter to keep track of the last rpc, max so it overflows
     let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
-    // Spawn tui if feature is enabled
+    // Spawn tui if the feature is enabled
     #[cfg(feature = "tui")]
     {
         // We're passing the rpc list as an arc to the ui thread.
