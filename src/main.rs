@@ -70,6 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // TODO: This is blocking writes. Make it potentially unsafe or add message passing???
         let rpc_list_tui = Arc::clone(&rpc_list_rwlock);
 
+        let response_list = Arc::new(RwLock::new(Vec::new()));
+
         let config_clone = config.clone();
         tokio::task::spawn(async move {
             let mut terminal = setup_terminal().unwrap();
@@ -98,13 +100,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .serve_connection(
                     io,
                     service_fn(move |req| {
-                        accept_request(
+                        let response = accept_request(
                             req,
                             Arc::clone(&rpc_list_rwlock_clone),
                             Arc::clone(&last_mtx_clone),
                             config.ma_lenght.clone(),
                             Arc::clone(&cache_clone),
-                        )
+                        );
+                        #[cfg(feature = "tui")] {
+                            response_list.write().unwrap().push(response.unwrap().clone());
+                        }
+                        response
                     }),
                 )
                 .await
