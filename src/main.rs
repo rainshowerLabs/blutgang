@@ -66,10 +66,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn tui if feature is enabled
     #[cfg(feature = "tui")]
     {
+        // We're passing the rpc list as an arc to the ui thread.
+        // TODO: This is blocking writes. Make it potentially unsafe or add message passing???
+        let rpc_list_tui = Arc::clone(&rpc_list_rwlock);
+
         let config_clone = config.clone();
         tokio::task::spawn(async move {
             let mut terminal = setup_terminal().unwrap();
-            let _ = run_tui(&mut terminal, config_clone).await;
+            let _ = run_tui(&mut terminal, config_clone, &rpc_list_tui).await;
         });
     }
 

@@ -1,4 +1,5 @@
 use crate::config::types::Settings;
+use crate::rpc::types::Rpc;
 
 use crossterm::execute;
 use ratatui::{
@@ -17,6 +18,10 @@ use ratatui::{
 use std::{
     error::Error,
     io::Stdout,
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 use tokio::time::sleep;
 
@@ -30,13 +35,14 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Er
 pub async fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     config: Settings,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn Error>> {
     // Redraw the full terminal window since we are not doing the new screen thing
     let _ = terminal.clear();
 
     // Draw the tui in a loop
     loop {
-        let _ = terminal.draw(|f| ui(f, &config))?;
+        let _ = terminal.draw(|f| ui(f, &config, &rpc_list))?;
         // Make sure the cursor is shown because we dont want to do raw mode
         terminal.show_cursor()?;
 
@@ -45,7 +51,7 @@ pub async fn run_tui(
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, config: &Settings) {
+fn ui<B: Backend>(f: &mut Frame<B>, config: &Settings, rpc_list: &Arc<RwLock<Vec<Rpc>>>) {
     // Get address we're bound to from the config
     let address = config.address.to_string();
     // Parse the DB settings from the config
