@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Settings::new(create_match()).await;
 
     // Make the list a mutex
-    let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list));
+    let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list.clone()));
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
@@ -64,11 +64,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn tui if feature is enabled
     #[cfg(feature = "tui")]
-    tokio::task::spawn(async move {
-        let mut terminal = setup_terminal().unwrap();
-        let _ = run_tui(&mut terminal).await;
-        let _ = restore_terminal(&mut terminal);
-    });
+    {
+        let config_clone = config.clone();
+        tokio::task::spawn(async move {
+            let mut terminal = setup_terminal().unwrap();
+            let _ = run_tui(&mut terminal, config_clone).await;
+        });
+    }
 
     // We start a loop to continuously accept incoming connections
     loop {
