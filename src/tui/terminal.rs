@@ -40,8 +40,8 @@ pub async fn run_tui(
         // Make sure the cursor is shown because we dont want to do raw mode
         terminal.show_cursor()?;
 
-        // Wait 350ms so we dont constantly block everything
-        sleep(std::time::Duration::from_millis(350)).await;
+        // Wait 50ms so we dont constantly block everything
+        sleep(std::time::Duration::from_millis(50)).await;
     }
 }
 
