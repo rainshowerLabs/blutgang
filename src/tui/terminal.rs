@@ -27,14 +27,6 @@ pub fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>, Box<dyn Er
     Ok(Terminal::new(CrosstermBackend::new(stdout))?)
 }
 
-// pub fn restore_terminal(
-//     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-// ) -> Result<(), Box<dyn Error>> {
-//     disable_raw_mode()?;
-//     execute!(terminal.backend_mut())?;
-//     Ok(terminal.show_cursor()?)
-// }
-
 pub async fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     config: Settings,
