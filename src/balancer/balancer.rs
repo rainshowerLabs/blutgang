@@ -19,13 +19,14 @@ use std::{
     sync::{
         Arc,
         Mutex,
+        RwLock,
     },
     time::Instant,
 };
 
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    rpc_list_mtx: &Arc<Mutex<Vec<Rpc>>>,
+    rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     last_mtx: &Arc<Mutex<usize>>,
     cache: Arc<Db>,
 ) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, bool) {
@@ -60,7 +61,7 @@ async fn forward_body(
                 let now;
                 {
                     let mut last = last_mtx.lock().unwrap();
-                    let mut rpc_list = rpc_list_mtx.lock().unwrap();
+                    let mut rpc_list = rpc_list_rwlock.write().unwrap();
 
                     (rpc, now) = pick(&mut rpc_list);
                     *last = now;
@@ -103,7 +104,7 @@ async fn forward_body(
 
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
-    rpc_list_mtx: Arc<Mutex<Vec<Rpc>>>,
+    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
     ma_lenght: f64,
     cache: Arc<Db>,
@@ -112,14 +113,14 @@ pub async fn accept_request(
     let time = Instant::now();
     let response;
     let hit_cache;
-    (response, hit_cache) = forward_body(tx, &rpc_list_mtx, &last_mtx, cache).await;
+    (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
     let time = time.elapsed();
 
     #[cfg(not(feature = "tui"))]
     println!("Request time: {:?}", time);
     // Get lock for the rpc list and add it to the moving average
     if !hit_cache {
-        let mut rpc_list = rpc_list_mtx.lock().unwrap();
+        let mut rpc_list = rpc_list_rwlock.write().unwrap();
         let last = last_mtx.lock().unwrap();
 
         rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);

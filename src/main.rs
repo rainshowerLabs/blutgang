@@ -19,6 +19,7 @@ use crate::{
 use std::sync::{
     Arc,
     Mutex,
+    RwLock,
 };
 use tokio::net::TcpListener;
 
@@ -38,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Settings::new(create_match()).await;
 
     // Make the list a mutex
-    let rpc_list_mtx = Arc::new(Mutex::new(config.rpc_list.clone()));
+    let rpc_list_rwlock = Arc::new(RwLock::new(config.rpc_list.clone()));
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
@@ -80,8 +81,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
-        // Clone the shared `rpc_list_mtx` and `last_mtx` for use in the closure
-        let rpc_list_mtx_clone = Arc::clone(&rpc_list_mtx);
+        // Clone the shared `rpc_list_rwlock` and `last_mtx` for use in the closure
+        let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let last_mtx_clone = Arc::clone(&last_mtx);
         let cache_clone = Arc::clone(&cache);
 
@@ -95,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     service_fn(move |req| {
                         accept_request(
                             req,
-                            Arc::clone(&rpc_list_mtx_clone),
+                            Arc::clone(&rpc_list_rwlock_clone),
                             Arc::clone(&last_mtx_clone),
                             config.ma_lenght.clone(),
                             Arc::clone(&cache_clone),
