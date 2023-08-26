@@ -127,6 +127,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // format response to string and push it to the response list
                 let _resp = format!("{:?}", _resp);
                 response_list_clone.write().unwrap().push(_resp);
+                // Remove old values 
+                if response_list_clone.read().unwrap().len() > 8192 {
+                    response_list_clone.write().unwrap().remove(0);
+                }
+
             }
         });
     }
