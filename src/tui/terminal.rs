@@ -56,13 +56,12 @@ fn format_rpc_text(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Vec<Line<'static>> {
     let mut rpc_text = Vec::new();
     let rpc_list = rpc_list.read().unwrap();
     for rpc in rpc_list.iter() {
-        rpc_text.push(Line::from(format!(
-            "RPC URL: {}",
-            rpc.url
-        )));
+        rpc_text.push(Line::from(format!("RPC URL: {}", rpc.url)));
         rpc_text.push(Line::from(format!(
             "Latency (avg): {:.2} ms | Consecutive: {} | Is erroring: {}",
-            rpc.status.latency / 1_000_000.0, rpc.consecutive, rpc.status.is_erroring
+            rpc.status.latency / 1_000_000.0,
+            rpc.consecutive,
+            rpc.status.is_erroring
         )));
     }
     rpc_text
@@ -71,7 +70,7 @@ fn format_rpc_text(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Vec<Line<'static>> {
 fn format_response_list(response_list: &Arc<RwLock<Vec<String>>>) -> Vec<Line<'static>> {
     let mut response_text = Vec::new();
     let response_list = response_list.read().unwrap();
-    for response in response_list.iter() {
+    for response in response_list.iter().rev() {
         response_text.push(Line::from(format!("{}", response)));
     }
     response_text
