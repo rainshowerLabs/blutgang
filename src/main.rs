@@ -38,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
     let config = Settings::new(create_match()).await;
 
-    // Make the list a mutex
+    // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config.rpc_list.clone()));
 
     // Create/Open sled DB
@@ -65,17 +65,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn tui if the feature is enabled
     #[cfg(feature = "tui")]
-    {
+    let response_list = Arc::new(RwLock::new(Vec::new()));
+    #[cfg(feature = "tui")]
+    {        
         // We're passing the rpc list as an arc to the ui thread.
         // TODO: This is blocking writes. Make it potentially unsafe or add message passing???
         let rpc_list_tui = Arc::clone(&rpc_list_rwlock);
 
-        let response_list = Arc::new(RwLock::new(Vec::new()));
-
         let config_clone = config.clone();
+        let response_list_clone = Arc::clone(&response_list);
         tokio::task::spawn(async move {
             let mut terminal = setup_terminal().unwrap();
-            let _ = run_tui(&mut terminal, config_clone, &rpc_list_tui).await;
+            let _ = run_tui(&mut terminal, config_clone, &rpc_list_tui, &response_list_clone).await;
         });
     }
 
@@ -91,11 +92,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let last_mtx_clone = Arc::clone(&last_mtx);
         let cache_clone = Arc::clone(&cache);
+        #[cfg(feature = "tui")]
+        let response_list_clone = Arc::clone(&response_list);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             // Finally, we bind the incoming connection to our service
-            if let Err(err) = http1::Builder::new()
+            let _resp = http1::Builder::new()
                 // `service_fn` converts our function in a `Service`
                 .serve_connection(
                     io,
@@ -107,15 +110,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             config.ma_lenght.clone(),
                             Arc::clone(&cache_clone),
                         );
-                        #[cfg(feature = "tui")] {
-                            response_list.write().unwrap().push(response.unwrap().clone());
-                        }
                         response
                     }),
                 )
-                .await
+                .await;
+
+            // Send to response list if tui is enabled
+            #[cfg(feature = "tui")]
             {
-                println!("Error serving connection: {:?}", err);
+                // format response to string and push it to the response list
+                let _resp = format!("{:?}", _resp);
+                response_list_clone.write().unwrap().push(_resp);
             }
         });
     }
