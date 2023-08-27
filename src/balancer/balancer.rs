@@ -195,8 +195,10 @@ pub async fn accept_request(
     last_mtx: Arc<Mutex<usize>>,
     ma_lenght: f64,
     cache: Arc<Db>,
-    channel: Arc<RwLock<Vec<String>>>,
+    response_list: Arc<RwLock<Vec<String>>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Push request to the response_list
+    let tx_string = format!("{:?}", tx);
     // Send request and measure time
     let time = Instant::now();
     let response;
@@ -204,16 +206,18 @@ pub async fn accept_request(
     (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
     let time = time.elapsed();
 
-    // Convert response to string and send to channel
+    // Convert response to string and send to response_list
     //
     // If the Vec has 8192 elements, remove the oldest one
     let response_string = format!("{:?}", &response.as_ref().unwrap());
     {
-        let mut channel = channel.write().unwrap();
-        if channel.len() == 8192 {
-            channel.remove(0);
+        let mut response_list = response_list.write().unwrap();
+        if response_list.len() == 8190 {
+            response_list.remove(0);
         }
-        channel.push(response_string);
+        response_list.push(tx_string);
+        response_list.push(response_string);
+        response_list.push("".to_string());
     }
 
     // Get lock for the rpc list and add it to the moving average
