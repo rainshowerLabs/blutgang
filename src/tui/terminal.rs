@@ -36,14 +36,14 @@ pub async fn run_tui(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     config: Settings,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    response_list: &Arc<RwLock<Vec<String>>>,
+    channel: &Arc<RwLock<Vec<String>>>,
 ) -> Result<(), Box<dyn Error>> {
     // Redraw the full terminal window since we are not doing the new screen thing
     let _ = terminal.clear();
 
     // Draw the tui in a loop
     loop {
-        let _ = terminal.draw(|f| ui(f, &config, &rpc_list, &response_list))?;
+        let _ = terminal.draw(|f| ui(f, &config, &rpc_list, &channel))?;
         // Make sure the cursor is shown because we dont want to do raw mode
         terminal.show_cursor()?;
 
@@ -80,7 +80,7 @@ fn ui<B: Backend>(
     f: &mut Frame<B>,
     config: &Settings,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    response_list: &Arc<RwLock<Vec<String>>>,
+    channel: &Arc<RwLock<Vec<String>>>,
 ) {
     // Get address we're bound to from the config
     let address = config.address.to_string();
@@ -110,7 +110,7 @@ fn ui<B: Backend>(
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true });
     f.render_widget(block, chunks[0]);
-    let stats = Paragraph::new(format_response_list(response_list))
+    let stats = Paragraph::new(format_response_list(channel))
         .block(Block::default().title("Responses").borders(Borders::ALL))
         .alignment(Alignment::Left)
         .wrap(Wrap { trim: true });

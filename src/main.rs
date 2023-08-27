@@ -1,9 +1,11 @@
 mod balancer;
 mod config;
 mod rpc;
+
 #[cfg(feature = "tui")]
 mod tui;
-
+#[cfg(feature = "tui")]
+use std::sync::mpsc::sync_channel;
 #[cfg(feature = "tui")]
 use tui::terminal::*;
 
@@ -32,6 +34,60 @@ use hyper_util::rt::TokioIo;
 // jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
+
+// Define macro to select between tui and regular accept_request
+#[cfg(not(feature = "tui"))]
+macro_rules! accept {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr) => {
+        // Finally, we bind the incoming connection to our service
+        if let Err(err) = http1::Builder::new()
+            // `service_fn` converts our function in a `Service`
+            .serve_connection(
+                $io,
+                service_fn(move |req| {
+                    let response = accept_request(
+                        req,
+                        Arc::clone($rpc_list_rwlock),
+                        Arc::clone($last_mtx),
+                        $ma_lenght,
+                        Arc::clone($cache),
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("Error serving connection: {:?}", err);
+        }
+    };
+}
+
+#[cfg(feature = "tui")]
+macro_rules! accept {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr, $rx:expr) => {
+        // Finally, we bind the incoming connection to our service
+        if let Err(err) = http1::Builder::new()
+            // `service_fn` converts our function in a `Service`
+            .serve_connection(
+                $io,
+                service_fn(move |req| {
+                    let response = accept_request(
+                        req,
+                        Arc::clone($rpc_list_rwlock),
+                        Arc::clone($last_mtx),
+                        $ma_lenght,
+                        Arc::clone($cache),
+                        $rx,
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("Error serving connection: {:?}", err);
+        }
+    };
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a counter to keep track of the last rpc, max so it overflows
     let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
-    // Spawn tui if the feature is enabled
+    // Create channel for response passing and spawn tui if the feature is enabled
     #[cfg(feature = "tui")]
     let response_list = Arc::new(RwLock::new(Vec::new()));
     #[cfg(feature = "tui")]
@@ -74,15 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let config_clone = config.clone();
         let response_list_clone = Arc::clone(&response_list);
+
         tokio::task::spawn(async move {
             let mut terminal = setup_terminal().unwrap();
-            let _ = run_tui(
-                &mut terminal,
-                config_clone,
-                &rpc_list_tui,
-                &response_list_clone,
-            )
-            .await;
+            let _ = run_tui(&mut terminal, config_clone, &rpc_list_tui, &response_list_clone).await;
         });
     }
 
@@ -103,36 +154,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            // Finally, we bind the incoming connection to our service
-            let _resp = http1::Builder::new()
-                // `service_fn` converts our function in a `Service`
-                .serve_connection(
-                    io,
-                    service_fn(move |req| {
-                        let response = accept_request(
-                            req,
-                            Arc::clone(&rpc_list_rwlock_clone),
-                            Arc::clone(&last_mtx_clone),
-                            config.ma_lenght.clone(),
-                            Arc::clone(&cache_clone),
-                        );
-                        response
-                    }),
-                )
-                .await;
-
-            // Send to response list if tui is enabled
+            #[cfg(not(feature = "tui"))]
+            accept!(
+                io,
+                &rpc_list_rwlock_clone,
+                &last_mtx_clone,
+                config.ma_lenght,
+                &cache_clone
+            );
             #[cfg(feature = "tui")]
-            {
-                // format response to string and push it to the response list
-                let _resp = format!("{:?}", _resp);
-                response_list_clone.write().unwrap().push(_resp);
-                // Remove old values 
-                if response_list_clone.read().unwrap().len() > 8192 {
-                    response_list_clone.write().unwrap().remove(0);
-                }
-
-            }
+            accept!(
+                io,
+                &rpc_list_rwlock_clone,
+                &last_mtx_clone,
+                config.ma_lenght,
+                &cache_clone,
+                &response_list_clone
+            );
         });
     }
 }

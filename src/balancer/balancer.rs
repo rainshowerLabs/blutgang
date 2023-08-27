@@ -102,6 +102,7 @@ async fn forward_body(
     (Ok(res), cache_hit)
 }
 
+#[cfg(not(feature = "tui"))]
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
@@ -116,8 +117,48 @@ pub async fn accept_request(
     (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
     let time = time.elapsed();
 
-    #[cfg(not(feature = "tui"))]
     println!("Request time: {:?}", time);
+    // Get lock for the rpc list and add it to the moving average
+    if !hit_cache {
+        let mut rpc_list = rpc_list_rwlock.write().unwrap();
+        let last = last_mtx.lock().unwrap();
+
+        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);
+        #[cfg(not(feature = "tui"))]
+        println!("LA {}", rpc_list[*last].status.latency);
+    }
+
+    response
+}
+
+#[cfg(feature = "tui")]
+pub async fn accept_request(
+    tx: Request<hyper::body::Incoming>,
+    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    last_mtx: Arc<Mutex<usize>>,
+    ma_lenght: f64,
+    cache: Arc<Db>,
+    channel: &Arc<RwLock<Vec<String>>>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Send request and measure time
+    let time = Instant::now();
+    let response;
+    let hit_cache;
+    (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
+    let time = time.elapsed();
+
+    // Convert response to string and send to channel
+    //
+    // If the Vec has 8192 elements, remove the oldest one
+    let response_string = format!("{:?}", &response.as_ref().unwrap());
+    {
+        let mut channel = channel.write().unwrap();
+        if channel.len() == 8192 {
+            channel.remove(0);
+        }
+        channel.push(response_string);
+    }
+
     // Get lock for the rpc list and add it to the moving average
     if !hit_cache {
         let mut rpc_list = rpc_list_rwlock.write().unwrap();
