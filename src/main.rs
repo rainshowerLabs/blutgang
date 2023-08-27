@@ -133,7 +133,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         tokio::task::spawn(async move {
             let mut terminal = setup_terminal().unwrap();
-            let _ = run_tui(&mut terminal, config_clone, &rpc_list_tui, &response_list_clone).await;
+            let _ = run_tui(
+                &mut terminal,
+                config_clone,
+                &rpc_list_tui,
+                &response_list_clone,
+            )
+            .await;
         });
     }
 
