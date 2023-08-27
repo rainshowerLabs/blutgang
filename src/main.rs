@@ -119,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &last_mtx_clone,
                 config.ma_lenght,
                 &cache_clone,
-                response_list_clone
+                &response_list_clone
             );
         });
     }

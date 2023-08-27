@@ -68,7 +68,7 @@ macro_rules! accept {
                         Arc::clone($last_mtx),
                         $ma_lenght,
                         Arc::clone($cache),
-                        $rx,
+                        Arc::clone($rx),
                     );
                     response
                 }),
