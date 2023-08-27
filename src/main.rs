@@ -1,11 +1,9 @@
 mod balancer;
 mod config;
 mod rpc;
-
 #[cfg(feature = "tui")]
 mod tui;
-#[cfg(feature = "tui")]
-use std::sync::mpsc::sync_channel;
+
 #[cfg(feature = "tui")]
 use tui::terminal::*;
 
@@ -34,60 +32,6 @@ use hyper_util::rt::TokioIo;
 // jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
-// Define macro to select between tui and regular accept_request
-#[cfg(not(feature = "tui"))]
-macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr) => {
-        // Finally, we bind the incoming connection to our service
-        if let Err(err) = http1::Builder::new()
-            // `service_fn` converts our function in a `Service`
-            .serve_connection(
-                $io,
-                service_fn(move |req| {
-                    let response = accept_request(
-                        req,
-                        Arc::clone($rpc_list_rwlock),
-                        Arc::clone($last_mtx),
-                        $ma_lenght,
-                        Arc::clone($cache),
-                    );
-                    response
-                }),
-            )
-            .await
-        {
-            println!("Error serving connection: {:?}", err);
-        }
-    };
-}
-
-#[cfg(feature = "tui")]
-macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr, $rx:expr) => {
-        // Finally, we bind the incoming connection to our service
-        if let Err(err) = http1::Builder::new()
-            // `service_fn` converts our function in a `Service`
-            .serve_connection(
-                $io,
-                service_fn(move |req| {
-                    let response = accept_request(
-                        req,
-                        Arc::clone($rpc_list_rwlock),
-                        Arc::clone($last_mtx),
-                        $ma_lenght,
-                        Arc::clone($cache),
-                        $rx,
-                    );
-                    response
-                }),
-            )
-            .await
-        {
-            println!("Error serving connection: {:?}", err);
-        }
-    };
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -175,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &last_mtx_clone,
                 config.ma_lenght,
                 &cache_clone,
-                &response_list_clone
+                response_list_clone
             );
         });
     }

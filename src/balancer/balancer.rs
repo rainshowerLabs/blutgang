@@ -24,6 +24,63 @@ use std::{
     time::Instant,
 };
 
+// Macros for accepting requests
+#[cfg(not(feature = "tui"))]
+#[macro_export]
+macro_rules! accept {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr) => {
+        // Finally, we bind the incoming connection to our service
+        if let Err(err) = http1::Builder::new()
+            // `service_fn` converts our function in a `Service`
+            .serve_connection(
+                $io,
+                service_fn(move |req| {
+                    let response = accept_request(
+                        req,
+                        Arc::clone($rpc_list_rwlock),
+                        Arc::clone($last_mtx),
+                        $ma_lenght,
+                        Arc::clone($cache),
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("Error serving connection: {:?}", err);
+        }
+    };
+}
+
+#[cfg(feature = "tui")]
+#[macro_export]
+macro_rules! accept {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr, $rx:expr) => {
+        // Finally, we bind the incoming connection to our service
+        if let Err(err) = http1::Builder::new()
+            // `service_fn` converts our function in a `Service`
+            .serve_connection(
+                $io,
+                service_fn(move |req| {
+                    let response = accept_request(
+                        req,
+                        Arc::clone($rpc_list_rwlock),
+                        Arc::clone($last_mtx),
+                        $ma_lenght,
+                        Arc::clone($cache),
+                        $rx,
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("Error serving connection: {:?}", err);
+        }
+    };
+}
+
+
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
@@ -138,7 +195,7 @@ pub async fn accept_request(
     last_mtx: Arc<Mutex<usize>>,
     ma_lenght: f64,
     cache: Arc<Db>,
-    channel: &Arc<RwLock<Vec<String>>>,
+    channel: Arc<RwLock<Vec<String>>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
     let time = Instant::now();
