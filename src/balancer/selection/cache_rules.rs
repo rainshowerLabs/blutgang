@@ -9,8 +9,7 @@ macro_rules! blacklist {
         // These responses are either to get the current state of the chain at the head or errors.
         //
         // For max performance, blacklist keywords should be sorted in the order of how common they are.
-        
-        
+
         ["latest", "blockNumber", "error", "missing"]
     };
 }

@@ -80,7 +80,6 @@ macro_rules! accept {
     };
 }
 
-
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
