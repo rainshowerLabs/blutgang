@@ -1,6 +1,6 @@
 use crate::{
     balancer::format::incoming_to_value,
-    balancer::selection::selection::cache_method,
+    balancer::selection::cache_rules::cache_method,
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
