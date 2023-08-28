@@ -1,7 +1,7 @@
 use crate::{
     balancer::format::incoming_to_value,
-    balancer::selection::cache_method,
-    balancer::selection::pick,
+    balancer::selection::selection::cache_method,
+    balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
 
