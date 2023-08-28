@@ -16,6 +16,7 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
 // In order to have custom algos, you must add and enable the feature,
 // as well as modify the cfg of the default algo to accomodate your new feature.
 //
+
 #[cfg(all(
     feature = "selection-weighed-round-robin",
     not(feature = "selection-random")
