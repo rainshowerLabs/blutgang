@@ -1,6 +1,6 @@
 use crate::Rpc;
 
-// Generic entry point fn to selec the next rpc and return its position
+// Generic entry point fn to select the next rpc and return its position
 pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, usize) {
     // If len is 1, return the only element
     if list.len() == 1 {
