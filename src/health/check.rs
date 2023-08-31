@@ -14,7 +14,7 @@ pub async fn check(
 	let mut heads = Vec::<u64>::new();
 
 	// Iterate over all RPCs
-	for rpc in rpc_list.read().unwrap().iter_mut() {
+	for rpc in rpc_list.read().unwrap().iter() {
 		let start = Instant::now();
 		// Spawn new thread calling block_number for the rpc
 		let reported_head = task::spawn(async move {
@@ -23,7 +23,6 @@ pub async fn check(
 		});
 
 		// Check every 5ms if we got a response, if after 300ms no response is received mark it as delinquent
-		let mut delinquent = false;
 		loop {
 			if reported_head.is_finished() {
 				// This unwrapping fiendish
@@ -31,7 +30,7 @@ pub async fn check(
 				break;
 			}
 			if start.elapsed().as_millis() > 300 {
-				delinquent = true;
+				heads.push(0);
 				break;
 			}
 			task::yield_now().await;
