@@ -16,12 +16,18 @@ pub async fn check(
 	// Iterate over all RPCs
 	for (i, rpc) in rpc_list.read().unwrap().iter().enumerate() {
 		let start = Instant::now();
-		let reported_head = task::spawn(rpc.block_number());
+		// Spawn new thread calling block_number for the rpc
+		let reported_head = task::spawn(async move {
+			let head = rpc.block_number().await;
+			Ok(head)
+		});
+
 		// Check every 5ms if we got a response, if after 300ms no response is received mark it as delinquent
 		let mut delinquent = false;
 		loop {
 			if reported_head.await.is_ok() {
-				heads.push(reported_head.await.unwrap()?);
+				// This unwrapping fiendish
+				heads.push(reported_head.await.unwrap().unwrap().unwrap());
 				break;
 			}
 			if start.elapsed().as_millis() > 300 {
@@ -37,3 +43,4 @@ pub async fn check(
 	Ok(())
 
 }
+
