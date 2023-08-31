@@ -1,5 +1,5 @@
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{ Value, json };
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
@@ -52,6 +52,25 @@ impl Rpc {
         Ok(response.text().await?)
     }
 
+    // Request blocknumber and return its value
+    pub async fn block_number(&self) -> Result<u64, Box<dyn std::error::Error>> {
+        let request = json!({
+            "method": "eth_blockNumber".to_string(),
+            "params": serde_json::Value::Null,
+            "id": 1,
+            "jsonrpc": "2.0".to_string(),
+        });
+
+        let number = self
+            .send_request(request)
+            .await?;
+        let return_number = format_hex(&number);
+        let return_number = hex_to_decimal(return_number)?;
+
+        Ok(return_number)
+    }
+
+    // Update the latency of the last n calls
     pub fn update_latency(&mut self, latest: f64, ma_lenght: f64) {
         // If we have data >= to ma_lenght, remove the first one in line
         if self.status.latency_data.len() >= ma_lenght as usize {
@@ -63,4 +82,25 @@ impl Rpc {
         self.status.latency =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
     }
+}
+
+fn format_hex(hex: &str) -> &str {
+    // if `hex` is "\"0x8a165b\"" only return 0x8a165b
+    // if `hex` is "0x8a165b" only return 0x8a165b
+    if hex.starts_with("\"") {
+        &hex[1..hex.len() - 1]
+    } else {
+        hex
+    }
+}
+
+fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
+    // remove 0x prefix if it exists
+    let hex_string = if hex_string.starts_with("0x") {
+        &hex_string[2..]
+    } else {
+        hex_string
+    };
+
+    u64::from_str_radix(hex_string, 16)
 }
