@@ -1,3 +1,4 @@
+use crate::rpc::error::RpcError;
 use reqwest::Client;
 use serde_json::{ Value, json };
 
@@ -25,18 +26,6 @@ pub struct Rpc {
     pub max_consecutive: u32,
     pub consecutive: u32,
 }
-
-// Errors
-#[derive(Debug)]
-pub enum RpcError {
-    // Error returned when the RPC is not responding
-    Unresponsive,
-    // Error returned when the RPC is responding but the response is not valid JSON
-    InvalidResponse(String),
-}
-
-
-
 
 // implement new for rpc
 impl Rpc {
