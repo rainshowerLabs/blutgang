@@ -1,6 +1,7 @@
 mod balancer;
 mod config;
 mod rpc;
+mod health;
 #[cfg(feature = "tui")]
 mod tui;
 
@@ -40,6 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config.rpc_list.clone()));
+    let rpc_poverty_list =  Arc::new(RwLock::new(Vec::<String>::new()));
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
