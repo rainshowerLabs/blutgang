@@ -26,6 +26,18 @@ pub struct Rpc {
     pub consecutive: u32,
 }
 
+// Errors
+#[derive(Debug)]
+pub enum RpcError {
+    // Error returned when the RPC is not responding
+    Unresponsive,
+    // Error returned when the RPC is responding but the response is not valid JSON
+    InvalidResponse(String),
+}
+
+
+
+
 // implement new for rpc
 impl Rpc {
     pub fn new(url: String, max_consecutive: u32) -> Self {
@@ -39,21 +51,21 @@ impl Rpc {
     }
 
     // Generic fn to send rpc
-    pub async fn send_request(&self, tx: Value) -> Result<String, Box<dyn std::error::Error>> {
+    pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
         // #[cfg(debug_assertions)] {
         //     println!("Sending request: {}", request.clone());
         // }
 
         let response = match self.client.post(&self.url).json(&tx).send().await {
             Ok(response) => response,
-            Err(err) => return Err(err.to_string().into()),
+            Err(err) => return Err(crate::rpc::types::RpcError::InvalidResponse(err.to_string())),
         };
 
-        Ok(response.text().await?)
+        Ok(response.text().await.unwrap())
     }
 
     // Request blocknumber and return its value
-    pub async fn block_number(&self) -> Result<u64, Box<dyn std::error::Error>> {
+    pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_blockNumber".to_string(),
             "params": serde_json::Value::Null,
@@ -65,7 +77,7 @@ impl Rpc {
             .send_request(request)
             .await?;
         let return_number = format_hex(&number);
-        let return_number = hex_to_decimal(return_number)?;
+        let return_number = hex_to_decimal(return_number).unwrap();
 
         Ok(return_number)
     }
