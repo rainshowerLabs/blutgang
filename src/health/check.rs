@@ -16,8 +16,8 @@ pub async fn health_check (
 	poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	loop {
-		check(rpc_list, poverty_list).await?;
 		sleep(Duration::from_secs(1)).await;
+		check(rpc_list, poverty_list).await?;
 	}
 }
 
