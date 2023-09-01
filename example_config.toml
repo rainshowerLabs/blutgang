@@ -4,7 +4,7 @@
 [blutgang]
 do_clear = false # Clear the cache DB on startup
 address = "localhost:3000" # Where to bind blutgang to
-ma_lenght = 20 # Moving average lenght for the latency
+ma_length = 20 # Moving average length for the latency
 sort_on_startup = true # Sort RPCs by latency on startup. Recommended to leave on.
 health_check = true # Enable health checking
 acceptable_wait_time = 300 # Acceptable time to wait for a response in ms

@@ -77,9 +77,9 @@ impl Rpc {
     }
 
     // Update the latency of the last n calls
-    pub fn update_latency(&mut self, latest: f64, ma_lenght: f64) {
-        // If we have data >= to ma_lenght, remove the first one in line
-        if self.status.latency_data.len() >= ma_lenght as usize {
+    pub fn update_latency(&mut self, latest: f64, ma_length: f64) {
+        // If we have data >= to ma_length, remove the first one in line
+        if self.status.latency_data.len() >= ma_length as usize {
             self.status.latency_data.remove(0);
         }
 
