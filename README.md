@@ -15,7 +15,7 @@ Blutgang is designed to be used in front of a cluster of Ethereum RPC nodes, dis
 
 ### Local usage
 
-If you are a developer or a power user, you can use blutgang as an intermediary between you and your RPC endpoint to cache historical querries. This speeds up usage dramatically, as well as increasing privacy.
+If you are a developer or a power user, you can use blutgang as an intermediary between you and your RPC endpoint to cache historical queries. This speeds up usage dramatically, as well as increasing privacy.
 
 ## How to run 
 
@@ -23,7 +23,7 @@ For detailed instructions on how to use blutgang, please read the [wiki]().
 
 ### Tldr
 
-Clone the repository, and fint the `example_config.toml` file. Edit it to your liking, and run `cargo run --release -- -c example_config.toml`.   
+Clone the repository, and find the `example_config.toml` file. Edit it to your liking, and run `cargo run --release -- -c example_config.toml`.   
 
 If you want to use command line arguments instead, please run `cargo run --release -- --help` for more info. Keep in mind that the recommended way to run blutgang is via a config file.
 
