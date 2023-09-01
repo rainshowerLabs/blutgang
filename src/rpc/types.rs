@@ -1,6 +1,9 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
-use serde_json::{ Value, json };
+use serde_json::{
+    json,
+    Value,
+};
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
@@ -47,7 +50,11 @@ impl Rpc {
 
         let response = match self.client.post(&self.url).json(&tx).send().await {
             Ok(response) => response,
-            Err(err) => return Err(crate::rpc::types::RpcError::InvalidResponse(err.to_string())),
+            Err(err) => {
+                return Err(crate::rpc::types::RpcError::InvalidResponse(
+                    err.to_string(),
+                ))
+            }
         };
 
         Ok(response.text().await.unwrap())
@@ -62,9 +69,7 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let number = self
-            .send_request(request)
-            .await?;
+        let number = self.send_request(request).await?;
         let return_number = format_hex(&number);
         let return_number = hex_to_decimal(return_number).unwrap();
 

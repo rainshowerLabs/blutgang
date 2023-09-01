@@ -1,7 +1,7 @@
 mod balancer;
 mod config;
-mod rpc;
 mod health;
+mod rpc;
 #[cfg(feature = "tui")]
 mod tui;
 
@@ -14,6 +14,7 @@ use crate::{
         cli_args::create_match,
         types::Settings,
     },
+    health::check::health_check,
     rpc::types::Rpc,
 };
 
@@ -41,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config.rpc_list.clone()));
-    let rpc_poverty_list =  Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
@@ -88,6 +89,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await;
         });
     }
+
+    // Spawn a thread for the health check
+    let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+    tokio::task::spawn(async move {
+        health_check(&mut rpc_list_health, &mut rpc_poverty_list).await;
+    });
 
     // We start a loop to continuously accept incoming connections
     loop {
