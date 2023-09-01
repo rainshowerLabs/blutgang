@@ -34,7 +34,7 @@ async fn head_check(
     // Iterate over all RPCs
     for rpc in rpc_list_guard.iter() {
         let start = Instant::now();
-        // Clone rpc_list for use inside the async block, heap go brrr
+        // more lifetime fuckery, heap go brrr
         let rpc_clone = Arc::new(rpc.clone());
 
         // Spawn new task calling block_number for the rpc
