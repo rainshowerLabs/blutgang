@@ -15,6 +15,10 @@ pub async fn check(
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
 
+    // Check if any rpc nodes made it out
+   	// Its ok if we call them twice because some might have been accidentally put here
+   	escape_poverty(rpc_list, poverty_list, agreed_head).await?;
+
     Ok(())
 }
 
@@ -90,7 +94,7 @@ async fn escape_poverty(
 ) -> Result<(), Box<dyn std::error::Error>> {
 	// Do a head check over the current poverty list to see if any nodes are back to normal
 	let poverty_heads = head_check(poverty_list, 150).await?;
-	// Check if any nodes made it 🗣️🔥🔥🔥🔥
+	// Check if any nodes made it 🗣️🔥🔥🔥
 	let mut poverty_list_guard = poverty_list.write().unwrap();
 	for i in 0..poverty_list_guard.len() {
 		if poverty_heads[i] >= agreed_head {
