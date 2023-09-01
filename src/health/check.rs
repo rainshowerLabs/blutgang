@@ -4,9 +4,25 @@ use std::sync::{
     RwLock,
 };
 use std::time::Instant;
-use tokio::task;
 
-pub async fn health_check(
+use tokio::{
+	task,
+	time::{ sleep, Duration },
+};
+
+// call check n a loop
+pub async fn health_check (
+	rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
+	poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+	loop {
+		check(rpc_list, poverty_list).await?;
+		sleep(Duration::from_secs(1)).await;
+	}
+}
+
+
+async fn check(
     rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
