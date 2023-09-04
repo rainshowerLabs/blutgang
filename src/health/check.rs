@@ -1,5 +1,6 @@
 use crate::Rpc;
 
+use std::print;
 use std::sync::{
     Arc,
     RwLock,
@@ -32,7 +33,7 @@ async fn check(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	//println!("hello from check");
+	print!("Checking RPC health...");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -44,6 +45,7 @@ async fn check(
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
     escape_poverty(&rpc_list, poverty_list, agreed_head).await?;
+    println!(" OK!");
 
     Ok(())
 }
