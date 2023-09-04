@@ -19,9 +19,10 @@ pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
+    health_check_ttl: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
-        sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, &ttl).await?;
     }
 }

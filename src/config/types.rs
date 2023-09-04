@@ -15,6 +15,7 @@ pub struct Settings {
     pub ma_lenght: f64,
     pub health_check: bool,
     pub ttl: u128,
+    pub health_check_ttl: u64,
     pub sled_config: Config,
 }
 
@@ -72,6 +73,7 @@ impl Settings {
 
         let health_check = blutgang_table.get("health_check").unwrap().as_bool().unwrap();
         let ttl = blutgang_table.get("ttl").unwrap().as_integer().unwrap() as u128;
+        let health_check_ttl = blutgang_table.get("health_check_ttl").unwrap().as_integer().unwrap() as u64;
 
         // Parse `sled` table
         let sled_table = parsed_toml.get("sled").unwrap().as_table().unwrap();
@@ -138,6 +140,7 @@ impl Settings {
             ma_lenght: ma_lenght,
             health_check: health_check,
             ttl: ttl,
+            health_check_ttl: health_check_ttl,
             sled_config: sled_config,
         }
     }
@@ -216,6 +219,7 @@ impl Settings {
             ma_lenght: ma_lenght,
             health_check: true,
             ttl: 300,
+            health_check_ttl: 2000,
             sled_config: sled_config,
         }
     }
