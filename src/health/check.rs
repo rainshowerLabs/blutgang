@@ -17,21 +17,23 @@ use tokio::{
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
+    ttl: u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_secs(1)).await;
-        check(&rpc_list, &poverty_list).await?;
+        check(&rpc_list, &poverty_list, &ttl).await?;
     }
 }
 
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
-    let heads = head_check(&rpc_list, 300).await?;
+    let heads = head_check(&rpc_list, *ttl).await?;
 
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;

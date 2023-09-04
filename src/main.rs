@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     tokio::task::spawn(async move {
-        let _ = health_check(rpc_list_health, rpc_poverty_list).await;
+        let _ = health_check(rpc_list_health, rpc_poverty_list, 300).await;
     });
 
     // We start a loop to continuously accept incoming connections
