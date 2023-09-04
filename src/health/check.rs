@@ -1,4 +1,5 @@
 use crate::Rpc;
+use std::println;
 use std::sync::{
     Arc,
     RwLock,
@@ -30,6 +31,7 @@ async fn check(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
+	println!("hello from check");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -96,20 +98,27 @@ fn make_poverty(
 ) -> Result<u64, Box<dyn std::error::Error>> {
     // Average `heads` and round it up so we get what the majority of nodes are reporting
     // We are being optimistic and assuming that the majority is correct
-    let average_head = heads.iter().sum::<u64>() / heads.len() as u64 + 1;
+    let average_head = heads.iter().sum::<u64>() / heads.len() as u64;
 
     // Iterate over `rpc_list` and move those falling behind to the `poverty_list`
     // We also set their is_erroring status to true and their last erroring to the
     // current unix timestamps in seconds
     let mut rpc_list_guard = rpc_list.write().unwrap();
     let mut poverty_list_guard = poverty_list.write().unwrap();
+    let mut rpc_list_positions: Vec<usize> = Vec::new();
+
     for i in 0..rpc_list_guard.len() {
         if heads[i] < average_head {
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
-            poverty_list_guard.push(rpc_list_guard.remove(i));
+            rpc_list_positions.push(i);
+            poverty_list_guard.push(rpc_list_guard[i].clone());
         }
     }
+
+    for i in rpc_list_positions.iter().rev() {
+		rpc_list_guard.remove(*i);
+	}
 
     Ok(average_head)
 }
