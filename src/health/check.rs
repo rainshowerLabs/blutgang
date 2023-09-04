@@ -32,7 +32,7 @@ async fn check(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	println!("hello from check");
+	//println!("hello from check");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
