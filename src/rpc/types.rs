@@ -18,7 +18,7 @@ pub struct Status {
     pub latency_data: Vec<f64>,
 
     // ???
-    pub throughput: f64,
+    // pub throughput: f64,
 }
 
 unsafe impl Sync for Status {}
