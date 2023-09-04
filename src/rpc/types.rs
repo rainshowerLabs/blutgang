@@ -16,7 +16,6 @@ pub struct Status {
     // The latency is a moving average of the last n calls
     pub latency: f64,
     pub latency_data: Vec<f64>,
-
     // ???
     // pub throughput: f64,
 }

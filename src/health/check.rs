@@ -6,21 +6,23 @@ use std::sync::{
 use std::time::Instant;
 
 use tokio::{
-	task,
-	time::{ sleep, Duration },
+    task,
+    time::{
+        sleep,
+        Duration,
+    },
 };
 
 // call check n a loop
-pub async fn health_check (
-	rpc_list: Arc<RwLock<Vec<Rpc>>>,
-	poverty_list: Arc<RwLock<Vec<Rpc>>>,
+pub async fn health_check(
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-	loop {
-		sleep(Duration::from_secs(1)).await;
-		check(&rpc_list, &poverty_list).await?;
-	}
+    loop {
+        sleep(Duration::from_secs(1)).await;
+        check(&rpc_list, &poverty_list).await?;
+    }
 }
-
 
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -51,8 +53,8 @@ async fn head_check(
     // TODO: there is no real need to clone this, deal with sync in a more sane way
     let list;
     {
-		let rpc_list_guard = rpc_list.read().unwrap();
-		list = rpc_list_guard.clone();
+        let rpc_list_guard = rpc_list.read().unwrap();
+        list = rpc_list_guard.clone();
     }
 
     // Iterate over all RPCs
@@ -79,7 +81,6 @@ async fn head_check(
             }
         }
     }
-
 
     Ok(heads)
 }
