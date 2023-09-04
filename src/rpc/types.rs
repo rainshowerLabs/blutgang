@@ -13,7 +13,7 @@ pub struct Status {
     pub is_erroring: bool,
     pub last_error: u64,
 
-    // The latency is a moving average of the last 200 calls
+    // The latency is a moving average of the last n calls
     pub latency: f64,
     pub latency_data: Vec<f64>,
 
