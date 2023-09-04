@@ -2,6 +2,7 @@
 use std::error::Error;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum RpcError {
     Unresponsive,
     InvalidResponse(String),

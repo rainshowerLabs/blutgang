@@ -12,31 +12,31 @@ use tokio::{
 
 // call check n a loop
 pub async fn health_check (
-	rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
-	poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
+	rpc_list: Arc<RwLock<Vec<Rpc>>>,
+	poverty_list: Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
 	loop {
 		sleep(Duration::from_secs(1)).await;
-		check(rpc_list, poverty_list).await?;
+		check(&rpc_list, &poverty_list).await?;
 	}
 }
 
 
 async fn check(
-    rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
-    poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
-    let heads = head_check(rpc_list, 300).await?;
+    let heads = head_check(&rpc_list, 300).await?;
 
     // Remove RPCs that are falling behind
-    let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
+    let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
-    escape_poverty(rpc_list, poverty_list, agreed_head).await?;
+    escape_poverty(&rpc_list, poverty_list, agreed_head).await?;
 
     Ok(())
 }
@@ -48,13 +48,19 @@ async fn head_check(
 ) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
     let mut heads = Vec::<u64>::new();
 
-    // lifetime fuckery
-    let rpc_list_guard = rpc_list.read().unwrap();
+    // TODO: there is no real need to clone this, deal with sync in a more sane way
+    let list;
+    {
+		let rpc_list_guard = rpc_list.read().unwrap();
+		list = rpc_list_guard.clone();
+    }
+
     // Iterate over all RPCs
-    for rpc in rpc_list_guard.iter() {
-        let start = Instant::now();
+    for rpc in list.iter() {
         // more lifetime fuckery, heap go brrr
         let rpc_clone = Arc::new(rpc.clone());
+
+        let start = Instant::now();
 
         // Spawn new task calling block_number for the rpc
         let reported_head = task::spawn(async move { rpc_clone.block_number().await });
@@ -73,14 +79,16 @@ async fn head_check(
             }
         }
     }
+
+
     Ok(heads)
 }
 
 // Add unresponsive/erroring RPCs to the poverty list
 // TODO: Doesn't take into account RPCs getting updated in the meantime
 fn make_poverty(
-    rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
-    poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     heads: Vec<u64>,
 ) -> Result<u64, Box<dyn std::error::Error>> {
     // Average `heads` and round it up so we get what the majority of nodes are reporting
@@ -105,12 +113,12 @@ fn make_poverty(
 
 // Go over the `poverty_list` to see if any nodes are back to normal
 async fn escape_poverty(
-    rpc_list: &mut Arc<RwLock<Vec<Rpc>>>,
-    poverty_list: &mut Arc<RwLock<Vec<Rpc>>>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     agreed_head: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Do a head check over the current poverty list to see if any nodes are back to normal
-    let poverty_heads = head_check(poverty_list, 150).await?;
+    let poverty_heads = head_check(&poverty_list, 150).await?;
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     for i in 0..poverty_list_guard.len() {
