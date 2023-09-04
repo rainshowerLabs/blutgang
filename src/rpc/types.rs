@@ -21,6 +21,8 @@ pub struct Status {
     pub throughput: f64,
 }
 
+unsafe impl Sync for Status {}
+
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub url: String,    // url of the rpc we're forwarding requests to.
@@ -29,6 +31,8 @@ pub struct Rpc {
     pub max_consecutive: u32,
     pub consecutive: u32,
 }
+
+unsafe impl Sync for Rpc {}
 
 // implement new for rpc
 impl Rpc {
