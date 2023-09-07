@@ -34,7 +34,7 @@ async fn check(
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "tui"))]
-	print!("Checking RPC health...");
+    print!("Checking RPC health...");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -122,8 +122,8 @@ fn make_poverty(
     }
 
     for i in rpc_list_positions.iter().rev() {
-		rpc_list_guard.remove(*i);
-	}
+        rpc_list_guard.remove(*i);
+    }
 
     Ok(average_head)
 }
