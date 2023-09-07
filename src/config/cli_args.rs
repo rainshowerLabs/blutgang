@@ -77,7 +77,7 @@ pub fn create_match() -> clap::Command {
             .default_value("300")
             .help("Time for the RPC to respond before we remove it from the active queue"))
         .arg(Arg::new("health_check_ttl")
-            .long("ttl")
+            .long("health_check_ttl")
             .num_args(1..)
             .default_value("2000")
             .help("How often to perform the health check"));
