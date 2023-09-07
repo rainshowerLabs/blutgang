@@ -57,23 +57,18 @@ async fn head_check(
     ttl: u128,
 ) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
     let mut heads = Vec::<u64>::new();
-
-    // TODO: there is no real need to clone this, deal with sync in a more sane way
-    let list;
-    {
-        let rpc_list_guard = rpc_list.read().unwrap();
-        list = rpc_list_guard.clone();
-    }
+    let len = rpc_list.read().unwrap().len();
 
     // Iterate over all RPCs
-    for rpc in list.iter() {
-        // more lifetime fuckery, heap go brrr
-        let rpc_clone = Arc::new(rpc.clone());
+    for i in 0..len {
+        let rpc_clone = rpc_list.read().unwrap()[i].clone();
 
         let start = Instant::now();
 
         // Spawn new task calling block_number for the rpc
-        let reported_head = task::spawn(async move { rpc_clone.block_number().await });
+        let reported_head = task::spawn(async move {
+            rpc_clone.block_number().await 
+        });
 
         // Check every 5ms if we got a response, if after ttl ms no response is received mark it as delinquent
         loop {
