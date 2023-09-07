@@ -5,9 +5,6 @@ mod rpc;
 #[cfg(feature = "tui")]
 mod tui;
 
-#[cfg(feature = "tui")]
-use tui::terminal::*;
-
 use crate::{
     balancer::balancer::accept_request,
     config::{
@@ -70,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response_list = Arc::new(RwLock::new(Vec::new()));
     #[cfg(feature = "tui")]
     {
+        use tui::terminal::*;
         // We're passing the rpc list as an arc to the ui thread.
         // TODO: This is blocking writes. Make it potentially unsafe or add message passing???
         let rpc_list_tui = Arc::clone(&rpc_list_rwlock);

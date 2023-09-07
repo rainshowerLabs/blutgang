@@ -1,6 +1,5 @@
 use crate::Rpc;
 
-use std::print;
 use std::sync::{
     Arc,
     RwLock,
