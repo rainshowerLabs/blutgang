@@ -66,6 +66,7 @@ async fn head_check(
         let start = Instant::now();
 
         // Spawn new task calling block_number for the rpc
+        // TODO: THIS DOESNT WORK
         let reported_head = task::spawn(async move {
             let a = rpc_clone.block_number().await;
             println!("RPC responded with {:?}", a);
