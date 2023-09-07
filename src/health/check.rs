@@ -66,17 +66,23 @@ async fn head_check(
         let start = Instant::now();
 
         // Spawn new task calling block_number for the rpc
-        let reported_head = task::spawn(async move { rpc_clone.block_number().await });
+        let reported_head = task::spawn(async move {
+            let a = rpc_clone.block_number().await;
+            println!("RPC responded with {:?}", a);
+            a
+        });
 
         // Keep checking if we got a response, if after ttl ms no response is received mark it as delinquent
         loop {
             if reported_head.is_finished() {
                 // This unwrapping is fine
                 heads.push(reported_head.await.unwrap().unwrap());
+                println!("RPC {} reported head: {}", i, heads[i]);
                 break;
             }
             if start.elapsed().as_millis() > ttl {
-                reported_head.abort();
+                //reported_head.abort();
+                println!("RPC {} is delinquent", i);
                 heads.push(0);
                 break;
             }
