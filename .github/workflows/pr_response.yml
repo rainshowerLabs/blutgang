@@ -1,0 +1,24 @@
+name: PR Response
+
+on:
+  pull_request:
+    types:
+      - opened
+
+jobs:
+  pr_response:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment on PR
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = "Thank you for opening this pull request! Before we're able to merge this PR, please confirm that you allow Rainshower Labs to dual license your code under AGPLv3, as well as either BSD-3-Clause, or MIT. For more info, please read the readme or contact us directly.";
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

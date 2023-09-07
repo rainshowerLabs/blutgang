@@ -47,7 +47,7 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 
 ## Notes on the license
 
-Blutgang is libre software licensed under the AGPL-3.0 license. In practice, this means that if you use blutgang for non-personal use, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
+Blutgang is libre software licensed under the AGPL-3.0 license. If you are using blutgang in a commercial enviroment, and do not get a commercial license from us, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
 
 ### Commercial use and support
 
