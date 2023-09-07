@@ -30,7 +30,7 @@ A clear and concise description of what you expected to happen.
  - DB mode: [e.g. HighThroughput]
  - DB compression: [e.g. no]
  - Cache capacity: [e.g. 1000000000]
- - MA lenght: [e.g. 20]
+ - MA length: [e.g. 20]
  - RPCs used: [e.g. local/geth, alchemy, llamanodes...]
 
 **Additional context**

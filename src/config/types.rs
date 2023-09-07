@@ -12,7 +12,7 @@ pub struct Settings {
     pub rpc_list: Vec<Rpc>,
     pub do_clear: bool,
     pub address: SocketAddr,
-    pub ma_lenght: f64,
+    pub ma_length: f64,
     pub health_check: bool,
     pub ttl: u128,
     pub health_check_ttl: u64,
@@ -65,8 +65,8 @@ impl Settings {
         };
         let address = address.parse::<SocketAddr>().unwrap();
 
-        let ma_lenght = blutgang_table
-            .get("ma_lenght")
+        let ma_length = blutgang_table
+            .get("ma_length")
             .unwrap()
             .as_integer()
             .unwrap() as f64;
@@ -130,14 +130,14 @@ impl Settings {
 
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            rpc_list = sort_by_latency(rpc_list, ma_lenght).await;
+            rpc_list = sort_by_latency(rpc_list, ma_length).await;
         }
 
         Settings {
             rpc_list,
             do_clear: do_clear,
             address: address,
-            ma_lenght: ma_lenght,
+            ma_length: ma_length,
             health_check: health_check,
             ttl: ttl,
             health_check_ttl: health_check_ttl,
@@ -195,10 +195,10 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid flush_every_ms");
 
-        let ma_lenght = matches
-            .get_one::<String>("ma_lenght")
-            .expect("Invalid ma_lenght");
-        let ma_lenght = ma_lenght.parse::<f64>().expect("Invalid ma_lenght");
+        let ma_length = matches
+            .get_one::<String>("ma_length")
+            .expect("Invalid ma_length");
+        let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
 
         let clear = matches.get_occurrences::<String>("clear").is_some();
         let compression = matches.get_occurrences::<String>("compression").is_some();
@@ -216,7 +216,7 @@ impl Settings {
             rpc_list,
             do_clear: clear,
             address: address,
-            ma_lenght: ma_lenght,
+            ma_length: ma_length,
             health_check: true,
             ttl: 300,
             health_check_ttl: 2000,

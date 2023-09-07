@@ -119,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io,
                 &rpc_list_rwlock_clone,
                 &last_mtx_clone,
-                config.ma_lenght,
+                config.ma_length,
                 &cache_clone
             );
             #[cfg(feature = "tui")]
@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io,
                 &rpc_list_rwlock_clone,
                 &last_mtx_clone,
-                config.ma_lenght,
+                config.ma_length,
                 &cache_clone,
                 &response_list_clone
             );
