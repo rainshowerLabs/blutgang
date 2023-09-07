@@ -74,6 +74,7 @@ async fn head_check(
 
         // Keep checking if we got a response, if after ttl ms no response is received mark it as delinquent
         loop {
+            println!("{}", reported_head.is_finished());
             if reported_head.is_finished() {
                 // This unwrapping is fine
                 heads.push(reported_head.await.unwrap().unwrap());
