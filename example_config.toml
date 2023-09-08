@@ -8,7 +8,7 @@ ma_lenght = 20 # Moving average lenght for the latency
 sort_on_startup = true # Sort RPCs by latency on startup. Recommended to leave on.
 health_check = true # Enable health checking
 ttl = 600 # Acceptable time to wait for a response in ms
-health_check_ttl = 2000 # Time between health checks in ms
+health_check_ttl = 30000 # Time between health checks in ms
 
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
