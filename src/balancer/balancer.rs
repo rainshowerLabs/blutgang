@@ -133,7 +133,7 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if cache_method(&tx_string) {
+                if cache_method(&tx_string) || cache_method(&rx) {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 
