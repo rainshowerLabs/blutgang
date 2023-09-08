@@ -34,7 +34,7 @@ async fn check(
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "tui"))]
-    print!("Checking RPC health...");
+    println!("Checking RPC health...");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -47,7 +47,7 @@ async fn check(
     // Its ok if we call them twice because some might have been accidentally put here
     escape_poverty(&rpc_list, poverty_list, agreed_head).await?;
     #[cfg(not(feature = "tui"))]
-    println!(" OK!");
+    println!("OK!");
 
     Ok(())
 }
