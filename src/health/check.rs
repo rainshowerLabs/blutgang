@@ -1,3 +1,4 @@
+use crate::rpc::error::RpcError;
 use crate::Rpc;
 
 use std::println;
@@ -8,7 +9,7 @@ use std::sync::{
 };
 
 use tokio::{
-    task,
+    select,
     time::{
         sleep,
         timeout,
@@ -58,48 +59,48 @@ async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
 ) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
-    let mut heads = Vec::<u64>::new();
     let len = rpc_list.read().unwrap().len();
+    let mut heads = Vec::new();
+    let mut threads = Vec::new();
+
+    // Create a vector to store the futures of all RPC requests
+    let mut rpc_futures = Vec::new();
 
     // Iterate over all RPCs
     for i in 0..len {
         let rpc_clone = rpc_list.read().unwrap()[i].clone();
 
-        // Spawn new task calling block_number for the rpc
-        // TODO: THIS DOESNT WORK.
-        let reported_head = task::spawn(async move {
-            let a = rpc_clone.block_number().await;
-            println!("RPC {} responded with {}", i, a.as_ref().unwrap());
+        // Spawn a future for each RPC
+        let rpc_future = async move {
+            let a = rpc_clone.block_number();
+            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
 
-            a
-        });
-
-        // TODO: This timeout just hangs for no reason????? Why??? 
-        let result = timeout(Duration::from_millis(ttl.try_into()?), reported_head).await?;
-        println!("GET ME OUT OF HERE {:?}", result);
-
-        match result {
-            Ok(Ok(response)) => {
-                // The task completed within the TTL
-                println!("RPC {} responded with {}", i, response);
-                heads.push(response);
+            match result {
+                Ok(response) => response.unwrap_or(0), // Handle timeout as 0
+                Err(_) => 0, // Handle timeout as 0
             }
-            Ok(Err(_)) => {
-                // The task was canceled due to TTL expiration
-                println!("RPC {} is delinquent", i);
-                heads.push(0);
-            }
-            Err(_) => {
-                // An error occurred while waiting for the task
-                // Handle the error as needed
-                return Err("Error while waiting for task".into());
+        };
+
+        rpc_futures.push(rpc_future);
+    }
+
+    // Wait for all RPC futures concurrently and collect their results
+    for rpc_future in rpc_futures {
+        let result = tokio::spawn(rpc_future);
+        threads.push(result);
+    }
+
+    // Collect the results using tokio::select!
+    for _ in 0..len {
+        select! {
+            result = threads.pop().unwrap() => {
+                heads.push(result.unwrap());
             }
         }
     }
 
     Ok(heads)
 }
-
 // Add unresponsive/erroring RPCs to the poverty list
 // TODO: Doesn't take into account RPCs getting updated in the meantime
 fn make_poverty(
