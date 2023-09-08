@@ -53,6 +53,7 @@ async fn check(
 }
 
 // Check what heads are reported by each RPC
+// TODO: check multiple RPCs at teh same time
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
@@ -65,7 +66,7 @@ async fn head_check(
         let rpc_clone = rpc_list.read().unwrap()[i].clone();
 
         // Spawn new task calling block_number for the rpc
-        // TODO: THIS DOESNT WORK
+        // TODO: THIS DOESNT WORK.
         let reported_head = task::spawn(async move {
             let a = rpc_clone.block_number().await;
             println!("RPC {} responded with {}", i, a.as_ref().unwrap());
@@ -73,6 +74,7 @@ async fn head_check(
             a
         });
 
+        // TODO: This timeout just hangs for no reason????? Why??? 
         let result = timeout(Duration::from_millis(ttl.try_into()?), reported_head).await?;
         println!("GET ME OUT OF HERE {:?}", result);
 
