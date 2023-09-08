@@ -95,7 +95,7 @@ async fn forward_body(
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: This is lazy and suboptimal
     let rax;
-    let tx_string = format!("{}", tx);
+    let tx_string = tx.to_string();
 
     let tx_hash = hash(tx_string.as_bytes());
 
