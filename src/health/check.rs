@@ -1,12 +1,11 @@
-use crate::rpc::error::RpcError;
 use crate::Rpc;
 
 use std::println;
-use std::time::Duration;
 use std::sync::{
     Arc,
     RwLock,
 };
+use std::time::Duration;
 
 use tokio::{
     select,
@@ -72,12 +71,14 @@ async fn head_check(
 
         // Spawn a future for each RPC
         let rpc_future = async move {
+            println!("Hi!");
             let a = rpc_clone.block_number();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
+            println!("hello!");
 
             match result {
                 Ok(response) => response.unwrap_or(0), // Handle timeout as 0
-                Err(_) => 0, // Handle timeout as 0
+                Err(_) => 0,                           // Handle timeout as 0
             }
         };
 
@@ -98,6 +99,7 @@ async fn head_check(
             }
         }
     }
+    println!("Heads: {:?}", heads);
 
     Ok(heads)
 }
