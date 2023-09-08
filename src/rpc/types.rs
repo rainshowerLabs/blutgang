@@ -94,16 +94,21 @@ impl Rpc {
 }
 
 fn format_hex(hex: &str) -> &str {
-    // if `hex` is "\"0x8a165b\"" only return 0x8a165b
-    // if `hex` is "0x8a165b" only return 0x8a165b
-    if hex.starts_with("\"") {
-        &hex[1..hex.len() - 1]
-    } else {
-        hex
-    }
+    // We're expecting a JSON RPC response similar to: "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x113f756\"}"
+    //
+    // We only have to extract the hex number and return it. We can start reading from the 0 char
+    // and stop reading at the last char - 4.
+    println!("hex: {}", hex);
+    let a = &hex[34..hex.len() - 2];
+    println!("a: {}", a);
+    a
 }
 
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
+    println!("hex_string: {}", hex_string);
+    // TODO: theres a bizzare edge case where the last " isnt removed in the previou step so check for that here and remove it if necessary
+    let hex_string: &str = &hex_string.replace("\"", "");
+
     // remove 0x prefix if it exists
     let hex_string = if hex_string.starts_with("0x") {
         &hex_string[2..]

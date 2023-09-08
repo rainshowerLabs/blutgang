@@ -15,8 +15,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const comment = "Thank you for opening this pull request! Before we're able to merge this PR, we need to confirm that you allow Rainshower Labs to dual license your code under AGPLv3, as well as either BSD-3-Clause, or MIT. To confirm, please respond with "I confirm". For more info, please read the readme or contact us directly.";
-            github.rest.issues.createComment({
+            const comment = "Thank you for opening this pull request! Before we're able to merge this PR, please confirm that you allow Rainshower Labs to dual license your code under AGPLv3, as well as either BSD-3-Clause, or MIT. For more info, please read the readme or contact us directly.";
+            github.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,

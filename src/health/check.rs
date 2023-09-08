@@ -1,6 +1,5 @@
 use crate::Rpc;
 
-use std::print;
 use std::sync::{
     Arc,
     RwLock,
@@ -34,7 +33,7 @@ async fn check(
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "tui"))]
-	print!("Checking RPC health...");
+    print!("Checking RPC health...");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -58,36 +57,34 @@ async fn head_check(
     ttl: u128,
 ) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
     let mut heads = Vec::<u64>::new();
-
-    // TODO: there is no real need to clone this, deal with sync in a more sane way
-    let list;
-    {
-        let rpc_list_guard = rpc_list.read().unwrap();
-        list = rpc_list_guard.clone();
-    }
+    let len = rpc_list.read().unwrap().len();
 
     // Iterate over all RPCs
-    for rpc in list.iter() {
-        // more lifetime fuckery, heap go brrr
-        let rpc_clone = Arc::new(rpc.clone());
+    for i in 0..len {
+        let rpc_clone = rpc_list.read().unwrap()[i].clone();
 
         let start = Instant::now();
 
         // Spawn new task calling block_number for the rpc
-
         // TODO: THIS DOESNT WORK
+        let reported_head = task::spawn(async move {
+            let a = rpc_clone.block_number().await;
+            println!("RPC responded with {:?}", a);
+            a
+        });
 
-        let reported_head = task::spawn(async move { rpc_clone.block_number().await });
-
-        // Check every 5ms if we got a response, if after ttl ms no response is received mark it as delinquent
+        // Keep checking if we got a response, if after ttl ms no response is received mark it as delinquent
         loop {
+            println!("{}", reported_head.is_finished());
             if reported_head.is_finished() {
                 // This unwrapping is fine
                 heads.push(reported_head.await.unwrap().unwrap());
+                println!("RPC {} reported head: {}", i, heads[i]);
                 break;
             }
             if start.elapsed().as_millis() > ttl {
-                reported_head.abort();
+                //reported_head.abort();
+                println!("RPC {} is delinquent", i);
                 heads.push(0);
                 break;
             }
@@ -125,8 +122,8 @@ fn make_poverty(
     }
 
     for i in rpc_list_positions.iter().rev() {
-		rpc_list_guard.remove(*i);
-	}
+        rpc_list_guard.remove(*i);
+    }
 
     Ok(average_head)
 }
