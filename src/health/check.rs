@@ -1,16 +1,17 @@
 use crate::Rpc;
 
+use std::println;
+use std::time::Duration;
 use std::sync::{
     Arc,
     RwLock,
 };
-use std::time::Instant;
 
 use tokio::{
     task,
     time::{
         sleep,
-        Duration,
+        timeout,
     },
 };
 
@@ -63,30 +64,33 @@ async fn head_check(
     for i in 0..len {
         let rpc_clone = rpc_list.read().unwrap()[i].clone();
 
-        let start = Instant::now();
-
         // Spawn new task calling block_number for the rpc
         // TODO: THIS DOESNT WORK
         let reported_head = task::spawn(async move {
             let a = rpc_clone.block_number().await;
-            println!("RPC responded with {:?}", a);
+            println!("RPC {} responded with {}", i, a.as_ref().unwrap());
+
             a
         });
 
-        // Keep checking if we got a response, if after ttl ms no response is received mark it as delinquent
-        loop {
-            println!("{}", reported_head.is_finished());
-            if reported_head.is_finished() {
-                // This unwrapping is fine
-                heads.push(reported_head.await.unwrap().unwrap());
-                println!("RPC {} reported head: {}", i, heads[i]);
-                break;
+        let result = timeout(Duration::from_millis(ttl.try_into()?), reported_head).await?;
+        println!("GET ME OUT OF HERE {:?}", result);
+
+        match result {
+            Ok(Ok(response)) => {
+                // The task completed within the TTL
+                println!("RPC {} responded with {}", i, response);
+                heads.push(response);
             }
-            if start.elapsed().as_millis() > ttl {
-                //reported_head.abort();
+            Ok(Err(_)) => {
+                // The task was canceled due to TTL expiration
                 println!("RPC {} is delinquent", i);
                 heads.push(0);
-                break;
+            }
+            Err(_) => {
+                // An error occurred while waiting for the task
+                // Handle the error as needed
+                return Err("Error while waiting for task".into());
             }
         }
     }
