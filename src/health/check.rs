@@ -71,10 +71,8 @@ async fn head_check(
 
         // Spawn a future for each RPC
         let rpc_future = async move {
-            println!("Hi!");
             let a = rpc_clone.block_number();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
-            println!("hello!");
 
             match result {
                 Ok(response) => response.unwrap_or(0), // Handle timeout as 0
