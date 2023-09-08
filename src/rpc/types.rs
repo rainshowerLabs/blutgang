@@ -98,14 +98,11 @@ fn format_hex(hex: &str) -> &str {
     //
     // We only have to extract the hex number and return it. We can start reading from the 0 char
     // and stop reading at the last char - 4.
-    println!("hex: {}", hex);
     let a = &hex[34..hex.len() - 2];
-    println!("a: {}", a);
     a
 }
 
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
-    println!("hex_string: {}", hex_string);
     // TODO: theres a bizzare edge case where the last " isnt removed in the previou step so check for that here and remove it if necessary
     let hex_string: &str = &hex_string.replace("\"", "");
 
