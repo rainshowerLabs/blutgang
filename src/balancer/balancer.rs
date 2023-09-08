@@ -1,3 +1,4 @@
+use serde_json::to_vec;
 use crate::{
     balancer::format::incoming_to_value,
     balancer::selection::cache_rules::cache_method,
@@ -92,20 +93,20 @@ async fn forward_body(
     // Flag that lets us know if we used the cache so we know if to rank the rpcs
     let mut cache_hit = false;
 
+    // read tx as bytes
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
-    // TODO: This is lazy and suboptimal
-    let rax;
-    let tx_string = tx.to_string();
-
-    let tx_hash = hash(tx_string.as_bytes());
-
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
+    let rax;
     rax = match cache.get(*tx_hash.as_bytes()) {
         Ok(rax) => {
             if let Some(rax) = rax {
                 cache_hit = true;
                 from_utf8(&rax).unwrap().to_string()
             } else {
+                let tx_string = tx.to_string();
+
                 // Quit blutgang if `tx_string` contains the word `blutgang_quit`
                 // Only for debugging, remove this for production builds.
                 if tx_string.contains("blutgang_quit") {
