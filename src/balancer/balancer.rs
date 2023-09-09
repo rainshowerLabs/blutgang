@@ -1,7 +1,7 @@
 use serde_json::to_vec;
 use crate::{
     balancer::format::incoming_to_value,
-    balancer::selection::cache_rules::cache_method,
+    balancer::selection::cache_rules::{ cache_method, cache_result },
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
@@ -133,7 +133,7 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if cache_method(&tx_string) || cache_method(&rx) {
+                if cache_method(&tx_string) || cache_result(&rx) {
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 
