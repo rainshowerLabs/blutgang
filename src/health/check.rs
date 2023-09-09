@@ -151,10 +151,13 @@ async fn escape_poverty(
     
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
+    let mut rpc_list_guard = rpc_list.write().unwrap();
+
     for i in 0..poverty_list_guard.len() {
         if poverty_heads[i] >= agreed_head {
             // Remove from poverty list and add to rpc list
-            rpc_list.write().unwrap().push(poverty_list_guard.remove(i));
+            rpc_list_guard.push(poverty_list_guard[i].clone());
+            poverty_list_guard.remove(i);
         }
     }
 
