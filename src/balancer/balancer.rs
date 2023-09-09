@@ -1,10 +1,13 @@
-use serde_json::to_vec;
 use crate::{
     balancer::format::incoming_to_value,
-    balancer::selection::cache_rules::{ cache_method, cache_result },
+    balancer::selection::cache_rules::{
+        cache_method,
+        cache_result,
+    },
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
+use serde_json::to_vec;
 
 use blake3::hash;
 use http_body_util::Full;

@@ -45,7 +45,7 @@ async fn check(
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
-    escape_poverty(&rpc_list, poverty_list, agreed_head).await?;
+    escape_poverty(&rpc_list, poverty_list, agreed_head, (*ttl).try_into().unwrap()).await?;
     #[cfg(not(feature = "tui"))]
     println!("OK!");
 
@@ -108,9 +108,13 @@ fn make_poverty(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     heads: Vec<u64>,
 ) -> Result<u64, Box<dyn std::error::Error>> {
-    // Average `heads` and round it up so we get what the majority of nodes are reporting
-    // We are being optimistic and assuming that the majority is correct
-    let average_head = heads.iter().sum::<u64>() / heads.len() as u64;
+    // Get the highest head reported by the RPCs
+    let mut highest_head = 0;
+    for head in heads.iter() {
+        if *head > highest_head {
+            highest_head = *head;
+        }
+    }
 
     // Iterate over `rpc_list` and move those falling behind to the `poverty_list`
     // We also set their is_erroring status to true and their last erroring to the
@@ -120,7 +124,7 @@ fn make_poverty(
     let mut rpc_list_positions: Vec<usize> = Vec::new();
 
     for i in 0..rpc_list_guard.len() {
-        if heads[i] < average_head {
+        if heads[i] < highest_head {
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
             rpc_list_positions.push(i);
@@ -132,17 +136,19 @@ fn make_poverty(
         rpc_list_guard.remove(*i);
     }
 
-    Ok(average_head)
+    Ok(highest_head)
 }
 
 // Go over the `poverty_list` to see if any nodes are back to normal
 async fn escape_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    ttl: u64,
     agreed_head: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Do a head check over the current poverty list to see if any nodes are back to normal
-    let poverty_heads = head_check(&poverty_list, 150).await?;
+    let poverty_heads = head_check(&poverty_list, ttl.into()).await?;
+    
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     for i in 0..poverty_list_guard.len() {
