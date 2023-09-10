@@ -53,7 +53,6 @@ async fn check(
 }
 
 // Check what heads are reported by each RPC
-// TODO: check multiple RPCs at teh same time
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
@@ -101,8 +100,8 @@ async fn head_check(
 
     Ok(heads)
 }
+
 // Add unresponsive/erroring RPCs to the poverty list
-// TODO: Doesn't take into account RPCs getting updated in the meantime
 fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -111,7 +110,7 @@ fn make_poverty(
     // Get the highest head reported by the RPCs
     let mut highest_head = 0;
     for head in heads.iter() {
-        if *head > highest_head {
+        if head > &highest_head {
             highest_head = *head;
         }
     }
@@ -121,19 +120,15 @@ fn make_poverty(
     // current unix timestamps in seconds
     let mut rpc_list_guard = rpc_list.write().unwrap();
     let mut poverty_list_guard = poverty_list.write().unwrap();
-    let mut rpc_list_positions: Vec<usize> = Vec::new();
 
     for i in 0..rpc_list_guard.len() {
         if heads[i] < highest_head {
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
-            rpc_list_positions.push(i);
+            
             poverty_list_guard.push(rpc_list_guard[i].clone());
+            rpc_list_guard.remove(i);
         }
-    }
-
-    for i in rpc_list_positions.iter().rev() {
-        rpc_list_guard.remove(*i);
     }
 
     Ok(highest_head)
