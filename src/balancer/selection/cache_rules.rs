@@ -27,7 +27,7 @@ pub fn cache_method(rx: &str) -> bool {
     let blacklist = ["latest", "blockNumber"];
 
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
-    // This means that we should be able to read from the 55. char to skip the parts of the
+    // This means that we should be able to read from the 35. char to skip the parts of the
     // string we can never(in theory) encounter blacklist keywords.
     for item in blacklist.iter() {
         if memmem::find(&rx[35..].as_bytes(), item.as_bytes()).is_some() {
