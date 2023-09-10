@@ -7,7 +7,7 @@ address = "localhost:3000" # Where to bind blutgang to
 ma_lenght = 20 # Moving average lenght for the latency
 sort_on_startup = true # Sort RPCs by latency on startup. Recommended to leave on.
 health_check = true # Enable health checking
-ttl = 600 # Acceptable time to wait for a response in ms
+ttl = 300 # Acceptable time to wait for a response in ms
 health_check_ttl = 30000 # Time between health checks in ms
 
 # Sled config
