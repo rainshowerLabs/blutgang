@@ -10,7 +10,7 @@ use serde_json::{
 pub struct Status {
     // Set this to true in case the RPC becomes unavailable
     // Also set the last time it was called, so we can check again later
-    pub is_erroring: bool,
+    pub is_erroring: bool, // TODO: maybe remove this???
     pub last_error: u64,
 
     // The latency is a moving average of the last n calls

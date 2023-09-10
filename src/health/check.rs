@@ -45,7 +45,13 @@ async fn check(
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
-    escape_poverty(&rpc_list, poverty_list, agreed_head, (*ttl).try_into().unwrap()).await?;
+    escape_poverty(
+        &rpc_list,
+        poverty_list,
+        agreed_head,
+        (*ttl).try_into().unwrap(),
+    )
+    .await?;
     #[cfg(not(feature = "tui"))]
     println!("OK!");
 
@@ -135,7 +141,6 @@ fn make_poverty(
         }
     }
 
-
     Ok(highest_head)
 }
 
@@ -148,7 +153,7 @@ async fn escape_poverty(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Do a head check over the current poverty list to see if any nodes are back to normal
     let poverty_heads = head_check(&poverty_list, ttl.into()).await?;
-    
+
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
@@ -157,7 +162,10 @@ async fn escape_poverty(
     while i < poverty_list_guard.len() {
         if poverty_heads[i] >= agreed_head {
             // Remove from poverty list and add to rpc list
-            let removed_rpc = poverty_list_guard.remove(i);
+            let mut removed_rpc = poverty_list_guard.remove(i);
+            // Remove erroring status from the rpc
+            removed_rpc.status.is_erroring = false;
+
             rpc_list_guard.push(removed_rpc);
         } else {
             i += 1; // Move to the next element if not removed
@@ -166,4 +174,3 @@ async fn escape_poverty(
 
     Ok(())
 }
-
