@@ -30,14 +30,13 @@ pub fn cache_method(rx: &str) -> bool {
     // This means that we should be able to read from the 55. char to skip the parts of the
     // string we can never(in theory) encounter blacklist keywords.
     for item in blacklist.iter() {
-        if memmem::find(&rx[55..].as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(&rx[35..].as_bytes(), item.as_bytes()).is_some() {
             return false;
         }
     }
 
     true
 }
-
 // Same as cache_method but for results
 pub fn cache_result(rx: &str) -> bool {
     // If no-cache feature is on, return false
