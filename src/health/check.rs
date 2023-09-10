@@ -121,15 +121,20 @@ fn make_poverty(
     let mut rpc_list_guard = rpc_list.write().unwrap();
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
-    for i in 0..rpc_list_guard.len() {
+    let mut i = 0;
+    while i < rpc_list_guard.len() {
         if heads[i] < highest_head {
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
-            
-            poverty_list_guard.push(rpc_list_guard[i].clone());
-            rpc_list_guard.remove(i);
+
+            // Remove the element from rpc_list_guard and append it to poverty_list_guard
+            let removed_rpc = rpc_list_guard.remove(i);
+            poverty_list_guard.push(removed_rpc);
+        } else {
+            i += 1; // Move to the next element if not removed
         }
     }
+
 
     Ok(highest_head)
 }
@@ -148,13 +153,17 @@ async fn escape_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
-    for i in 0..poverty_list_guard.len() {
+    let mut i = 0;
+    while i < poverty_list_guard.len() {
         if poverty_heads[i] >= agreed_head {
             // Remove from poverty list and add to rpc list
-            rpc_list_guard.push(poverty_list_guard[i].clone());
-            poverty_list_guard.remove(i);
+            let removed_rpc = poverty_list_guard.remove(i);
+            rpc_list_guard.push(removed_rpc);
+        } else {
+            i += 1; // Move to the next element if not removed
         }
     }
 
     Ok(())
 }
+
