@@ -44,7 +44,7 @@ pub fn cache_result(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
-    let blacklist = ["error", "missing"];
+    let blacklist = ["Error", "error", "missing"];
 
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // This means that we should be able to read from the 55. char to skip the parts of the

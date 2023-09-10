@@ -52,6 +52,7 @@ async fn check(
         (*ttl).try_into().unwrap(),
     )
     .await?;
+
     #[cfg(not(feature = "tui"))]
     println!("OK!");
 
