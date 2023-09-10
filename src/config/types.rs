@@ -71,9 +71,17 @@ impl Settings {
             .as_integer()
             .unwrap() as f64;
 
-        let health_check = blutgang_table.get("health_check").unwrap().as_bool().unwrap();
+        let health_check = blutgang_table
+            .get("health_check")
+            .unwrap()
+            .as_bool()
+            .unwrap();
         let ttl = blutgang_table.get("ttl").unwrap().as_integer().unwrap() as u128;
-        let health_check_ttl = blutgang_table.get("health_check_ttl").unwrap().as_integer().unwrap() as u64;
+        let health_check_ttl = blutgang_table
+            .get("health_check_ttl")
+            .unwrap()
+            .as_integer()
+            .unwrap() as u64;
 
         // Parse `sled` table
         let sled_table = parsed_toml.get("sled").unwrap().as_table().unwrap();
@@ -212,14 +220,26 @@ impl Settings {
             .print_profile_on_drop(print_profile)
             .flush_every_ms(Some(flush_every_ms));
 
+        let health_check = matches.get_occurrences::<String>("health_check").is_some();
+        let ttl = matches
+            .get_one::<String>("ttl")
+            .expect("Invalid ttl")
+            .parse::<u128>()
+            .expect("Invalid ttl");
+        let health_check_ttl = matches
+            .get_one::<String>("health_check_ttl")
+            .expect("Invalid health_check_ttl")
+            .parse::<u64>()
+            .expect("Invalid health_check_ttl");
+
         Settings {
             rpc_list,
             do_clear: clear,
             address: address,
             ma_lenght: ma_lenght,
-            health_check: true,
-            ttl: 300,
-            health_check_ttl: 2000,
+            health_check: health_check,
+            ttl: ttl,
+            health_check_ttl: health_check_ttl,
             sled_config: sled_config,
         }
     }

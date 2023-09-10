@@ -1,23 +1,47 @@
 use crate::Rpc;
 use std::time::Instant;
+use tokio::sync::mpsc;
 
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
-pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_lenght: f64) -> Vec<Rpc> {
-    for rpc in rpc_list.iter_mut() {
-        for _ in 0..ma_lenght as u32 {
-            let start = Instant::now();
-            let _ = rpc
-                .send_request(
-                    "{\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1,\"jsonrpc\":\"2.0\"}"
-                        .into(),
-                )
-                .await
-                .unwrap();
-            let end = Instant::now();
-            rpc.update_latency(end.duration_since(start).as_nanos() as f64, ma_lenght);
-        }
-        println!("{}: {}ns", rpc.url, rpc.status.latency);
+pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Vec<Rpc> {
+    let (tx, mut rx) = mpsc::channel(rpc_list.len());
+
+    // Iterate over each RPC
+    for mut rpc in rpc_list.drain(..) {
+        let tx = tx.clone();
+
+        // Spawn a new asynchronous task for each RPC
+        tokio::spawn(async move {
+            let mut latencies = Vec::new();
+
+            for _ in 0..ma_length as u32 {
+                let start = Instant::now();
+                let _ = rpc.block_number().await.unwrap();
+                let end = Instant::now();
+                let latency = end.duration_since(start).as_nanos() as f64;
+                latencies.push(latency);
+            }
+
+            let avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
+            rpc.update_latency(avg_latency, ma_length);
+
+            println!("{}: {}ns", rpc.url, rpc.status.latency);
+
+            tx.send(rpc).await.expect("Failed to send RPC result.");
+        });
     }
-    rpc_list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
-    rpc_list
+
+    drop(tx); // Drop the sender to signal that all tasks are done
+
+    let mut sorted_rpc_list = Vec::new();
+
+    // Collect results from tasks
+    while let Some(rpc) = rx.recv().await {
+        sorted_rpc_list.push(rpc);
+    }
+
+    // Sort the RPCs by latency
+    sorted_rpc_list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
+
+    sorted_rpc_list
 }
