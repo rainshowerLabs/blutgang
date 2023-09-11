@@ -122,9 +122,16 @@ async fn forward_body(
                 {
                     let mut last = last_mtx.lock().unwrap();
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
-                    // Check if we have any RPCs in the list, if not return
+
+                    // Check if we have any RPCs in the list, if not return error
                     if rpc_list.len() == 0 {
-                        return (Ok(hyper::Response::builder().status(200).body(Full::new(Bytes::from("".to_string()))).unwrap()), false);
+                        return (
+                            Ok(hyper::Response::builder()
+                                .status(200)
+                                .body(Full::new(Bytes::from("Error: No working RPC available!".to_string())))
+                                .unwrap()),
+                            false,
+                        );
                     }
 
                     (rpc, now) = pick(&mut rpc_list);
