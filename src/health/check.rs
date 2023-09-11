@@ -179,12 +179,13 @@ async fn escape_poverty(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::env;
 
     // Helper function to create a test Rpc struct
     fn create_test_rpcs() -> Vec<Rpc> {
-        let llama = Rpc::new("https://llama.com".to_string(), 5);
-        let builder0x69 = Rpc::new("https://rpc.builder0x69.io".to_string(), 5);
-        let tenderly = Rpc::new("https://gateway.tenderly.co/public/mainnet".to_string(), 5);
+        let llama = Rpc::new(env::var("RPC0").expect("RPC0 not found in .env"), 5);
+        let builder0x69 = Rpc::new(env::var("RPC1").expect("RPC1 not found in .env"), 5);
+        let tenderly = Rpc::new(env::var("RPC2").expect("RPC2 not found in .env"), 5);
 
         vec![llama, builder0x69, tenderly]
     }
