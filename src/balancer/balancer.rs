@@ -32,7 +32,7 @@ use std::{
 #[cfg(not(feature = "tui"))]
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -43,7 +43,7 @@ macro_rules! accept {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         Arc::clone($last_mtx),
-                        $ma_lenght,
+                        $ma_length,
                         Arc::clone($cache),
                     );
                     response
@@ -59,7 +59,7 @@ macro_rules! accept {
 #[cfg(feature = "tui")]
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_lenght:expr, $cache:expr, $rx:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr, $rx:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -70,7 +70,7 @@ macro_rules! accept {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         Arc::clone($last_mtx),
-                        $ma_lenght,
+                        $ma_length,
                         Arc::clone($cache),
                         Arc::clone($rx),
                     );
@@ -167,7 +167,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
-    ma_lenght: f64,
+    ma_length: f64,
     cache: Arc<Db>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
@@ -183,7 +183,7 @@ pub async fn accept_request(
         let mut rpc_list = rpc_list_rwlock.write().unwrap();
         let last = last_mtx.lock().unwrap();
 
-        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);
+        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);
         #[cfg(not(feature = "tui"))]
         println!("LA {}", rpc_list[*last].status.latency);
     }
@@ -196,7 +196,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     last_mtx: Arc<Mutex<usize>>,
-    ma_lenght: f64,
+    ma_length: f64,
     cache: Arc<Db>,
     response_list: Arc<RwLock<Vec<String>>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -228,7 +228,7 @@ pub async fn accept_request(
         let mut rpc_list = rpc_list_rwlock.write().unwrap();
         let last = last_mtx.lock().unwrap();
 
-        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_lenght);
+        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);
         #[cfg(not(feature = "tui"))]
         println!("LA {}", rpc_list[*last].status.latency);
     }
