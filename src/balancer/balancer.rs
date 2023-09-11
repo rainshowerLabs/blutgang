@@ -120,7 +120,6 @@ async fn forward_body(
                 let rpc;
                 let now;
                 {
-                    let mut last = last_mtx.lock().unwrap();
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
 
                     // Check if we have any RPCs in the list, if not return error
@@ -135,6 +134,7 @@ async fn forward_body(
                     }
 
                     (rpc, now) = pick(&mut rpc_list);
+                    let mut last = last_mtx.lock().unwrap();
                     *last = now;
                 }
                 #[cfg(not(feature = "tui"))]
