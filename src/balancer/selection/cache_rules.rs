@@ -43,7 +43,7 @@ pub fn cache_result(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
-    let blacklist = ["Error", "error", "missing"];
+    let blacklist = ["Error", "error", "missing", "bad"];
 
     for item in blacklist.iter() {
         if memmem::find(&rx.as_bytes(), item.as_bytes()).is_some() {
