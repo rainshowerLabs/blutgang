@@ -26,7 +26,10 @@ use std::{
         Mutex,
         RwLock,
     },
-    time::{ Instant, Duration },
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
 // Macros for accepting requests
