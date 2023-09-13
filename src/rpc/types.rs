@@ -100,7 +100,7 @@ fn format_hex(hex: &str) -> Result<&str, RpcError> {
     // and stop reading at the last char - 4.
 
     // Check if the extraction indices are out of bounds
-    if hex.len() < 34 {
+    if hex.len() < 36 {
         return Err(RpcError::OutOfBounds);
     }
 
