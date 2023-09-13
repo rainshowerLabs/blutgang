@@ -130,6 +130,7 @@ fn make_poverty(
 
     let mut i = 0;
     while i < rpc_list_guard.len() {
+        // If the RPC is not following the head, nuke it to poverty
         if heads[i] < highest_head {
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;

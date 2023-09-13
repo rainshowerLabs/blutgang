@@ -127,7 +127,9 @@ async fn forward_body(
                         return (
                             Ok(hyper::Response::builder()
                                 .status(200)
-                                .body(Full::new(Bytes::from("Error: No working RPC available!".to_string())))
+                                .body(Full::new(Bytes::from(
+                                    "Error: No working RPC available!".to_string(),
+                                )))
                                 .unwrap()),
                             false,
                         );
