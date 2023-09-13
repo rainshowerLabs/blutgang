@@ -16,6 +16,7 @@ use hyper::{
     Request,
 };
 use sled::Db;
+use tokio::time::timeout;
 
 use std::{
     convert::Infallible,
@@ -25,14 +26,14 @@ use std::{
         Mutex,
         RwLock,
     },
-    time::Instant,
+    time::{ Instant, Duration },
 };
 
 // Macros for accepting requests
 #[cfg(not(feature = "tui"))]
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -45,6 +46,7 @@ macro_rules! accept {
                         Arc::clone($last_mtx),
                         $ma_length,
                         Arc::clone($cache),
+                        $ttl,
                     );
                     response
                 }),
@@ -182,13 +184,31 @@ pub async fn accept_request(
     last_mtx: Arc<Mutex<usize>>,
     ma_length: f64,
     cache: Arc<Db>,
+    ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
     let time = Instant::now();
     let response;
     let hit_cache;
-    (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
+    let future = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache);
+    let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
     let time = time.elapsed();
+
+    match result {
+        Ok((res, cache_hit)) => {
+            response = res;
+            hit_cache = cache_hit;
+        }
+        Err(_) => {
+            response = Ok(hyper::Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from(
+                    "Error: Request timed out! Try again later...".to_string(),
+                )))
+                .unwrap());
+            hit_cache = false;
+        }
+    }
 
     println!("Request time: {:?}", time);
     // Get lock for the rpc list and add it to the moving average
@@ -197,7 +217,7 @@ pub async fn accept_request(
         let last = last_mtx.lock().unwrap();
 
         rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);
-        #[cfg(not(feature = "tui"))]
+
         println!("LA {}", rpc_list[*last].status.latency);
     }
 

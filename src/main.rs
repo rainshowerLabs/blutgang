@@ -124,7 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &rpc_list_rwlock_clone,
                 &last_mtx_clone,
                 config.ma_length,
-                &cache_clone
+                &cache_clone,
+                config.ttl
             );
             #[cfg(feature = "tui")]
             accept!(
