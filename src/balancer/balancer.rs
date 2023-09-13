@@ -193,6 +193,7 @@ pub async fn accept_request(
     let time = Instant::now();
     let response;
     let hit_cache;
+    // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let future = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache);
     let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
     let time = time.elapsed();
