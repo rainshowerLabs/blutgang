@@ -47,7 +47,7 @@ pub fn cache_result(rx: &str) -> bool {
 
     // just checking if `error` is present should be enough, but include the beggining error
     // codes juuuust to be extra safe
-    let blacklist = ["error", "-320", "-326"];
+    let blacklist = ["error", "-320", "-326", "-327"];
 
     for item in blacklist.iter() {
         if memmem::find(&rx.as_bytes(), item.as_bytes()).is_some() {
