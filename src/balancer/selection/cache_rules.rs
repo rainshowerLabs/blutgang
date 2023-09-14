@@ -26,10 +26,13 @@ pub fn cache_method(rx: &str) -> bool {
 
     let blacklist = ["latest", "blockNumber", "earliest", "safe", "finalized", "pending"];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
-    // This means that we should be able to read from the 26(id is optional). char to skip the parts of the
-    // string we can never(in theory) encounter blacklist keywords.
+    // Even tho rx should look like the example above, its still a valid request if the method
+    // is first, so it will be skipped if we try to be smart and skip the first n charachters.
+    //
+    // We could potentially try to find `params` and then move from there but it would end up
+    // being slower in most cases.
     for item in blacklist.iter() {
-        if memmem::find(&rx[26..].as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
             return false;
         }
     }
