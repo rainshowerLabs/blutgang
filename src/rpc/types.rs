@@ -79,6 +79,23 @@ impl Rpc {
         Ok(return_number)
     }
 
+    // Get the latest finalized block
+    // TODO: make this work
+    pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        let request = json!({
+            "method": "eth_getBlock".to_string(),
+            "params": "finalized".to_string(),
+            "id": 1,
+            "jsonrpc": "2.0".to_string(),
+        });
+
+        let number = self.send_request(request).await?;
+        let return_number = format_hex(&number)?;
+        let return_number = hex_to_decimal(return_number).unwrap();
+
+        Ok(return_number)
+    }
+
     // Update the latency of the last n calls
     pub fn update_latency(&mut self, latest: f64, ma_length: f64) {
         // If we have data >= to ma_length, remove the first one in line
