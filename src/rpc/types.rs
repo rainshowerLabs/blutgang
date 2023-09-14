@@ -99,6 +99,8 @@ fn format_hex(hex: &str) -> Result<&str, RpcError> {
     // We only have to extract the hex number and return it. We can start reading from the 0 char
     // and stop reading at the last char - 4.
 
+    // TODO: this is kinda broken, just do a regex desu
+
     // Check if the extraction indices are out of bounds
     if hex.len() < 36 {
         return Err(RpcError::OutOfBounds);

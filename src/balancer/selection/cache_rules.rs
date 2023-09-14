@@ -24,13 +24,12 @@ pub fn cache_method(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
-    let blacklist = ["latest", "blockNumber"];
-
+    let blacklist = ["latest", "blockNumber", "earliest", "safe", "finalized", "pending"];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
-    // This means that we should be able to read from the 35. char to skip the parts of the
+    // This means that we should be able to read from the 26(id is optional). char to skip the parts of the
     // string we can never(in theory) encounter blacklist keywords.
     for item in blacklist.iter() {
-        if memmem::find(&rx[35..].as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(&rx[26..].as_bytes(), item.as_bytes()).is_some() {
             return false;
         }
     }
