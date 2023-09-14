@@ -193,6 +193,7 @@ pub async fn accept_request(
     let time = Instant::now();
     let response;
     let hit_cache;
+
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let future = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache);
     let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
@@ -218,6 +219,7 @@ pub async fn accept_request(
     // Get lock for the rpc list and add it to the moving average
     if !hit_cache {
         let mut rpc_list = rpc_list_rwlock.write().unwrap();
+        // TODO: Dont use a mutex for this...
         let last = last_mtx.lock().unwrap();
 
         rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);

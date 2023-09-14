@@ -39,6 +39,7 @@ pub fn cache_method(rx: &str) -> bool {
 
     true
 }
+
 // Same as cache_method but for results
 pub fn cache_result(rx: &str) -> bool {
     // If no-cache feature is on, return false
