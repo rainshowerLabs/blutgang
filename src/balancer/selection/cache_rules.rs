@@ -45,7 +45,9 @@ pub fn cache_result(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
-    let blacklist = ["Error", "error", "missing", "bad"];
+    // just checking if `error` is present should be enough, but include the beggining error
+    // codes juuuust to be extra safe
+    let blacklist = ["error", "-320", "-326"];
 
     for item in blacklist.iter() {
         if memmem::find(&rx.as_bytes(), item.as_bytes()).is_some() {

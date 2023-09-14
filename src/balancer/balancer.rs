@@ -56,7 +56,7 @@ macro_rules! accept {
             )
             .await
         {
-            println!("Error serving connection: {:?}", err);
+            println!("error serving connection: {:?}", err);
         }
     };
 }
@@ -84,7 +84,7 @@ macro_rules! accept {
             )
             .await
         {
-            println!("Error serving connection: {:?}", err);
+            println!("error serving connection: {:?}", err);
         }
     };
 }
@@ -133,7 +133,7 @@ async fn forward_body(
                             Ok(hyper::Response::builder()
                                 .status(200)
                                 .body(Full::new(Bytes::from(
-                                    "Error: No working RPC available!".to_string(),
+                                    "error: No working RPC available!".to_string(),
                                 )))
                                 .unwrap()),
                             false,
@@ -207,7 +207,7 @@ pub async fn accept_request(
             response = Ok(hyper::Response::builder()
                 .status(200)
                 .body(Full::new(Bytes::from(
-                    "Error: Request timed out! Try again later...".to_string(),
+                    "error: Request timed out! Try again later...".to_string(),
                 )))
                 .unwrap());
             hit_cache = false;
