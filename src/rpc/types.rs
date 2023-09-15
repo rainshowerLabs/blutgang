@@ -89,9 +89,7 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let number = self.send_request(request).await?;
-        let return_number = format_hex(&number)?;
-        let return_number = hex_to_decimal(return_number).unwrap();
+        let return_number = extract_number(&self.send_request(request).await?)?;
 
         Ok(return_number)
     }
@@ -108,6 +106,21 @@ impl Rpc {
         self.status.latency =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
     }
+}
+
+// Take in the result of eth_getBlockByNumber, and extract the block number
+fn extract_number(rx: &str) -> Result<u64, RpcError> {
+    let json: Value = serde_json::from_str(rx).unwrap();
+
+    let number = match json["result"].as_str() {
+        Some(number) => number,
+        None => return Err(RpcError::InvalidResponse("error: Invalid response".to_string())),
+    };
+
+    let number = hex_to_decimal(number).unwrap();
+
+    Ok(number)
+
 }
 
 fn format_hex(hex: &str) -> Result<&str, RpcError> {
@@ -128,7 +141,8 @@ fn format_hex(hex: &str) -> Result<&str, RpcError> {
 }
 
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
-    // TODO: theres a bizzare edge case where the last " isnt removed in the previou step so check for that here and remove it if necessary
+    // TODO: theres a bizzare edge case where the last " isnt removed in the 
+    // previou step so check for that here and remove it if necessary
     let hex_string: &str = &hex_string.replace("\"", "");
 
     // remove 0x prefix if it exists
