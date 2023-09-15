@@ -89,20 +89,22 @@ macro_rules! accept {
     };
 }
 
+// Pick RPC and send request to it. In case the result is cached,
+// read and return from the cache.
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     last_mtx: &Arc<Mutex<usize>>,
     cache: Arc<Db>,
-) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, bool) {
+) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, Option<usize>) {
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
 
-    // Flag that lets us know if we used the cache so we know if to rank the rpcs
-    let mut cache_hit = false;
-
     // read tx as bytes
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+
+    // TODO: Current RPC position. idk of a better way for now so this will do
+    let rpc_position;
 
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
@@ -110,7 +112,7 @@ async fn forward_body(
     rax = match cache.get(*tx_hash.as_bytes()) {
         Ok(rax) => {
             if let Some(rax) = rax {
-                cache_hit = true;
+                rpc_position = None;
                 from_utf8(&rax).unwrap().to_string()
             } else {
                 let tx_string = tx.to_string();
@@ -123,7 +125,6 @@ async fn forward_body(
 
                 // Get the next Rpc in line.
                 let rpc;
-                let now;
                 {
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
 
@@ -136,13 +137,11 @@ async fn forward_body(
                                     "error: No working RPC available!".to_string(),
                                 )))
                                 .unwrap()),
-                            false,
+                            None,
                         );
                     }
 
-                    (rpc, now) = pick(&mut rpc_list);
-                    let mut last = last_mtx.lock().unwrap();
-                    *last = now;
+                    (rpc, rpc_position) = pick(&mut rpc_list);
                 }
                 #[cfg(not(feature = "tui"))]
                 println!("Forwarding to: {}", rpc.url);
@@ -164,6 +163,7 @@ async fn forward_body(
         Err(_) => {
             // If anything errors send an rpc request and see if it works, if not then gg
             println!("Cache error! Check the DB!");
+            rpc_position = None;
             "".to_string()
         }
     };
@@ -177,9 +177,13 @@ async fn forward_body(
     //Build the response
     let res = hyper::Response::builder().status(200).body(body).unwrap();
 
-    (Ok(res), cache_hit)
+    (Ok(res), rpc_position)
 }
 
+// Forward the request to *a* RPC picked by the algo set by the user.
+// Measures the time needed for a request, and updates the respective
+// RPC lself.
+// In case of a timeout, returns an error.
 #[cfg(not(feature = "tui"))]
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
@@ -192,7 +196,7 @@ pub async fn accept_request(
     // Send request and measure time
     let time = Instant::now();
     let response;
-    let hit_cache;
+    let mut rpc_position: Option<usize> = Default::default();
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let future = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache);
@@ -200,9 +204,9 @@ pub async fn accept_request(
     let time = time.elapsed();
 
     match result {
-        Ok((res, cache_hit)) => {
+        Ok((res, now)) => {
             response = res;
-            hit_cache = cache_hit;
+            rpc_position = now;
         }
         Err(_) => {
             response = Ok(hyper::Response::builder()
@@ -211,20 +215,16 @@ pub async fn accept_request(
                     "error: Request timed out! Try again later...".to_string(),
                 )))
                 .unwrap());
-            hit_cache = false;
         }
     }
 
     println!("Request time: {:?}", time);
-    // Get lock for the rpc list and add it to the moving average
-    if !hit_cache {
-        let mut rpc_list = rpc_list_rwlock.write().unwrap();
-        // TODO: Dont use a mutex for this...
-        let last = last_mtx.lock().unwrap();
+    // Get lock for the rpc list and add it to the moving average if we picked an rpc
+    if rpc_position != None {
+        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);
-
-        println!("LA {}", rpc_list[*last].status.latency);
+        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64, ma_length);
+        println!("LA {}", rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency);
     }
 
     response
