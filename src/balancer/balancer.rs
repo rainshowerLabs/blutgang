@@ -93,7 +93,10 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
-) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, Option<usize>) {
+) -> (
+    Result<hyper::Response<Full<Bytes>>, Infallible>,
+    Option<usize>,
+) {
     // Convert incoming body to serde value
     let tx = incoming_to_value(tx).await.unwrap();
 
@@ -219,8 +222,12 @@ pub async fn accept_request(
     if rpc_position != None {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64, ma_length);
-        println!("LA {}", rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency);
+        rpc_list_rwlock_guard[rpc_position.unwrap()]
+            .update_latency(time.as_nanos() as f64, ma_length);
+        println!(
+            "LA {}",
+            rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
+        );
     }
 
     response
@@ -281,8 +288,12 @@ pub async fn accept_request(
     if rpc_position != None {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64, ma_length);
-        println!("LA {}", rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency);
+        rpc_list_rwlock_guard[rpc_position.unwrap()]
+            .update_latency(time.as_nanos() as f64, ma_length);
+        println!(
+            "LA {}",
+            rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
+        );
     }
 
     response

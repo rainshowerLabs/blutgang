@@ -24,7 +24,14 @@ pub fn cache_method(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
-    let blacklist = ["latest", "blockNumber", "earliest", "safe", "finalized", "pending"];
+    let blacklist = [
+        "latest",
+        "blockNumber",
+        "earliest",
+        "safe",
+        "finalized",
+        "pending",
+    ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method
     // is first, so it will be skipped if we try to be smart and skip the first n charachters.
