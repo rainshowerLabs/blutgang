@@ -23,7 +23,6 @@ use std::{
     str::from_utf8,
     sync::{
         Arc,
-        Mutex,
         RwLock,
     },
     time::{
@@ -36,7 +35,7 @@ use std::{
 #[cfg(not(feature = "tui"))]
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -46,7 +45,6 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        Arc::clone($last_mtx),
                         $ma_length,
                         Arc::clone($cache),
                         $ttl,
@@ -94,7 +92,6 @@ macro_rules! accept {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    last_mtx: &Arc<Mutex<usize>>,
     cache: Arc<Db>,
 ) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, Option<usize>) {
     // Convert incoming body to serde value
@@ -188,7 +185,6 @@ async fn forward_body(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    last_mtx: Arc<Mutex<usize>>,
     ma_length: f64,
     cache: Arc<Db>,
     ttl: u128,
@@ -199,7 +195,7 @@ pub async fn accept_request(
     let mut rpc_position: Option<usize> = Default::default();
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
-    let future = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache);
+    let future = forward_body(tx, &rpc_list_rwlock, cache);
     let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
     let time = time.elapsed();
 

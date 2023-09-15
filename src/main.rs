@@ -60,7 +60,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Bound to: {}", config.address);
 
     // Create a counter to keep track of the last rpc, max so it overflows
-    let last_mtx: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
 
     // Create channel for response passing and spawn tui if the feature is enabled
     #[cfg(feature = "tui")]
@@ -109,9 +108,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
-        // Clone the shared `rpc_list_rwlock` and `last_mtx` for use in the closure
+        // Clone the shared `rpc_list_rwlock` and cache for use in the closure
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
-        let last_mtx_clone = Arc::clone(&last_mtx);
         let cache_clone = Arc::clone(&cache);
         #[cfg(feature = "tui")]
         let response_list_clone = Arc::clone(&response_list);
@@ -122,7 +120,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
-                &last_mtx_clone,
                 config.ma_length,
                 &cache_clone,
                 config.ttl
