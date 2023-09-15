@@ -17,7 +17,6 @@ use crate::{
 
 use std::sync::{
     Arc,
-    Mutex,
     RwLock,
 };
 use tokio::net::TcpListener;
@@ -128,10 +127,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
-                &last_mtx_clone,
                 config.ma_length,
                 &cache_clone,
-                &response_list_clone
+                &response_list_clone,
+                config.ttl
             );
         });
     }

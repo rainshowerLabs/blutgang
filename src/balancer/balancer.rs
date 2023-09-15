@@ -62,7 +62,7 @@ macro_rules! accept {
 #[cfg(feature = "tui")]
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $last_mtx:expr, $ma_length:expr, $cache:expr, $rx:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $rx:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -72,10 +72,10 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        Arc::clone($last_mtx),
                         $ma_length,
                         Arc::clone($cache),
                         Arc::clone($rx),
+                        $ttl,
                     );
                     response
                 }),
@@ -230,19 +230,37 @@ pub async fn accept_request(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    last_mtx: Arc<Mutex<usize>>,
     ma_length: f64,
     cache: Arc<Db>,
     response_list: Arc<RwLock<Vec<String>>>,
+    ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Push request to the response_list
-    let tx_string = format!("{:?}", tx);
     // Send request and measure time
     let time = Instant::now();
     let response;
-    let hit_cache;
-    (response, hit_cache) = forward_body(tx, &rpc_list_rwlock, &last_mtx, cache).await;
+    let mut rpc_position: Option<usize> = Default::default();
+
+    let tx_string = format!("{:?}", tx);
+
+    // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
+    let future = forward_body(tx, &rpc_list_rwlock, cache);
+    let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
     let time = time.elapsed();
+
+    match result {
+        Ok((res, now)) => {
+            response = res;
+            rpc_position = now;
+        }
+        Err(_) => {
+            response = Ok(hyper::Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from(
+                    "error: Request timed out! Try again later...".to_string(),
+                )))
+                .unwrap());
+        }
+    }
 
     // Convert response to string and send to response_list
     //
@@ -258,14 +276,13 @@ pub async fn accept_request(
         response_list.push("".to_string());
     }
 
-    // Get lock for the rpc list and add it to the moving average
-    if !hit_cache {
-        let mut rpc_list = rpc_list_rwlock.write().unwrap();
-        let last = last_mtx.lock().unwrap();
+    println!("Request time: {:?}", time);
+    // Get lock for the rpc list and add it to the moving average if we picked an rpc
+    if rpc_position != None {
+        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list[*last].update_latency(time.as_nanos() as f64, ma_length);
-        #[cfg(not(feature = "tui"))]
-        println!("LA {}", rpc_list[*last].status.latency);
+        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64, ma_length);
+        println!("LA {}", rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency);
     }
 
     response
