@@ -5,6 +5,8 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // If len is 1, return the only element
     if list.len() == 1 {
         return (list[0].clone(), Some(0));
+    } else if list.len() == 0 {
+        return (Rpc::default(), None);
     }
 
     algo(list)

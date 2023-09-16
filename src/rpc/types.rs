@@ -33,6 +33,18 @@ pub struct Rpc {
 
 unsafe impl Sync for Rpc {}
 
+impl Default for Rpc {
+    fn default() -> Self {
+        Self {
+            url: "".to_string(),
+            client: Client::new(),
+            status: Status::default(),
+            max_consecutive: 0,
+            consecutive: 0,
+        }
+    }
+}
+
 // implement new for rpc
 impl Rpc {
     pub fn new(url: String, max_consecutive: u32) -> Self {

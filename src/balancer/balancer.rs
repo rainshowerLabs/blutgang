@@ -127,24 +127,24 @@ async fn forward_body(
                 let rpc;
                 {
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
-
-                    // Check if we have any RPCs in the list, if not return error
-                    if rpc_list.len() == 0 {
-                        return (
-                            Ok(hyper::Response::builder()
-                                .status(200)
-                                .body(Full::new(Bytes::from(
-                                    "error: No working RPC available!".to_string(),
-                                )))
-                                .unwrap()),
-                            None,
-                        );
-                    }
-
                     (rpc, rpc_position) = pick(&mut rpc_list);
+
                 }
                 #[cfg(not(feature = "tui"))]
                 println!("Forwarding to: {}", rpc.url);
+
+                // Check if we have any RPCs in the list, if not return error
+                if rpc_position == None {
+                    return (
+                        Ok(hyper::Response::builder()
+                            .status(200)
+                            .body(Full::new(Bytes::from(
+                                "error: No working RPC available!".to_string(),
+                            )))
+                            .unwrap()),
+                        None,
+                    );
+                }
 
                 // Send the request.
                 //
