@@ -128,7 +128,6 @@ async fn forward_body(
                 {
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
                     (rpc, rpc_position) = pick(&mut rpc_list);
-
                 }
                 #[cfg(not(feature = "tui"))]
                 println!("Forwarding to: {}", rpc.url);
