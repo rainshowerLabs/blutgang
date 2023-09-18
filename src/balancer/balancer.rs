@@ -18,6 +18,8 @@ use hyper::{
 use sled::Db;
 use tokio::time::timeout;
 
+use memchr::memmem;
+
 use std::{
     convert::Infallible,
     str::from_utf8,
@@ -119,7 +121,7 @@ async fn forward_body(
 
                 // Quit blutgang if `tx_string` contains the word `blutgang_quit`
                 // Only for debugging, remove this for production builds.
-                if tx_string.contains("blutgang_quit") {
+                if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
                     std::process::exit(0);
                 }
 

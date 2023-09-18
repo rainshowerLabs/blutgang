@@ -1,14 +1,17 @@
+use crate::{
+    rpc::error::RpcError,
+    Rpc,
+};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 use tokio::{
     select,
     time::{
         timeout,
         Duration,
     },
-};
-use crate::{Rpc, rpc::error::RpcError};
-use std::sync::{
-    Arc,
-    RwLock,
 };
 
 // Get the latest finalized block

@@ -157,7 +157,6 @@ fn _format_hex(rx: &str) -> Result<String, RpcError> {
             ))
         }
     }
-
 }
 
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
