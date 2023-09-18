@@ -92,7 +92,7 @@ impl Rpc {
 
         let number = self.send_request(request).await?;
         let return_number = format_hex(&number)?;
-        let return_number = hex_to_decimal(return_number).unwrap();
+        let return_number = hex_to_decimal(&return_number).unwrap();
 
         Ok(return_number)
     }
@@ -144,21 +144,21 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     Ok(number)
 }
 
-fn format_hex(hex: &str) -> Result<&str, RpcError> {
-    // We're expecting a JSON RPC response similar to: "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x113f756\"}"
-    //
-    // We only have to extract the hex number and return it. We can start reading from the 0 char
-    // and stop reading at the last char - 4.
+fn format_hex(rx: &str) -> Result<String, RpcError> {
+    let json: Value = match serde_json::from_str(rx) {
+        Ok(json) => json,
+        Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
+    };
 
-    // TODO: this is kinda broken, just do a regex desu
-
-    // Check if the extraction indices are out of bounds
-    if hex.len() < 36 {
-        return Err(RpcError::OutOfBounds);
+    match json["result"].as_str() {
+        Some(hex) => Ok(hex.to_string()),
+        None => {
+            return Err(RpcError::InvalidResponse(
+                "error: Invalid response".to_string(),
+            ))
+        }
     }
 
-    let a = &hex[34..hex.len() - 2];
-    Ok(a)
 }
 
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
