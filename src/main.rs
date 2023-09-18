@@ -86,8 +86,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Spawn a thread for the health check
+    //
+    // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let finalized = Arc::new(RwLock::new(0));
 
     tokio::task::spawn(async move {
         let _ = health_check(
@@ -97,6 +100,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config.health_check_ttl,
         )
         .await;
+
+        // Get the finalized block
     });
 
     // We start a loop to continuously accept incoming connections
