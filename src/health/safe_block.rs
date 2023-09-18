@@ -15,7 +15,11 @@ use tokio::{
 };
 
 // Get the latest finalized block
-async fn get_safe_block(rpc_list: &Arc<RwLock<Vec<Rpc>>>, ttl: u64) -> Result<u64, RpcError> {
+pub async fn get_safe_block(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    finalized: &Arc<RwLock<u64>>,
+    ttl: u64
+) -> Result<u64, RpcError> {
     let len = rpc_list.read().unwrap().len();
     let mut safe = 0;
     let mut threads = Vec::new();
@@ -29,7 +33,7 @@ async fn get_safe_block(rpc_list: &Arc<RwLock<Vec<Rpc>>>, ttl: u64) -> Result<u6
 
         // Spawn a future for each RPC
         let rpc_future = async move {
-            let a = rpc_clone.block_number();
+            let a = rpc_clone.get_finalized_block();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
 
             match result {
@@ -56,6 +60,11 @@ async fn get_safe_block(rpc_list: &Arc<RwLock<Vec<Rpc>>>, ttl: u64) -> Result<u6
                 }
             }
         }
+    }
+
+    // Update the finalized block
+    if safe > *finalized.read().unwrap() {
+        *finalized.write().unwrap() = safe;
     }
 
     Ok(safe)

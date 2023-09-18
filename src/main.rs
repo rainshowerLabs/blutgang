@@ -96,12 +96,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = health_check(
             rpc_list_health,
             rpc_poverty_list,
+            finalized,
             config.ttl,
             config.health_check_ttl,
         )
         .await;
-
-        // Get the finalized block
     });
 
     // We start a loop to continuously accept incoming connections

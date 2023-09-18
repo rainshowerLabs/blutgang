@@ -1,3 +1,4 @@
+use crate::health::safe_block::get_safe_block;
 use crate::Rpc;
 
 use std::println;
@@ -19,12 +20,14 @@ use tokio::{
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
+    finalized: Arc<RwLock<u64>>,
     ttl: u128,
     health_check_ttl: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, &ttl).await?;
+        get_safe_block(&rpc_list, &finalized, health_check_ttl).await?;
     }
 }
 
