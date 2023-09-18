@@ -91,15 +91,14 @@ impl Rpc {
         });
 
         let number = self.send_request(request).await?;
-        let return_number = format_hex(&number)?;
-        let return_number = hex_to_decimal(&return_number).unwrap();
+        let return_number = extract_number(&number)?;
 
         Ok(return_number)
     }
 
     // Get the latest finalized block
     // TODO: make this work
-    pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+    pub async fn _get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
             "params": ["finalized", false],
@@ -144,7 +143,7 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     Ok(number)
 }
 
-fn format_hex(rx: &str) -> Result<String, RpcError> {
+fn _format_hex(rx: &str) -> Result<String, RpcError> {
     let json: Value = match serde_json::from_str(rx) {
         Ok(json) => json,
         Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
