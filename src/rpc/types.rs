@@ -143,22 +143,6 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     Ok(number)
 }
 
-fn _format_hex(rx: &str) -> Result<String, RpcError> {
-    let json: Value = match serde_json::from_str(rx) {
-        Ok(json) => json,
-        Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
-    };
-
-    match json["result"].as_str() {
-        Some(hex) => Ok(hex.to_string()),
-        None => {
-            return Err(RpcError::InvalidResponse(
-                "error: Invalid response".to_string(),
-            ))
-        }
-    }
-}
-
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
     // TODO: theres a bizzare edge case where the last " isnt removed in the
     // previou step so check for that here and remove it if necessary
