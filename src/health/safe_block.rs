@@ -18,7 +18,7 @@ use tokio::{
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     finalized: &Arc<RwLock<u64>>,
-    ttl: u64
+    ttl: u64,
 ) -> Result<u64, RpcError> {
     let len = rpc_list.read().unwrap().len();
     let mut safe = 0;
