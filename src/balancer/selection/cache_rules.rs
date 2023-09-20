@@ -26,7 +26,7 @@ pub fn cache_method(rx: &str) -> bool {
 
     let blacklist = [
         "latest",
-        "blockNumber",
+        "eth_blockNumber",
         "earliest",
         "safe",
         "finalized",

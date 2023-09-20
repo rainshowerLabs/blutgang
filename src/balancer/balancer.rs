@@ -162,7 +162,7 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if cache_method(&tx_string) || cache_result(&rx) {
+                if cache_method(&tx_string) && cache_result(&rx) {
                     // Replace the id with 0 and insert that
                     let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
                     rx_value["id"] = id.into();
