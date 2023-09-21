@@ -14,7 +14,7 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, Box<dyn s
     Ok(tx)
 }
 
-pub fn extract_id(request: &str) -> Option<String> {
+pub fn _extract_id(request: &str) -> Option<String> {
     // Define the regular expression pattern to capture the "id" field
     let re = Regex::new(r#""id"\s*:\s*("([^"]*)"|(\d+))"#).unwrap();
 
@@ -27,7 +27,7 @@ pub fn extract_id(request: &str) -> Option<String> {
     None
 }
 
-pub fn replace_id(tx: &str, id: &str) -> Result<String, RpcError> {
+pub fn _replace_id(tx: &str, id: &str) -> Result<String, RpcError> {
     // Use regex to find and capture the "id" field with optional double quotes
     //
     // We could be using memmem and making it much more optimized but this is fine
@@ -45,28 +45,28 @@ pub fn replace_id(tx: &str, id: &str) -> Result<String, RpcError> {
 #[test]
 fn replace_id_test() {
     let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = replace_id(tx, "2").unwrap();
+    let tx = _replace_id(tx, "2").unwrap();
     assert_eq!(
         tx,
         r#"{"id":2,"jsonrpc":"2.0","method":"eth_call","params":...}"#
     );
 
     let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id":1, "params":...}"#;
-    let tx = replace_id(tx, "2").unwrap();
+    let tx = _replace_id(tx, "2").unwrap();
     assert_eq!(
         tx,
         r#"{"jsonrpc":"2.0","method":"eth_call", "id":2, "params":...}"#
     );
 
     let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": "1", "params":...}"#;
-    let tx = replace_id(tx, "2").unwrap();
+    let tx = _replace_id(tx, "2").unwrap();
     assert_eq!(
         tx,
         r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
     );
 
     let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": 1, "params":...}"#;
-    let tx = replace_id(tx, "2").unwrap();
+    let tx = _replace_id(tx, "2").unwrap();
     assert_eq!(
         tx,
         r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
@@ -76,26 +76,26 @@ fn replace_id_test() {
 #[test]
 fn extract_id_test() {
     let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx).unwrap();
+    let tx = _extract_id(tx).unwrap();
     assert_eq!(tx, r#"1"#);
 
     let tx = r#"{"id": 1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx).unwrap();
+    let tx = _extract_id(tx).unwrap();
     assert_eq!(tx, r#"1"#);
 
     let tx = r#"{"id":1 ,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx).unwrap();
+    let tx = _extract_id(tx).unwrap();
     assert_eq!(tx, r#"1"#);
 
     let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx).unwrap();
+    let tx = _extract_id(tx).unwrap();
     assert_eq!(tx, r#"1"#);
 
     let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx).unwrap();
+    let tx = _extract_id(tx).unwrap();
     assert_eq!(tx, r#"1"#);
 
     let tx = r#"{,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = extract_id(tx);
+    let tx = _extract_id(tx);
     assert_eq!(tx, None);
 }
