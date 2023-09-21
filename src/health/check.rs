@@ -44,7 +44,9 @@ async fn check(
     let heads = head_check(&rpc_list, *ttl).await?;
 
     // Remove RPCs that are falling behind
+    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
     let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;
+    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
@@ -55,6 +57,7 @@ async fn check(
         (*ttl).try_into().unwrap(),
     )
     .await?;
+    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
 
     #[cfg(not(feature = "tui"))]
     println!("OK!");
@@ -124,6 +127,7 @@ fn make_poverty(
             highest_head = *head;
         }
     }
+    println!("Highest head: {:?}", highest_head);
 
     // Iterate over `rpc_list` and move those falling behind to the `poverty_list`
     // We also set their is_erroring status to true and their last erroring to the
@@ -132,9 +136,12 @@ fn make_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
     let mut i = 0;
+
     while i < rpc_list_guard.len() {
         // If the RPC is not following the head, nuke it to poverty
         if heads[i] < highest_head {
+            println!("RPC {} is falling behind",  rpc_list_guard[i].url);
+
             rpc_list_guard[i].status.is_erroring = true;
             rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
 
@@ -158,6 +165,7 @@ async fn escape_poverty(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Do a head check over the current poverty list to see if any nodes are back to normal
     let poverty_heads = head_check(&poverty_list, ttl.into()).await?;
+    println!("Poverty heads: {:?}", poverty_heads);
 
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
