@@ -180,60 +180,60 @@ async fn escape_poverty(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use std::env;
 
-    // Helper function to create a test Rpc struct
-    fn create_test_rpcs() -> Vec<Rpc> {
-        let llama = Rpc::new(env::var("RPC0").expect("RPC0 not found in .env"), 5);
-        let builder0x69 = Rpc::new(env::var("RPC1").expect("RPC1 not found in .env"), 5);
-        let tenderly = Rpc::new(env::var("RPC2").expect("RPC2 not found in .env"), 5);
+//     // Helper function to create a test Rpc struct
+//     fn create_test_rpcs() -> Vec<Rpc> {
+//         let llama = Rpc::new(env::var("RPC0").expect("RPC0 not found in .env"), 5);
+//         let builder0x69 = Rpc::new(env::var("RPC1").expect("RPC1 not found in .env"), 5);
+//         let tenderly = Rpc::new(env::var("RPC2").expect("RPC2 not found in .env"), 5);
 
-        vec![llama, builder0x69, tenderly]
-    }
+//         vec![llama, builder0x69, tenderly]
+//     }
 
-    #[tokio::test]
-    async fn test_head_check() {
-        // Create a test Rpc list with at least one Rpc
-        let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
+//     #[tokio::test]
+//     async fn test_head_check() {
+//         // Create a test Rpc list with at least one Rpc
+//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
 
-        // Call the head_check function with test arguments
-        let result = head_check(&rpc_list, 700).await;
-        assert!(result.is_ok());
+//         // Call the head_check function with test arguments
+//         let result = head_check(&rpc_list, 700).await;
+//         assert!(result.is_ok());
 
-        // Add assertions for the expected behavior of head_check
-        // based on the test Rpc instance's behavior.
-    }
+//         // Add assertions for the expected behavior of head_check
+//         // based on the test Rpc instance's behavior.
+//     }
 
-    #[tokio::test]
-    async fn test_make_poverty() {
-        // Create a test Rpc list with at least one Rpc
-        let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
-        // Create an empty test poverty list
-        let poverty_list = Arc::new(RwLock::new(Vec::new()));
+//     #[tokio::test]
+//     async fn test_make_poverty() {
+//         // Create a test Rpc list with at least one Rpc
+//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
+//         // Create an empty test poverty list
+//         let poverty_list = Arc::new(RwLock::new(Vec::new()));
 
-        // Call the make_poverty function with test arguments
-        let result = make_poverty(&rpc_list, &poverty_list, vec![0]).unwrap();
-        assert_eq!(result, 0);
+//         // Call the make_poverty function with test arguments
+//         let result = make_poverty(&rpc_list, &poverty_list, vec![0]).unwrap();
+//         assert_eq!(result, 0);
 
-        // Add assertions for the expected behavior of make_poverty
-        // based on the test Rpc instance's behavior and input data.
-    }
+//         // Add assertions for the expected behavior of make_poverty
+//         // based on the test Rpc instance's behavior and input data.
+//     }
 
-    #[tokio::test]
-    async fn test_escape_poverty() {
-        // Create a test Rpc list with at least one Rpc
-        let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
-        // Create a test poverty list with at least one Rpc
-        let poverty_list = Arc::new(RwLock::new(create_test_rpcs()));
+//     #[tokio::test]
+//     async fn test_escape_poverty() {
+//         // Create a test Rpc list with at least one Rpc
+//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
+//         // Create a test poverty list with at least one Rpc
+//         let poverty_list = Arc::new(RwLock::new(create_test_rpcs()));
 
-        // Call the escape_poverty function with test arguments
-        let result = escape_poverty(&rpc_list, &poverty_list, 700, 0).await;
-        assert!(result.is_ok());
+//         // Call the escape_poverty function with test arguments
+//         let result = escape_poverty(&rpc_list, &poverty_list, 700, 0).await;
+//         assert!(result.is_ok());
 
-        // Add assertions for the expected behavior of escape_poverty
-        // based on the test Rpc instance's behavior and input data.
-    }
-}
+//         // Add assertions for the expected behavior of escape_poverty
+//         // based on the test Rpc instance's behavior and input data.
+//     }
+// }

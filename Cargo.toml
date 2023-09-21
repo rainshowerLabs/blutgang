@@ -32,6 +32,7 @@ memchr = "2.5.0"
 crossterm = {version = "0.27.0", optional = true}
 rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
+regex = "1.9.5"
 
 [features]
 default = ["selection-weighed-round-robin"]

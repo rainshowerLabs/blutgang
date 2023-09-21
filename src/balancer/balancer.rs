@@ -120,7 +120,12 @@ async fn forward_body(
         Ok(rax) => {
             if let Some(rax) = rax {
                 rpc_position = None;
-                from_utf8(&rax).unwrap().to_string()
+
+                // Reconstruct ID
+                let cached = from_utf8(&rax).unwrap();
+                let mut cached: serde_json::Value = serde_json::from_str(&cached).unwrap();
+                cached["id"] = id.into();
+                cached.to_string()
             } else {
                 // Kinda jank but set the id back to what it was before
                 tx["id"] = id.into();
@@ -165,7 +170,7 @@ async fn forward_body(
                 if cache_method(&tx_string) && cache_result(&rx) {
                     // Replace the id with 0 and insert that
                     let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
-                    rx_value["id"] = id.into();
+                    rx_value["id"] = "0".into();
                     let rx = serde_json::to_string(&rx_value).unwrap();
 
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
