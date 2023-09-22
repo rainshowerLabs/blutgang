@@ -13,7 +13,6 @@ use tokio::{
     time::{
         sleep,
         timeout,
-        Instant,
     },
 };
 
@@ -60,8 +59,8 @@ async fn check(
     escape_poverty(
         &rpc_list,
         poverty_list,
-        agreed_head,
         (*ttl).try_into().unwrap(),
+        agreed_head,
     )
     .await?;
     println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
@@ -186,8 +185,12 @@ async fn escape_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
+    println!("agreed_head: {:?}", agreed_head);
+
     for head_result in poverty_heads {
-        if head_result.reported_head == agreed_head {
+        println!("head_result: {:?}", head_result.reported_head);
+
+        if head_result.reported_head >= agreed_head {
             // Move the RPC from the poverty list to the rpc list
             rpc_list_guard.push(poverty_list_guard[head_result.rpc_list_index].clone());
 
