@@ -9,13 +9,18 @@ use std::sync::{
 use std::time::Duration;
 
 use tokio::{
-    select,
     time::{
         sleep,
         timeout,
     },
     sync::mpsc,
 };
+
+#[derive(Debug, Default)]
+struct HeadResult {
+    rpc_list_index: usize,
+    reported_head: u64,
+}
 
 // call check n a loop
 pub async fn health_check(
@@ -70,19 +75,19 @@ async fn check(
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
-) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
+) -> Result<Vec<HeadResult>, Box<dyn std::error::Error>> {
     let len = rpc_list.read().unwrap().len();
+    let mut heads = Vec::<HeadResult>::new();
+
     // If len == 0 return empty Vec
     if len == 0 {
-        return Ok(Vec::<u64>::new());
+        return Ok(heads);
     }
-
-    let mut heads = Vec::new();
 
     // Create a vector to store the futures of all RPC requests
     let mut rpc_futures = Vec::new();
 
-    // Create a channel for collecting results in order
+    // Create a channel for collecting results
     let (tx, mut rx) = mpsc::channel(len);
 
     // Iterate over all RPCs
@@ -100,8 +105,13 @@ async fn head_check(
                 Err(_) => 0,                           // Handle timeout as 0
             };
 
+            let head_result = HeadResult {
+                rpc_list_index: i,
+                reported_head: head,
+            };
+
             // Send the result to the main thread through the channel
-            tx.send(head).await.expect("Channel send error");
+            tx.send(head_result).await.expect("head check: Channel send error");
         };
 
         rpc_futures.push(rpc_future);
@@ -123,7 +133,6 @@ async fn head_check(
 
     Ok(heads)
 }
-
 
 // Add unresponsive/erroring RPCs to the poverty list
 fn make_poverty(
@@ -149,8 +158,11 @@ fn make_poverty(
     let mut i = 0;
 
     while i < rpc_list_guard.len() {
+        println!("checking {}",  rpc_list_guard[i].url);
+        println!("head: {}", heads[i]);
+
         // If the RPC is not following the head, nuke it to poverty
-        if heads[i] < highest_head {
+        if heads[i] >= highest_head {
             println!("RPC {} is falling behind",  rpc_list_guard[i].url);
 
             rpc_list_guard[i].status.is_erroring = true;
