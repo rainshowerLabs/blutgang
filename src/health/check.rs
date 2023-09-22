@@ -9,12 +9,12 @@ use std::sync::{
 use std::time::Duration;
 
 use tokio::{
+    sync::mpsc,
     time::{
-        Instant,
         sleep,
         timeout,
+        Instant,
     },
-    sync::mpsc,
 };
 
 #[derive(Debug, Default)]
@@ -112,7 +112,9 @@ async fn head_check(
             };
 
             // Send the result to the main thread through the channel
-            tx.send(head_result).await.expect("head check: Channel send error");
+            tx.send(head_result)
+                .await
+                .expect("head check: Channel send error");
         };
 
         rpc_futures.push(rpc_future);
@@ -184,13 +186,15 @@ async fn escape_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
-    for head_result in provert_heads {
+    for head_result in poverty_heads {
         if head_result.reported_head == agreed_head {
             // Move the RPC from the poverty list to the rpc list
             rpc_list_guard.push(poverty_list_guard[head_result.rpc_list_index].clone());
 
             // Remove the RPC from the poverty list
-            poverty_list_guard[head_result.rpc_list_index].status.is_erroring = false;
+            poverty_list_guard[head_result.rpc_list_index]
+                .status
+                .is_erroring = false;
         }
     }
 
