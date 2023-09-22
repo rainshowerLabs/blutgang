@@ -14,6 +14,7 @@ use tokio::{
         sleep,
         timeout,
     },
+    sync::mpsc,
 };
 
 // call check n a loop
@@ -71,48 +72,58 @@ async fn head_check(
     ttl: u128,
 ) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
     let len = rpc_list.read().unwrap().len();
+    // If len == 0 return empty Vec
+    if len == 0 {
+        return Ok(Vec::<u64>::new());
+    }
+
     let mut heads = Vec::new();
-    let mut threads = Vec::new();
 
     // Create a vector to store the futures of all RPC requests
     let mut rpc_futures = Vec::new();
 
+    // Create a channel for collecting results in order
+    let (tx, mut rx) = mpsc::channel(len);
+
     // Iterate over all RPCs
     for i in 0..len {
         let rpc_clone = rpc_list.read().unwrap()[i].clone();
+        let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC
         let rpc_future = async move {
             let a = rpc_clone.block_number();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
 
-            match result {
+            let head = match result {
                 Ok(response) => response.unwrap_or(0), // Handle timeout as 0
                 Err(_) => 0,                           // Handle timeout as 0
-            }
+            };
+
+            // Send the result to the main thread through the channel
+            tx.send(head).await.expect("Channel send error");
         };
 
         rpc_futures.push(rpc_future);
     }
 
-    // Wait for all RPC futures concurrently and collect their results
+    // Wait for all RPC futures concurrently
     for rpc_future in rpc_futures {
-        let result = tokio::spawn(rpc_future);
-        threads.push(result);
+        tokio::spawn(rpc_future);
     }
 
-    // Collect the results using tokio::select!
+    // Collect the results in order from the channel
     for _ in 0..len {
-        select! {
-            result = threads.pop().unwrap() => {
-                heads.push(result.unwrap());
-            }
+        if let Some(result) = rx.recv().await {
+            heads.push(result);
         }
     }
+
     println!("Heads: {:?}", heads);
 
     Ok(heads)
 }
+
 
 // Add unresponsive/erroring RPCs to the poverty list
 fn make_poverty(
