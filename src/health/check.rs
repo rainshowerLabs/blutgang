@@ -10,6 +10,7 @@ use std::time::Duration;
 
 use tokio::{
     time::{
+        Instant,
         sleep,
         timeout,
     },
@@ -138,43 +139,32 @@ async fn head_check(
 fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
-    heads: Vec<u64>,
+    heads: Vec<HeadResult>,
 ) -> Result<u64, Box<dyn std::error::Error>> {
     // Get the highest head reported by the RPCs
     let mut highest_head = 0;
-    for head in heads.iter() {
-        if head > &highest_head {
-            highest_head = *head;
+    for head in &heads {
+        if head.reported_head > highest_head {
+            highest_head = head.reported_head;
         }
     }
-    println!("Highest head: {:?}", highest_head);
 
-    // Iterate over `rpc_list` and move those falling behind to the `poverty_list`
-    // We also set their is_erroring status to true and their last erroring to the
-    // current unix timestamps in seconds
+    // Mark all RPCs that dont report the highest head as erroring
     let mut rpc_list_guard = rpc_list.write().unwrap();
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
-    let mut i = 0;
+    for head in heads {
+        if head.reported_head < highest_head {
+            // Mark the RPC as erroring
+            rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
 
-    while i < rpc_list_guard.len() {
-        println!("checking {}",  rpc_list_guard[i].url);
-        println!("head: {}", heads[i]);
-
-        // If the RPC is not following the head, nuke it to poverty
-        if heads[i] >= highest_head {
-            println!("RPC {} is falling behind",  rpc_list_guard[i].url);
-
-            rpc_list_guard[i].status.is_erroring = true;
-            rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
-
-            // Remove the element from rpc_list_guard and append it to poverty_list_guard
-            let removed_rpc = rpc_list_guard.remove(i);
-            poverty_list_guard.push(removed_rpc);
-        } else {
-            i += 1; // Move to the next element if not removed
+            // Add the RPC to the poverty list
+            poverty_list_guard.push(rpc_list_guard[head.rpc_list_index].clone());
         }
     }
+
+    // Go over rpc_list_guard and remove all erroring rpcs
+    rpc_list_guard.retain(|rpc| rpc.status.is_erroring == false);
 
     Ok(highest_head)
 }
