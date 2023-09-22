@@ -33,11 +33,13 @@ pub async fn health_check(
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, &ttl).await?;
-        
-        println!("\nrpc_list len: {:?}", rpc_list.read().unwrap().len());
-        println!("poverty_list len: {:?}\n", poverty_list.read().unwrap().len());
-        get_safe_block(&rpc_list, &finalized, health_check_ttl).await?;
 
+        println!("\nrpc_list len: {:?}", rpc_list.read().unwrap().len());
+        println!(
+            "poverty_list len: {:?}\n",
+            poverty_list.read().unwrap().len()
+        );
+        get_safe_block(&rpc_list, &finalized, health_check_ttl).await?;
     }
 }
 
