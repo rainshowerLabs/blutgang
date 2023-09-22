@@ -184,19 +184,18 @@ async fn escape_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
-    let mut i = 0;
-    while i < poverty_list_guard.len() {
-        if poverty_heads[i] >= agreed_head {
-            // Remove from poverty list and add to rpc list
-            let mut removed_rpc = poverty_list_guard.remove(i);
-            // Remove erroring status from the rpc
-            removed_rpc.status.is_erroring = false;
+    for head_result in provert_heads {
+        if head_result.reported_head == agreed_head {
+            // Move the RPC from the poverty list to the rpc list
+            rpc_list_guard.push(poverty_list_guard[head_result.rpc_list_index].clone());
 
-            rpc_list_guard.push(removed_rpc);
-        } else {
-            i += 1; // Move to the next element if not removed
+            // Remove the RPC from the poverty list
+            poverty_list_guard[head_result.rpc_list_index].status.is_erroring = false;
         }
     }
+
+    // Only retain erroring RPCs
+    poverty_list_guard.retain(|rpc| rpc.status.is_erroring == true);
 
     Ok(())
 }
