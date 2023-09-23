@@ -46,7 +46,7 @@ pub async fn get_safe_block(
 
             let reported_finalized = match result {
                 Ok(response) => response.unwrap(), // Handle timeout as 0
-                Err(_) => 0,                           // Handle timeout as 0
+                Err(_) => 0,                       // Handle timeout as 0
             };
 
             // Send the result to the main thread through the channel

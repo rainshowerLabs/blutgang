@@ -16,11 +16,16 @@ use crate::{
 };
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
     sync::{
-    Arc,
-    RwLock,
-}};
+        Arc,
+        RwLock,
+    },
+};
+
 use tokio::net::TcpListener;
 
 use hyper::{
