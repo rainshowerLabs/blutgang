@@ -15,10 +15,12 @@ use crate::{
     rpc::types::Rpc,
 };
 
-use std::sync::{
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{
     Arc,
     RwLock,
-};
+}};
 use tokio::net::TcpListener;
 
 use hyper::{
@@ -47,6 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "172cf910abc64d0fe6b243766b3ae9f56f32978d7c144ddadde9c615ea38891d",
         "true",
     );
+    // Cache for storing querries near the tip
+    let head_cache = Arc::new(BTreeMap::<u64, HashMap<&str, &str>>::new());
 
     // Clear database if specified
     if config.do_clear {
