@@ -59,7 +59,8 @@ impl Rpc {
 
     // Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
-        // #[cfg(debug_assertions)] {
+        // #[cfg(debug_assertions)]
+        // {
         //     println!("Sending request: {}", tx.clone());
         // }
 
@@ -72,7 +73,8 @@ impl Rpc {
             }
         };
 
-        // #[cfg(debug_assertions)] {
+        // #[cfg(debug_assertions)]
+        // {
         //     let a = response.text().await.unwrap();
         //     println!("response: {}", a);
         //     return Ok(a);
@@ -106,7 +108,10 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let return_number = extract_number(&self.send_request(request).await?)?;
+        let number: Value = serde_json::from_str(&self.send_request(request).await?).unwrap();
+        let number = &number["result"]["number"];
+
+        let return_number = hex_to_decimal(number.as_str().unwrap()).unwrap();
 
         Ok(return_number)
     }
@@ -139,7 +144,6 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     };
 
     let number = hex_to_decimal(number).unwrap();
-
     Ok(number)
 }
 

@@ -15,10 +15,12 @@ use crate::{
     rpc::types::Rpc,
 };
 
-use std::sync::{
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::{
     Arc,
     RwLock,
-};
+}};
 use tokio::net::TcpListener;
 
 use hyper::{
@@ -47,6 +49,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "172cf910abc64d0fe6b243766b3ae9f56f32978d7c144ddadde9c615ea38891d",
         "true",
     );
+    // Cache for storing querries near the tip
+    let head_cache = Arc::new(BTreeMap::<u64, HashMap<&str, &str>>::new());
 
     // Clear database if specified
     if config.do_clear {
@@ -92,16 +96,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
     let finalized = Arc::new(RwLock::new(0));
 
-    tokio::task::spawn(async move {
-        let _ = health_check(
-            rpc_list_health,
-            rpc_poverty_list,
-            finalized,
-            config.ttl,
-            config.health_check_ttl,
-        )
-        .await;
-    });
+    if config.health_check {
+        tokio::task::spawn(async move {
+            let _ = health_check(
+                rpc_list_health,
+                rpc_poverty_list,
+                finalized,
+                config.ttl,
+                config.health_check_ttl,
+            )
+            .await;
+        });
+    }
 
     // We start a loop to continuously accept incoming connections
     loop {

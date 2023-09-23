@@ -100,7 +100,12 @@ async fn forward_body(
     Option<usize>,
 ) {
     // Convert incoming body to serde value
-    let tx = incoming_to_value(tx).await.unwrap();
+    let mut tx = incoming_to_value(tx).await.unwrap();
+
+    // Get the id of the request and set it to 0 for caching
+    let id = tx["id"].as_u64().unwrap_or(0);
+
+    tx["id"] = "0".into();
 
     // read tx as bytes
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
@@ -115,8 +120,16 @@ async fn forward_body(
         Ok(rax) => {
             if let Some(rax) = rax {
                 rpc_position = None;
-                from_utf8(&rax).unwrap().to_string()
+
+                // Reconstruct ID
+                let cached = from_utf8(&rax).unwrap();
+                let mut cached: serde_json::Value = serde_json::from_str(&cached).unwrap();
+                cached["id"] = id.into();
+                cached.to_string()
             } else {
+                // Kinda jank but set the id back to what it was before
+                tx["id"] = id.into();
+
                 let tx_string = tx.to_string();
 
                 // Quit blutgang if `tx_string` contains the word `blutgang_quit`
@@ -154,7 +167,12 @@ async fn forward_body(
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
-                if cache_method(&tx_string) || cache_result(&rx) {
+                if cache_method(&tx_string) && cache_result(&rx) {
+                    // Replace the id with 0 and insert that
+                    let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
+                    rx_value["id"] = "0".into();
+                    let rx = serde_json::to_string(&rx_value).unwrap();
+
                     cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
                 }
 
