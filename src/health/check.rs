@@ -33,12 +33,6 @@ pub async fn health_check(
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, &ttl).await?;
-
-        println!("\nrpc_list len: {:?}", rpc_list.read().unwrap().len());
-        println!(
-            "poverty_list len: {:?}\n",
-            poverty_list.read().unwrap().len()
-        );
         get_safe_block(&rpc_list, &finalized, health_check_ttl).await?;
     }
 }
@@ -49,26 +43,22 @@ async fn check(
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "tui"))]
-    println!("Checking RPC health...");
+    print!("Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
     let heads = head_check(&rpc_list, *ttl).await?;
 
     // Remove RPCs that are falling behind
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
     let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
 
     // Do a head check over the current poverty list to see if any nodes are back to normal
     let poverty_heads = head_check(&poverty_list, (*ttl).into()).await?;
-    println!("Poverty heads: {:?}", poverty_heads);
 
     escape_poverty(&rpc_list, poverty_list, poverty_heads, agreed_head)?;
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
 
     #[cfg(not(feature = "tui"))]
     println!("OK!");
@@ -136,8 +126,6 @@ async fn head_check(
         }
     }
 
-    println!("Heads: {:?}", heads);
-
     Ok(heads)
 }
 
@@ -186,14 +174,8 @@ fn escape_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
-    println!("agreed_head: {:?}", agreed_head);
-
     for head_result in poverty_heads {
-        println!("head_result: {:?}", head_result.reported_head);
-
         if head_result.reported_head >= agreed_head {
-            println!("RPC escaped poverty! 🗣️🔥🔥🔥");
-
             let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
             rpc.status.is_erroring = false;
 
@@ -207,12 +189,8 @@ fn escape_poverty(
         }
     }
 
-    println!("rpc_list len: {:?}", rpc_list_guard.len());
-    println!("poverty_list len: {:?}", poverty_list_guard.len());
-
     // Only retain erroring RPCs
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring == true);
-    println!("poverty_list len: {:?}", poverty_list_guard.len());
 
     Ok(())
 }
@@ -296,17 +274,12 @@ mod tests {
         ];
 
         // Call the escape_poverty function
-        {
-            let poverty_list_guard = poverty_list.read().unwrap();
-            println!("len: {:?}", poverty_list_guard.len());
-        }
         let result = escape_poverty(&rpc_list, &poverty_list, heads, 18193012);
         assert!(result.is_ok());
 
         // Check the state of RPCs after the test
         let rpc_list_guard = rpc_list.read().unwrap();
         let poverty_list_guard = poverty_list.read().unwrap();
-        println!("len: {:?}", poverty_list_guard.len());
         // RPC3 should have escaped poverty
         assert_eq!(rpc_list_guard.len(), 2);
 
