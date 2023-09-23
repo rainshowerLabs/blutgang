@@ -9,12 +9,18 @@ use std::sync::{
 use std::time::Duration;
 
 use tokio::{
-    select,
+    sync::mpsc,
     time::{
         sleep,
         timeout,
     },
 };
+
+#[derive(Debug, Default)]
+struct HeadResult {
+    rpc_list_index: usize,
+    reported_head: u64,
+}
 
 // call check n a loop
 pub async fn health_check(
@@ -37,27 +43,22 @@ async fn check(
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "tui"))]
-    println!("Checking RPC health...");
+    print!("Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
     let heads = head_check(&rpc_list, *ttl).await?;
 
     // Remove RPCs that are falling behind
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
     let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
-    escape_poverty(
-        &rpc_list,
-        poverty_list,
-        agreed_head,
-        (*ttl).try_into().unwrap(),
-    )
-    .await?;
-    println!("rpc_list len: {:?}", rpc_list.read().unwrap().len());
+
+    // Do a head check over the current poverty list to see if any nodes are back to normal
+    let poverty_heads = head_check(&poverty_list, (*ttl).into()).await?;
+
+    escape_poverty(&rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
     #[cfg(not(feature = "tui"))]
     println!("OK!");
@@ -69,47 +70,61 @@ async fn check(
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
-) -> Result<Vec<u64>, Box<dyn std::error::Error>> {
+) -> Result<Vec<HeadResult>, Box<dyn std::error::Error>> {
     let len = rpc_list.read().unwrap().len();
-    let mut heads = Vec::new();
-    let mut threads = Vec::new();
+    let mut heads = Vec::<HeadResult>::new();
+
+    // If len == 0 return empty Vec
+    if len == 0 {
+        return Ok(heads);
+    }
 
     // Create a vector to store the futures of all RPC requests
     let mut rpc_futures = Vec::new();
 
+    // Create a channel for collecting results
+    let (tx, mut rx) = mpsc::channel(len);
+
     // Iterate over all RPCs
     for i in 0..len {
         let rpc_clone = rpc_list.read().unwrap()[i].clone();
+        let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC
         let rpc_future = async move {
             let a = rpc_clone.block_number();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
 
-            match result {
+            let head = match result {
                 Ok(response) => response.unwrap_or(0), // Handle timeout as 0
                 Err(_) => 0,                           // Handle timeout as 0
-            }
+            };
+
+            let head_result = HeadResult {
+                rpc_list_index: i,
+                reported_head: head,
+            };
+
+            // Send the result to the main thread through the channel
+            tx.send(head_result)
+                .await
+                .expect("head check: Channel send error");
         };
 
         rpc_futures.push(rpc_future);
     }
 
-    // Wait for all RPC futures concurrently and collect their results
+    // Wait for all RPC futures concurrently
     for rpc_future in rpc_futures {
-        let result = tokio::spawn(rpc_future);
-        threads.push(result);
+        tokio::spawn(rpc_future);
     }
 
-    // Collect the results using tokio::select!
+    // Collect the results in order from the channel
     for _ in 0..len {
-        select! {
-            result = threads.pop().unwrap() => {
-                heads.push(result.unwrap());
-            }
+        if let Some(result) = rx.recv().await {
+            heads.push(result);
         }
     }
-    println!("Heads: {:?}", heads);
 
     Ok(heads)
 }
@@ -118,130 +133,157 @@ async fn head_check(
 fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
-    heads: Vec<u64>,
+    heads: Vec<HeadResult>,
 ) -> Result<u64, Box<dyn std::error::Error>> {
     // Get the highest head reported by the RPCs
     let mut highest_head = 0;
-    for head in heads.iter() {
-        if head > &highest_head {
-            highest_head = *head;
+    for head in &heads {
+        if head.reported_head > highest_head {
+            highest_head = head.reported_head;
         }
     }
-    println!("Highest head: {:?}", highest_head);
 
-    // Iterate over `rpc_list` and move those falling behind to the `poverty_list`
-    // We also set their is_erroring status to true and their last erroring to the
-    // current unix timestamps in seconds
+    // Mark all RPCs that dont report the highest head as erroring
     let mut rpc_list_guard = rpc_list.write().unwrap();
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
-    let mut i = 0;
+    for head in heads {
+        if head.reported_head < highest_head {
+            // Mark the RPC as erroring
+            rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
 
-    while i < rpc_list_guard.len() {
-        // If the RPC is not following the head, nuke it to poverty
-        if heads[i] < highest_head {
-            println!("RPC {} is falling behind",  rpc_list_guard[i].url);
-
-            rpc_list_guard[i].status.is_erroring = true;
-            rpc_list_guard[i].status.last_error = chrono::Utc::now().timestamp() as u64;
-
-            // Remove the element from rpc_list_guard and append it to poverty_list_guard
-            let removed_rpc = rpc_list_guard.remove(i);
-            poverty_list_guard.push(removed_rpc);
-        } else {
-            i += 1; // Move to the next element if not removed
+            // Add the RPC to the poverty list
+            poverty_list_guard.push(rpc_list_guard[head.rpc_list_index].clone());
         }
     }
+
+    // Go over rpc_list_guard and remove all erroring rpcs
+    rpc_list_guard.retain(|rpc| rpc.status.is_erroring == false);
 
     Ok(highest_head)
 }
 
 // Go over the `poverty_list` to see if any nodes are back to normal
-async fn escape_poverty(
+fn escape_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
-    ttl: u64,
+    poverty_heads: Vec<HeadResult>,
     agreed_head: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Do a head check over the current poverty list to see if any nodes are back to normal
-    let poverty_heads = head_check(&poverty_list, ttl.into()).await?;
-    println!("Poverty heads: {:?}", poverty_heads);
-
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
-    let mut i = 0;
-    while i < poverty_list_guard.len() {
-        if poverty_heads[i] >= agreed_head {
-            // Remove from poverty list and add to rpc list
-            let mut removed_rpc = poverty_list_guard.remove(i);
-            // Remove erroring status from the rpc
-            removed_rpc.status.is_erroring = false;
+    for head_result in poverty_heads {
+        if head_result.reported_head >= agreed_head {
+            let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
+            rpc.status.is_erroring = false;
 
-            rpc_list_guard.push(removed_rpc);
-        } else {
-            i += 1; // Move to the next element if not removed
+            // Move the RPC from the poverty list to the rpc list
+            rpc_list_guard.push(rpc);
+
+            // Remove the RPC from the poverty list
+            poverty_list_guard[head_result.rpc_list_index]
+                .status
+                .is_erroring = false;
         }
     }
+
+    // Only retain erroring RPCs
+    poverty_list_guard.retain(|rpc| rpc.status.is_erroring == true);
 
     Ok(())
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use std::env;
+/*
+ * Tests
+ */
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     // Helper function to create a test Rpc struct
-//     fn create_test_rpcs() -> Vec<Rpc> {
-//         let llama = Rpc::new(env::var("RPC0").expect("RPC0 not found in .env"), 5);
-//         let builder0x69 = Rpc::new(env::var("RPC1").expect("RPC1 not found in .env"), 5);
-//         let tenderly = Rpc::new(env::var("RPC2").expect("RPC2 not found in .env"), 5);
+    // Construct a hypothetical RPC and heads list for testing
+    fn dummy_head_check() -> Vec<HeadResult> {
+        vec![
+            HeadResult {
+                rpc_list_index: 0,
+                reported_head: 18177557,
+            },
+            HeadResult {
+                rpc_list_index: 1,
+                reported_head: 18193012,
+            },
+            HeadResult {
+                rpc_list_index: 2,
+                reported_head: 0,
+            },
+        ]
+    }
 
-//         vec![llama, builder0x69, tenderly]
-//     }
+    #[test]
+    fn test_poverty() {
+        // Create a mock RPC list and poverty list
+        let rpc1 = Rpc::default();
+        let rpc2 = Rpc::default();
+        let rpc3 = Rpc::default();
 
-//     #[tokio::test]
-//     async fn test_head_check() {
-//         // Create a test Rpc list with at least one Rpc
-//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
+        let rpc_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc2.clone(), rpc3.clone()]));
+        let poverty_list = Arc::new(RwLock::new(vec![]));
 
-//         // Call the head_check function with test arguments
-//         let result = head_check(&rpc_list, 700).await;
-//         assert!(result.is_ok());
+        // Test with dummy head results
+        let heads = dummy_head_check();
 
-//         // Add assertions for the expected behavior of head_check
-//         // based on the test Rpc instance's behavior.
-//     }
+        // Call the make_poverty function
+        let result = make_poverty(&rpc_list, &poverty_list, heads);
+        assert!(result.is_ok());
 
-//     #[tokio::test]
-//     async fn test_make_poverty() {
-//         // Create a test Rpc list with at least one Rpc
-//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
-//         // Create an empty test poverty list
-//         let poverty_list = Arc::new(RwLock::new(Vec::new()));
+        // Check the state of RPCs after the test
+        let rpc_list_guard = rpc_list.read().unwrap();
+        let poverty_list_guard = poverty_list.read().unwrap();
 
-//         // Call the make_poverty function with test arguments
-//         let result = make_poverty(&rpc_list, &poverty_list, vec![0]).unwrap();
-//         assert_eq!(result, 0);
+        // Only 1 RPC should be in the rpc list
+        assert_eq!(rpc_list_guard.len(), 1);
 
-//         // Add assertions for the expected behavior of make_poverty
-//         // based on the test Rpc instance's behavior and input data.
-//     }
+        // The poverty list should now contain 2 RPCs
+        assert_eq!(poverty_list_guard.len(), 2);
+    }
 
-//     #[tokio::test]
-//     async fn test_escape_poverty() {
-//         // Create a test Rpc list with at least one Rpc
-//         let rpc_list = Arc::new(RwLock::new(create_test_rpcs()));
-//         // Create a test poverty list with at least one Rpc
-//         let poverty_list = Arc::new(RwLock::new(create_test_rpcs()));
+    #[test]
+    fn test_escape() {
+        // Create a mock RPC list and poverty list
+        let mut rpc1 = Rpc::default();
+        rpc1.status.is_erroring = true;
 
-//         // Call the escape_poverty function with test arguments
-//         let result = escape_poverty(&rpc_list, &poverty_list, 700, 0).await;
-//         assert!(result.is_ok());
+        let rpc2 = Rpc::default();
+        let mut rpc3 = Rpc::default();
+        rpc3.status.is_erroring = true;
 
-//         // Add assertions for the expected behavior of escape_poverty
-//         // based on the test Rpc instance's behavior and input data.
-//     }
-// }
+        let rpc_list = Arc::new(RwLock::new(vec![rpc2.clone()]));
+        let poverty_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc3.clone()]));
+
+        // Test with dummy head results
+        let heads = vec![
+            HeadResult {
+                rpc_list_index: 0,
+                reported_head: 18177557,
+            },
+            HeadResult {
+                rpc_list_index: 1,
+                reported_head: 18193012,
+            },
+        ];
+
+        // Call the escape_poverty function
+        let result = escape_poverty(&rpc_list, &poverty_list, heads, 18193012);
+        assert!(result.is_ok());
+
+        // Check the state of RPCs after the test
+        let rpc_list_guard = rpc_list.read().unwrap();
+        let poverty_list_guard = poverty_list.read().unwrap();
+        // RPC3 should have escaped poverty
+        assert_eq!(rpc_list_guard.len(), 2);
+
+        // The poverty list should have 1 RPC
+        assert_eq!(poverty_list_guard.len(), 1);
+    }
+}
