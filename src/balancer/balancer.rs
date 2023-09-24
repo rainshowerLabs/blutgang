@@ -93,8 +93,7 @@ async fn forward_body(
                 rpc_position = None;
 
                 // Reconstruct ID
-                let cached = from_utf8_lossy(&rax);
-                let mut cached: serde_json::Value = serde_json::from_str(&cached).unwrap();
+                let mut cached: serde_json::Value = serde_json::from_slice(&rax).unwrap();
                 cached["id"] = id.into();
                 cached.to_string()
             } else {
