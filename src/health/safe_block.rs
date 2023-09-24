@@ -73,7 +73,7 @@ pub async fn get_safe_block(
     }
 
     // Send new blocknumber if modified
-    let send_if_changed = | number: &mut u64 | {
+    let send_if_changed = |number: &mut u64| {
         if number != &safe {
             *number = safe;
             return true;

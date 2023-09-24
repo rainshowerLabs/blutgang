@@ -9,7 +9,10 @@ use std::{
     },
 };
 
-use sled::{ IVec, Batch };
+use sled::{
+    Batch,
+    IVec,
+};
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
@@ -19,7 +22,12 @@ pub async fn manage_cache(
     // Loop for waiting on new values from the blocknum_rx channel
     while blocknum_rx.changed().await.is_ok() {
         let new_finalized = blocknum_rx.borrow().clone();
-        println!("received: {:?}", new_finalized);
+
+        println!(
+            "New finalized block {}, flushing head cache to disk...",
+            new_finalized
+        );
+
         let _ = flush_cache(head_cache, new_finalized, cache);
     }
 
@@ -31,7 +39,7 @@ fn flush_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
     block_number: u64,
     cache: &Arc<sled::Db>,
-) -> Result<(), Box<dyn std::error::Error>>{
+) -> Result<(), Box<dyn std::error::Error>> {
     // sled batch
     let mut batch = Batch::default();
 
@@ -44,7 +52,7 @@ fn flush_cache(
     };
 
     // Iterate from `oldest` to `block_number` and cache all queries into `cache`
-    for block in oldest..=block_number+1 {
+    for block in oldest..=block_number + 1 {
         if let Some(data) = head_cache_guard.get(&block) {
             for (key, value) in data.iter() {
                 // Insert data into the sled batch
@@ -69,9 +77,7 @@ mod tests {
     #[test]
     fn test_flush_cache() -> Result<(), Box<dyn std::error::Error>> {
         // Create a temporary directory for the sled database
-        let db_config = Config::default()
-            .temporary(true)
-            .flush_every_ms(None);
+        let db_config = Config::default().temporary(true).flush_every_ms(None);
 
         // Open a sled database
         let cache = Arc::new(db_config.open()?);
@@ -130,9 +136,8 @@ mod tests {
         assert_eq!(head_cache_guard.len(), 1);
 
         // Test that it doesnt crash when btreemap is empty
-        let head_cache: Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>> = Arc::new(RwLock::new(
-            BTreeMap::new(),
-        ));
+        let head_cache: Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>> =
+            Arc::new(RwLock::new(BTreeMap::new()));
         let result = flush_cache(&head_cache, 2, &cache)?;
         assert_eq!(result, ());
 
