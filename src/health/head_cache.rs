@@ -124,6 +124,10 @@ mod tests {
         let result = cache.get(b"key4")?;
         assert_eq!(result.is_none(), true);
 
+        // Check that we only have 1 hashmap
+        let head_cache_guard = head_cache.read().unwrap();
+        assert_eq!(head_cache_guard.len(), 1);
+
         Ok(())
     }
 }
