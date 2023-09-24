@@ -44,7 +44,7 @@ fn flush_cache(
     };
 
     // Iterate from `oldest` to `block_number` and cache all queries into `cache`
-    for block in oldest..=block_number {
+    for block in oldest..=block_number+1 {
         if let Some(data) = head_cache_guard.get(&block) {
             for (key, value) in data.iter() {
                 // Insert data into the sled batch
@@ -95,6 +95,13 @@ mod tests {
                         .cloned()
                         .collect(),
                 ),
+                (
+                    3, // Block number
+                    [("key4".to_string(), IVec::from("value3"))]
+                        .iter()
+                        .cloned()
+                        .collect(),
+                ),
             ]
             .into_iter()
             .collect(),
@@ -112,6 +119,10 @@ mod tests {
 
         let result = cache.get(b"key3")?;
         assert_eq!(result.unwrap().to_vec(), b"value3");
+
+        // Check that kek4 was not flushed
+        let result = cache.get(b"key4")?;
+        assert_eq!(result.is_none(), true);
 
         Ok(())
     }
