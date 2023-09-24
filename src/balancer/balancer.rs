@@ -23,7 +23,6 @@ use memchr::memmem;
 
 use std::{
     convert::Infallible,
-    str::from_utf8,
     sync::{
         Arc,
         RwLock,
@@ -35,7 +34,6 @@ use std::{
 };
 
 // Macros for accepting requests
-#[cfg(not(feature = "tui"))]
 #[macro_export]
 macro_rules! accept {
     ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
@@ -50,34 +48,6 @@ macro_rules! accept {
                         Arc::clone($rpc_list_rwlock),
                         $ma_length,
                         Arc::clone($cache),
-                        $ttl,
-                    );
-                    response
-                }),
-            )
-            .await
-        {
-            println!("error serving connection: {:?}", err);
-        }
-    };
-}
-
-#[cfg(feature = "tui")]
-#[macro_export]
-macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $rx:expr, $ttl:expr) => {
-        // Finally, we bind the incoming connection to our service
-        if let Err(err) = http1::Builder::new()
-            // `service_fn` converts our function in a `Service`
-            .serve_connection(
-                $io,
-                service_fn(move |req| {
-                    let response = accept_request(
-                        req,
-                        Arc::clone($rpc_list_rwlock),
-                        $ma_length,
-                        Arc::clone($cache),
-                        Arc::clone($rx),
                         $ttl,
                     );
                     response
@@ -145,7 +115,6 @@ async fn forward_body(
                     let mut rpc_list = rpc_list_rwlock.write().unwrap();
                     (rpc, rpc_position) = pick(&mut rpc_list);
                 }
-                #[cfg(not(feature = "tui"))]
                 println!("Forwarding to: {}", rpc.url);
 
                 // Check if we have any RPCs in the list, if not return error
@@ -204,7 +173,6 @@ async fn forward_body(
 // Measures the time needed for a request, and updates the respective
 // RPC lself.
 // In case of a timeout, returns an error.
-#[cfg(not(feature = "tui"))]
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
@@ -235,72 +203,6 @@ pub async fn accept_request(
                 )))
                 .unwrap());
         }
-    }
-
-    println!("Request time: {:?}", time);
-    // Get lock for the rpc list and add it to the moving average if we picked an rpc
-    if rpc_position != None {
-        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
-
-        rpc_list_rwlock_guard[rpc_position.unwrap()]
-            .update_latency(time.as_nanos() as f64, ma_length);
-        println!(
-            "LA {}",
-            rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
-        );
-    }
-
-    response
-}
-
-#[cfg(feature = "tui")]
-pub async fn accept_request(
-    tx: Request<hyper::body::Incoming>,
-    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    ma_length: f64,
-    cache: Arc<Db>,
-    response_list: Arc<RwLock<Vec<String>>>,
-    ttl: u128,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Send request and measure time
-    let time = Instant::now();
-    let response;
-    let mut rpc_position: Option<usize> = Default::default();
-
-    let tx_string = format!("{:?}", tx);
-
-    // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
-    let future = forward_body(tx, &rpc_list_rwlock, cache);
-    let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
-    let time = time.elapsed();
-
-    match result {
-        Ok((res, now)) => {
-            response = res;
-            rpc_position = now;
-        }
-        Err(_) => {
-            response = Ok(hyper::Response::builder()
-                .status(200)
-                .body(Full::new(Bytes::from(
-                    "error: Request timed out! Try again later...".to_string(),
-                )))
-                .unwrap());
-        }
-    }
-
-    // Convert response to string and send to response_list
-    //
-    // If the Vec has 8192 elements, remove the oldest one
-    let response_string = format!("{:?}", &response.as_ref().unwrap());
-    {
-        let mut response_list = response_list.write().unwrap();
-        if response_list.len() == 8190 {
-            response_list.remove(0);
-        }
-        response_list.push(tx_string);
-        response_list.push(response_string);
-        response_list.push("".to_string());
     }
 
     println!("Request time: {:?}", time);
