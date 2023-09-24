@@ -7,6 +7,7 @@ use crate::{
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
+use serde::__private::from_utf8_lossy;
 use serde_json::to_vec;
 
 use blake3::hash;
@@ -122,7 +123,7 @@ async fn forward_body(
                 rpc_position = None;
 
                 // Reconstruct ID
-                let cached = from_utf8(&rax).unwrap();
+                let cached = from_utf8_lossy(&rax);
                 let mut cached: serde_json::Value = serde_json::from_str(&cached).unwrap();
                 cached["id"] = id.into();
                 cached.to_string()
