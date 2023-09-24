@@ -120,7 +120,7 @@ async fn forward_body(
                 if rpc_position == None {
                     return (
                         Ok(hyper::Response::builder()
-                            .status(200)
+                            .status(500)
                             .body(Full::new(Bytes::from(
                                 "error: No working RPC available!".to_string(),
                             )))
