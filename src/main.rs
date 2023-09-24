@@ -9,7 +9,10 @@ use crate::{
         cli_args::create_match,
         types::Settings,
     },
-    health::check::health_check,
+    health::{
+        check::health_check,
+        head_cache::manage_cache,
+    },
     rpc::types::Rpc,
 };
 
@@ -72,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let (mut blocknum_tx, blocknum_rx) = watch::channel(0);
+    let (blocknum_tx, blocknum_rx) = watch::channel(0);
     
     if config.health_check {
         tokio::task::spawn(async move {
@@ -86,6 +89,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await;
         });
     }
+
+    // Spawn a thread for the head cache
+    let head_cache_clone = Arc::clone(&head_cache);
+    let cache_clone = Arc::clone(&cache);
+    let blocknum_rx_clone = blocknum_rx.clone();
+    tokio::task::spawn(async move {
+        let _ = manage_cache(
+            &head_cache_clone,
+            blocknum_rx_clone.clone(),
+            &cache_clone,
+        )
+        .await;
+    });
+
 
     // We start a loop to continuously accept incoming connections
     loop {
