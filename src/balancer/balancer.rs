@@ -196,7 +196,7 @@ pub async fn accept_request(
         }
         Err(_) => {
             response = Ok(hyper::Response::builder()
-                .status(200)
+                .status(408)
                 .body(Full::new(Bytes::from(
                     "error: Request timed out! Try again later...".to_string(),
                 )))
