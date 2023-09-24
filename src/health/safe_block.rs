@@ -17,7 +17,7 @@ use tokio::{
 // Get the latest finalized block
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    finalized: &Arc<RwLock<u64>>,
+    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: u64,
 ) -> Result<u64, RpcError> {
     let len = rpc_list.read().unwrap().len();
@@ -72,10 +72,16 @@ pub async fn get_safe_block(
         }
     }
 
-    // Update the latest finalized block
-    if safe > *finalized.read().unwrap() {
-        *finalized.write().unwrap() = safe;
-    }
+    // Send new blocknumber if modified
+    let send_if_changed = | number: &mut u64 | {
+        if number != &safe {
+            *number = safe;
+            return true;
+        }
+        return false;
+    };
+
+    blocknum_tx.send_if_modified(send_if_changed);
 
     // println!("Safe block: {}", safe);
 

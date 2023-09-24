@@ -24,7 +24,9 @@ use std::{
     },
 };
 
+use sled::IVec;
 use tokio::net::TcpListener;
+use tokio::sync::watch;
 
 use hyper::{
     server::conn::http1,
@@ -53,7 +55,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "true",
     );
     // Cache for storing querries near the tip
-    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, String>>::new()));
+    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, IVec>>::new()));
 
     // Clear database if specified
     if config.do_clear {
@@ -70,14 +72,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let finalized = Arc::new(RwLock::new(0));
-
+    let (mut blocknum_tx, blocknum_rx) = watch::channel(0);
+    
     if config.health_check {
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 rpc_poverty_list,
-                finalized,
+                blocknum_tx,
                 config.ttl,
                 config.health_check_ttl,
             )
