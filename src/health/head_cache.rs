@@ -61,6 +61,7 @@ fn flush_cache(
     Ok(())
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use sled::Config;

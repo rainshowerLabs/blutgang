@@ -7,7 +7,7 @@ use crate::{
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
-use serde::__private::from_utf8_lossy;
+
 use serde_json::to_vec;
 
 use blake3::hash;
