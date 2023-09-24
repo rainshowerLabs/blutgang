@@ -42,7 +42,6 @@ async fn check(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(not(feature = "tui"))]
     print!("Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
@@ -60,7 +59,6 @@ async fn check(
 
     escape_poverty(&rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
-    #[cfg(not(feature = "tui"))]
     println!("OK!");
 
     Ok(())

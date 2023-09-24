@@ -2,8 +2,6 @@ mod balancer;
 mod config;
 mod health;
 mod rpc;
-#[cfg(feature = "tui")]
-mod tui;
 
 use crate::{
     balancer::balancer::accept_request,
@@ -67,33 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(config.address).await?;
     println!("Bound to: {}", config.address);
 
-    // Create a counter to keep track of the last rpc, max so it overflows
-
-    // Create channel for response passing and spawn tui if the feature is enabled
-    #[cfg(feature = "tui")]
-    let response_list = Arc::new(RwLock::new(Vec::new()));
-    #[cfg(feature = "tui")]
-    {
-        use tui::terminal::*;
-        // We're passing the rpc list as an arc to the ui thread.
-        // TODO: This is blocking writes. Make it potentially unsafe or add message passing???
-        let rpc_list_tui = Arc::clone(&rpc_list_rwlock);
-
-        let config_clone = config.clone();
-        let response_list_clone = Arc::clone(&response_list);
-
-        tokio::task::spawn(async move {
-            let mut terminal = setup_terminal().unwrap();
-            let _ = run_tui(
-                &mut terminal,
-                config_clone,
-                &rpc_list_tui,
-                &response_list_clone,
-            )
-            .await;
-        });
-    }
-
     // Spawn a thread for the health check
     //
     // Also handle the finalized block tracking in this thread
@@ -125,26 +96,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Clone the shared `rpc_list_rwlock` and cache for use in the closure
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
-        #[cfg(feature = "tui")]
-        let response_list_clone = Arc::clone(&response_list);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            #[cfg(not(feature = "tui"))]
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
                 config.ma_length,
                 &cache_clone,
-                config.ttl
-            );
-            #[cfg(feature = "tui")]
-            accept!(
-                io,
-                &rpc_list_rwlock_clone,
-                config.ma_length,
-                &cache_clone,
-                &response_list_clone,
                 config.ttl
             );
         });
