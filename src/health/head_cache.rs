@@ -128,6 +128,13 @@ mod tests {
         let head_cache_guard = head_cache.read().unwrap();
         assert_eq!(head_cache_guard.len(), 1);
 
+        // Test that it doesnt crash when btreemap is empty
+        let head_cache: Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>> = Arc::new(RwLock::new(
+            BTreeMap::new(),
+        ));
+        let result = flush_cache(&head_cache, 2, &cache)?;
+        assert_eq!(result, ());
+
         Ok(())
     }
 }
