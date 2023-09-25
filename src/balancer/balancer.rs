@@ -195,6 +195,8 @@ pub async fn accept_request(
             rpc_position = now;
         }
         Err(_) => {
+            // Set rpc position so we can update the 
+            rpc_position =  Some(usize::MAX);
             response = Ok(hyper::Response::builder()
                 .status(408)
                 .body(Full::new(Bytes::from(
