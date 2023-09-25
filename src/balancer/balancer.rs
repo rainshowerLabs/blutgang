@@ -60,6 +60,99 @@ macro_rules! accept {
     };
 }
 
+macro_rules! get_response {
+    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $ttl:expr) => {
+        match $cache.get($tx_hash.as_bytes()) {
+            Ok(rax) => {
+                if let Some(rax) = rax {
+                    $rpc_position = None;
+
+                    // Reconstruct ID
+                    let mut cached: serde_json::Value = serde_json::from_slice(&rax).unwrap();
+                    cached["id"] = $id.into();
+                    cached.to_string()
+                } else {
+                    // Kinda jank but set the id back to what it was before
+                    $tx["id"] = $id.into();
+
+                    let tx_string = $tx.to_string();
+
+                    // Quit blutgang if `tx_string` contains the word `blutgang_quit`
+                    // Only for debugging, remove this for production builds.
+                    if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
+                        std::process::exit(0);
+                    }
+
+                    // Get the next Rpc in line.
+                    let rpc;
+                    {
+                        let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                        (rpc, $rpc_position) = pick(&mut rpc_list);
+                    }
+                    println!("Forwarding to: {}", rpc.url);
+
+                    // Check if we have any RPCs in the list, if not return error
+                    if $rpc_position == None {
+                        return (
+                            Ok(hyper::Response::builder()
+                                .status(500)
+                                .body(Full::new(Bytes::from(
+                                    "error: No working RPC available!".to_string(),
+                                )))
+                                .unwrap()),
+                            None,
+                        );
+                    }
+
+                    // Send the request. And return a timeout if it takes too long
+                    //
+                    // Check if it contains any errors or if its `latest` and insert it if it isn't
+                    let rx = match timeout(
+                        Duration::from_millis($ttl.try_into().unwrap()),
+                        rpc.send_request($tx.clone()),
+                    )
+                    .await
+                    {
+                        Ok(rx) => rx.unwrap(),
+                        Err(_) => {
+                            return (
+                                Ok(hyper::Response::builder()
+                                    .status(408)
+                                    .body(Full::new(Bytes::from(
+                                        "error: Request timed out! Try again later...".to_string(),
+                                    )))
+                                    .unwrap()),
+                                $rpc_position,
+                            );
+                        }
+                    };
+
+                    let rx_str = rx.as_str().to_string();
+
+                    // Don't cache responses that contain errors or missing trie nodes
+                    if cache_method(&tx_string) && cache_result(&rx) {
+                        // Replace the id with 0 and insert that
+                        let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
+                        rx_value["id"] = "0".into();
+                        let rx = serde_json::to_string(&rx_value).unwrap();
+
+                        $cache.insert($tx_hash.as_bytes(), rx.as_bytes()).unwrap();
+                    }
+
+                    rx_str
+                }
+            }
+            Err(_) => {
+                // If anything errors send an rpc request and see if it works, if not then gg
+                println!("Cache error! Check the DB!");
+                $rpc_position = None;
+                "".to_string()
+            }
+        }
+    };
+}
+
+
 // Pick RPC and send request to it. In case the result is cached,
 // read and return from the cache.
 async fn forward_body(
@@ -87,94 +180,7 @@ async fn forward_body(
 
     // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
-    let rax;
-    rax = match cache.get(*tx_hash.as_bytes()) {
-        Ok(rax) => {
-            if let Some(rax) = rax {
-                rpc_position = None;
-
-                // Reconstruct ID
-                let mut cached: serde_json::Value = serde_json::from_slice(&rax).unwrap();
-                cached["id"] = id.into();
-                cached.to_string()
-            } else {
-                // Kinda jank but set the id back to what it was before
-                tx["id"] = id.into();
-
-                let tx_string = tx.to_string();
-
-                // Quit blutgang if `tx_string` contains the word `blutgang_quit`
-                // Only for debugging, remove this for production builds.
-                if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
-                    std::process::exit(0);
-                }
-
-                // Get the next Rpc in line.
-                let rpc;
-                {
-                    let mut rpc_list = rpc_list_rwlock.write().unwrap();
-                    (rpc, rpc_position) = pick(&mut rpc_list);
-                }
-                println!("Forwarding to: {}", rpc.url);
-
-                // Check if we have any RPCs in the list, if not return error
-                if rpc_position == None {
-                    return (
-                        Ok(hyper::Response::builder()
-                            .status(500)
-                            .body(Full::new(Bytes::from(
-                                "error: No working RPC available!".to_string(),
-                            )))
-                            .unwrap()),
-                        None,
-                    );
-                }
-
-                // Send the request. And return a timeout if it takes too long
-                //
-                // Check if it contains any errors or if its `latest` and insert it if it isn't
-                let rx = match timeout(
-                    Duration::from_millis(ttl.try_into().unwrap()),
-                    rpc.send_request(tx.clone()),
-                )
-                .await
-                {
-                    Ok(rx) => rx.unwrap(),
-                    Err(_) => {
-                        return (
-                            Ok(hyper::Response::builder()
-                                .status(408)
-                                .body(Full::new(Bytes::from(
-                                    "error: Request timed out! Try again later...".to_string(),
-                                )))
-                                .unwrap()),
-                            rpc_position,
-                        );
-                    }
-                };
-
-                let rx_str = rx.as_str().to_string();
-
-                // Don't cache responses that contain errors or missing trie nodes
-                if cache_method(&tx_string) && cache_result(&rx) {
-                    // Replace the id with 0 and insert that
-                    let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
-                    rx_value["id"] = "0".into();
-                    let rx = serde_json::to_string(&rx_value).unwrap();
-
-                    cache.insert(*tx_hash.as_bytes(), rx.as_bytes()).unwrap();
-                }
-
-                rx_str
-            }
-        }
-        Err(_) => {
-            // If anything errors send an rpc request and see if it works, if not then gg
-            println!("Cache error! Check the DB!");
-            rpc_position = None;
-            "".to_string()
-        }
-    };
+    let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, ttl);
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
