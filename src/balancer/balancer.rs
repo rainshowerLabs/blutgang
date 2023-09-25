@@ -98,7 +98,7 @@ macro_rules! get_response {
                             Ok(hyper::Response::builder()
                                 .status(500)
                                 .body(Full::new(Bytes::from(
-                                    "error: No working RPC available!".to_string(),
+                                    "{code:-32002, message:\"error: No working RPC available! Try again later...\"".to_string(),
                                 )))
                                 .unwrap()),
                             None,
@@ -120,7 +120,7 @@ macro_rules! get_response {
                                 Ok(hyper::Response::builder()
                                     .status(408)
                                     .body(Full::new(Bytes::from(
-                                        "error: Request timed out! Try again later...".to_string(),
+                                        "{code:-32001, message:\"error: Request timed out! Try again later...\"".to_string(),
                                     )))
                                     .unwrap()),
                                 $rpc_position,
