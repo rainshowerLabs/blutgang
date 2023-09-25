@@ -66,6 +66,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
+    ttl: u128,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
@@ -129,10 +130,29 @@ async fn forward_body(
                     );
                 }
 
-                // Send the request.
+                // Send the request. And return a timeout if it takes too long
                 //
                 // Check if it contains any errors or if its `latest` and insert it if it isn't
-                let rx = rpc.send_request(tx.clone()).await.unwrap();
+                let rx = match timeout(
+                    Duration::from_millis(ttl.try_into().unwrap()),
+                    rpc.send_request(tx.clone()),
+                )
+                .await
+                {
+                    Ok(rx) => rx.unwrap(),
+                    Err(_) => {
+                        return (
+                            Ok(hyper::Response::builder()
+                                .status(408)
+                                .body(Full::new(Bytes::from(
+                                    "error: Request timed out! Try again later...".to_string(),
+                                )))
+                                .unwrap()),
+                            rpc_position,
+                        );
+                    }
+                };
+
                 let rx_str = rx.as_str().to_string();
 
                 // Don't cache responses that contain errors or missing trie nodes
@@ -180,31 +200,15 @@ pub async fn accept_request(
     ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
-    let time = Instant::now();
-    let response;
-    let mut rpc_position: Option<usize> = Default::default();
+    let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
+    let rpc_position: Option<usize>;
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
-    let future = forward_body(tx, &rpc_list_rwlock, cache);
-    let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), future).await;
+    let time = Instant::now();
+    (response, rpc_position) = forward_body(tx, &rpc_list_rwlock, cache, ttl).await;
     let time = time.elapsed();
-
-    match result {
-        Ok((res, now)) => {
-            response = res;
-            rpc_position = now;
-        }
-        Err(_) => {
-            response = Ok(hyper::Response::builder()
-                .status(408)
-                .body(Full::new(Bytes::from(
-                    "error: Request timed out! Try again later...".to_string(),
-                )))
-                .unwrap());
-        }
-    }
-
     println!("Request time: {:?}", time);
+
     // Get lock for the rpc list and add it to the moving average if we picked an rpc
     if rpc_position != None {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
