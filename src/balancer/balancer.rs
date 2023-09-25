@@ -60,6 +60,7 @@ macro_rules! accept {
     };
 }
 
+// Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
     ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $ttl:expr) => {
         match $cache.get($tx_hash.as_bytes()) {
@@ -132,7 +133,8 @@ macro_rules! get_response {
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Replace the id with 0 and insert that
-                        let mut rx_value: serde_json::Value = serde_json::from_str(&rx_str).unwrap();
+                        let mut rx_value: serde_json::Value =
+                            serde_json::from_str(&rx_str).unwrap();
                         rx_value["id"] = "0".into();
                         let rx = serde_json::to_string(&rx_value).unwrap();
 
@@ -151,7 +153,6 @@ macro_rules! get_response {
         }
     };
 }
-
 
 // Pick RPC and send request to it. In case the result is cached,
 // read and return from the cache.
