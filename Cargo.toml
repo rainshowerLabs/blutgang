@@ -2,7 +2,7 @@
 name = "blutgang"
 version = "0.1.0"
 edition = "2021"
-authors = ["makemake <vukasin@gostovic.me>"]
+authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, github contributors"]
 license = "AGPL-3.0-only"
 description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSOM-RPC calls."
 readme = "README.md"
