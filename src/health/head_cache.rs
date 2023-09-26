@@ -21,7 +21,7 @@ pub async fn manage_cache(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Loop for waiting on new values from the blocknum_rx channel
     while blocknum_rx.changed().await.is_ok() {
-        let new_finalized = blocknum_rx.borrow().clone();
+        let new_finalized = *blocknum_rx.borrow();
 
         println!(
             "New finalized block {}, flushing head cache to disk...",

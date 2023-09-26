@@ -42,7 +42,7 @@ pub async fn get_safe_block(
         // Spawn a future for each RPC
         let rpc_future = async move {
             let a = rpc_clone.get_finalized_block();
-            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
+            let result = timeout(Duration::from_millis(ttl), a).await;
 
             let reported_finalized = match result {
                 Ok(response) => response.unwrap(), // Handle timeout as 0
@@ -78,7 +78,7 @@ pub async fn get_safe_block(
             *number = safe;
             return true;
         }
-        return false;
+        false
     };
 
     blocknum_tx.send_if_modified(send_if_changed);

@@ -49,10 +49,10 @@ impl Default for Rpc {
 impl Rpc {
     pub fn new(url: String, max_consecutive: u32) -> Self {
         Self {
-            url: url,
+            url,
             client: Client::new(),
             status: Status::default(),
-            max_consecutive: max_consecutive,
+            max_consecutive,
             consecutive: 0,
         }
     }
@@ -150,7 +150,7 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
 fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
     // TODO: theres a bizzare edge case where the last " isnt removed in the
     // previou step so check for that here and remove it if necessary
-    let hex_string: &str = &hex_string.replace("\"", "");
+    let hex_string: &str = &hex_string.replace('\"', "");
 
     // remove 0x prefix if it exists
     let hex_string = if hex_string.starts_with("0x") {

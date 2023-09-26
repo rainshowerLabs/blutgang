@@ -217,7 +217,7 @@ pub async fn accept_request(
     println!("Request time: {:?}", time);
 
     // Get lock for the rpc list and add it to the moving average if we picked an rpc
-    if rpc_position != None {
+    if rpc_position.is_some() {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
         rpc_list_rwlock_guard[rpc_position.unwrap()]

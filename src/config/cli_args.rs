@@ -82,5 +82,5 @@ pub fn create_match() -> clap::Command {
             .default_value("2000")
             .help("How often to perform the health check"));
 
-    return matches;
+    matches
 }

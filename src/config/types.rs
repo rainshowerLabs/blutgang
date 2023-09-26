@@ -25,7 +25,7 @@ impl Settings {
 
         // Try to open the file at the path specified in the args
         let path = matches.get_one::<String>("config").unwrap();
-        let file: Option<String> = match fs::read_to_string(&path) {
+        let file: Option<String> = match fs::read_to_string(path) {
             Ok(file) => Some(file),
             Err(_) => panic!("Error opening config file at {}", path),
         };
@@ -58,7 +58,7 @@ impl Settings {
         // Replace `localhost` if it exists
         let address = address.replace("localhost", "127.0.0.1");
         // If the address contains `:` dont concatanate the port and just pass the address
-        let address = if address.contains(":") {
+        let address = if address.contains(':') {
             address.to_string()
         } else {
             format!("{}:{}", address, port)
@@ -143,13 +143,13 @@ impl Settings {
 
         Settings {
             rpc_list,
-            do_clear: do_clear,
-            address: address,
-            ma_length: ma_length,
-            health_check: health_check,
-            ttl: ttl,
-            health_check_ttl: health_check_ttl,
-            sled_config: sled_config,
+            do_clear,
+            address,
+            ma_length,
+            health_check,
+            ttl,
+            health_check_ttl,
+            sled_config,
         }
     }
 
@@ -160,7 +160,7 @@ impl Settings {
             .expect("Invalid rpc_list")
             .to_string();
         // Turn the rpc_list into a csv vec
-        let rpc_list: Vec<&str> = rpc_list.split(",").collect();
+        let rpc_list: Vec<&str> = rpc_list.split(',').collect();
         let rpc_list: Vec<String> = rpc_list.iter().map(|rpc| rpc.to_string()).collect();
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
@@ -174,7 +174,7 @@ impl Settings {
             .expect("Invalid address");
         let port = matches.get_one::<String>("port").expect("Invalid port");
         // If the address contains `:` dont concatanate the port and just pass the address
-        let address = if address.contains(":") {
+        let address = if address.contains(':') {
             address.to_string()
         } else {
             format!("{}:{}", address, port)
@@ -235,12 +235,12 @@ impl Settings {
         Settings {
             rpc_list,
             do_clear: clear,
-            address: address,
-            ma_length: ma_length,
-            health_check: health_check,
-            ttl: ttl,
-            health_check_ttl: health_check_ttl,
-            sled_config: sled_config,
+            address,
+            ma_length,
+            health_check,
+            ttl,
+            health_check_ttl,
+            sled_config,
         }
     }
 }

@@ -58,7 +58,7 @@ pub fn cache_result(rx: &str) -> bool {
     let blacklist = ["error", "-320", "-326", "-327"];
 
     for item in blacklist.iter() {
-        if memmem::find(&rx.as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
             return false;
         }
     }
