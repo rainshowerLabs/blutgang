@@ -169,9 +169,7 @@ async fn forward_body(
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // Get the id of the request and set it to 0 for caching
-    let id = tx["id"].as_u64().unwrap_or(0);
-
-    tx["id"] = "0".into();
+    let id = tx["id"].take().as_u64().unwrap_or(0);
 
     // read tx as bytes
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
