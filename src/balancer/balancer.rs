@@ -136,9 +136,8 @@ macro_rules! get_response {
                         let mut rx_value: serde_json::Value =
                             serde_json::from_str(&rx_str).unwrap();
                         rx_value["id"] = "0".into();
-                        let rx = serde_json::to_string(&rx_value).unwrap();
 
-                        $cache.insert($tx_hash.as_bytes(), rx.as_bytes()).unwrap();
+                        $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                     }
 
                     rx_str
