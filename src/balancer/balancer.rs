@@ -135,7 +135,7 @@ macro_rules! get_response {
                         // Replace the id with 0 and insert that
                         let mut rx_value: serde_json::Value =
                             serde_json::from_str(&rx_str).unwrap();
-                        rx_value["id"] = "0".into();
+                        rx_value["id"] = serde_json::Value::Null;
 
                         $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                     }
