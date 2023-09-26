@@ -145,7 +145,9 @@ macro_rules! get_response {
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
-                println!("Cache error! Check the DB!");
+                println!("!!! Cache error! Check the DB !!!");
+                println!("To recover, please stop blutgang, delete your cache folder, and start it again.");
+                println!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
                 $rpc_position = None;
                 "".to_string()
             }
