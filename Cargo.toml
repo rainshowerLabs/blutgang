@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2021"
 authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, github contributors"]
 license = "AGPL-3.0-only"
-description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSOM-RPC calls."
+description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSON-RPC calls."
 readme = "README.md"
-homepage = "https://github.com/rainshowerLabs/sothis"
-repository = "https://github.com/rainshowerLabs/sothis"
-keywords = ["cli", "ethereum", "foundry", "reth", "revm"]
+homepage = "https://github.com/rainshowerLabs/blutgang"
+repository = "https://github.com/rainshowerLabs/blutgang"
+keywords = ["cli", "ethereum"]
 categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
