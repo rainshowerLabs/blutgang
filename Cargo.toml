@@ -32,6 +32,12 @@ rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
 
+[profile.maxperf]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+incremental = false
+
 [features]
 default = ["selection-weighed-round-robin"]
 no-cache = []
