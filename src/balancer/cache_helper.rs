@@ -65,7 +65,13 @@ fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error> {
     for item in methods.iter() {
         if memmem::find(tx["method"].to_string().as_bytes(), item.method).is_some() {
             let pos = item.position.unwrap();
-            let block_number = tx["params"][pos].to_string();
+            let block_number = tx["params"][pos].to_string().replace("\"", "");
+            
+            // If `null` return None
+            if block_number == "null" {
+                return Ok(None);
+            }
+
             return Ok(Some(block_number));
         }
     }
@@ -226,4 +232,3 @@ mod tests {
         );
     }
 }
-
