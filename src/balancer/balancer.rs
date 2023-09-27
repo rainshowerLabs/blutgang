@@ -186,7 +186,7 @@ async fn forward_body(
     // TODO: Current RPC position. idk of a better way for now so this will do
     let rpc_position;
 
-    // Check if `tx` contains latest anywhere. If not, write or retrieve it from the db
+    // Get the response from either the DB or from a RPC. If it timeouts, retry.
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
     let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, ttl);
 
