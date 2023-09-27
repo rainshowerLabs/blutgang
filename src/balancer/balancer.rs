@@ -43,12 +43,8 @@ macro_rules! accept {
             .serve_connection(
                 $io,
                 service_fn(move |req| {
-                    let response = accept_request(
-                        req,
-                        Arc::clone($rpc_list_rwlock),
-                        Arc::clone($cache),
-                        $ttl,
-                    );
+                    let response =
+                        accept_request(req, Arc::clone($rpc_list_rwlock), Arc::clone($cache), $ttl);
                     response
                 }),
             )
@@ -239,8 +235,7 @@ pub async fn accept_request(
     if rpc_position.is_some() {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list_rwlock_guard[rpc_position.unwrap()]
-            .update_latency(time.as_nanos() as f64);
+        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
         println!(
             "LA {}",
             rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency

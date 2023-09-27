@@ -48,11 +48,7 @@ impl Default for Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(
-        url: String,
-        max_consecutive: u32,
-        ma_length: f64
-    ) -> Self {
+    pub fn new(url: String, max_consecutive: u32, ma_length: f64) -> Self {
         Self {
             url,
             client: Client::new(),
