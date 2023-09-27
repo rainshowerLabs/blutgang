@@ -16,6 +16,7 @@ pub struct Status {
     // The latency is a moving average of the last n calls
     pub latency: f64,
     pub latency_data: Vec<f64>,
+    ma_length: f64,
     // ???
     // pub throughput: f64,
 }
@@ -47,11 +48,18 @@ impl Default for Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String, max_consecutive: u32) -> Self {
+    pub fn new(
+        url: String,
+        max_consecutive: u32,
+        ma_length: f64
+    ) -> Self {
         Self {
             url,
             client: Client::new(),
-            status: Status::default(),
+            status: Status {
+                ma_length,
+                ..Default::default()
+            },
             max_consecutive,
             consecutive: 0,
         }
@@ -117,9 +125,9 @@ impl Rpc {
     }
 
     // Update the latency of the last n calls
-    pub fn update_latency(&mut self, latest: f64, ma_length: f64) {
+    pub fn update_latency(&mut self, latest: f64) {
         // If we have data >= to ma_length, remove the first one in line
-        if self.status.latency_data.len() >= ma_length as usize {
+        if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
         }
 

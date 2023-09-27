@@ -46,7 +46,6 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        $ma_length,
                         Arc::clone($cache),
                         $ttl,
                     );
@@ -89,7 +88,7 @@ macro_rules! get_response {
                     let mut retries = 0;
                     loop {
                         // Get the next Rpc in line.
-                        let rpc;
+                        let mut rpc;
                         {
                             let mut rpc_list = $rpc_list_rwlock.write().unwrap();
                             (rpc, $rpc_position) = pick(&mut rpc_list);
@@ -122,10 +121,13 @@ macro_rules! get_response {
                                 rx = rxa.unwrap();
                                 break;
                             },
-                            Err(_) => retries += 1,
+                            Err(_) => {
+                                rpc.update_latency($ttl as f64);
+                                retries += 1;
+                            },
                         };
 
-                        if retries == 5 {
+                        if retries == 128 {
                             return (
                                 Ok(hyper::Response::builder()
                                     .status(408)
@@ -220,7 +222,6 @@ async fn forward_body(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    ma_length: f64,
     cache: Arc<Db>,
     ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -239,7 +240,7 @@ pub async fn accept_request(
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
         rpc_list_rwlock_guard[rpc_position.unwrap()]
-            .update_latency(time.as_nanos() as f64, ma_length);
+            .update_latency(time.as_nanos() as f64);
         println!(
             "LA {}",
             rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
