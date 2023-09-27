@@ -84,38 +84,48 @@ macro_rules! get_response {
                         std::process::exit(0);
                     }
 
-                    // Get the next Rpc in line.
-                    let rpc;
-                    {
-                        let mut rpc_list = $rpc_list_rwlock.write().unwrap();
-                        (rpc, $rpc_position) = pick(&mut rpc_list);
-                    }
-                    println!("Forwarding to: {}", rpc.url);
+                    // Loop until we get a response
+                    let rx;
+                    let mut retries = 0;
+                    loop {
+                        // Get the next Rpc in line.
+                        let rpc;
+                        {
+                            let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                            (rpc, $rpc_position) = pick(&mut rpc_list);
+                        }
+                        println!("Forwarding to: {}", rpc.url);
 
-                    // Check if we have any RPCs in the list, if not return error
-                    if $rpc_position == None {
-                        return (
-                            Ok(hyper::Response::builder()
-                                .status(500)
-                                .body(Full::new(Bytes::from(
-                                    "{code:-32002, message:\"error: No working RPC available! Try again later...\"".to_string(),
-                                )))
-                                .unwrap()),
-                            None,
-                        );
-                    }
+                        // Check if we have any RPCs in the list, if not return error
+                        if $rpc_position == None {
+                            return (
+                                Ok(hyper::Response::builder()
+                                    .status(500)
+                                    .body(Full::new(Bytes::from(
+                                        "{code:-32002, message:\"error: No working RPC available! Try again later...\"".to_string(),
+                                    )))
+                                    .unwrap()),
+                                None,
+                            );
+                        }
 
-                    // Send the request. And return a timeout if it takes too long
-                    //
-                    // Check if it contains any errors or if its `latest` and insert it if it isn't
-                    let rx = match timeout(
-                        Duration::from_millis($ttl.try_into().unwrap()),
-                        rpc.send_request($tx.clone()),
-                    )
-                    .await
-                    {
-                        Ok(rx) => rx.unwrap(),
-                        Err(_) => {
+                        // Send the request. And return a timeout if it takes too long
+                        //
+                        // Check if it contains any errors or if its `latest` and insert it if it isn't
+                        match timeout(
+                            Duration::from_millis($ttl.try_into().unwrap()),
+                            rpc.send_request($tx.clone()),
+                        )
+                        .await
+                        {
+                            Ok(rxa) => {
+                                rx = rxa.unwrap();
+                                break;
+                            },
+                            Err(_) => retries += 1,
+                        };
+
+                        if retries == 5 {
                             return (
                                 Ok(hyper::Response::builder()
                                     .status(408)
@@ -126,7 +136,8 @@ macro_rules! get_response {
                                 $rpc_position,
                             );
                         }
-                    };
+
+                    }
 
                     let rx_str = rx.as_str().to_string();
 
@@ -184,7 +195,7 @@ async fn forward_body(
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
 
     // TODO: Current RPC position. idk of a better way for now so this will do
-    let rpc_position;
+    let mut rpc_position;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
