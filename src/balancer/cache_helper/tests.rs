@@ -166,8 +166,9 @@ fn create_dummy_head_cache() -> Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>
     Arc::new(RwLock::new(BTreeMap::new()))
 }
 
-#[tokio::test]
-async fn test_get_cache_block_less_than_finalized() {
+
+#[test]
+fn test_get_cache_block_less_than_finalized() {
     // Arrange
     let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xa", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
@@ -183,8 +184,9 @@ async fn test_get_cache_block_less_than_finalized() {
     assert_eq!(result.unwrap(), None);
 }
 
-#[tokio::test]
-async fn test_get_cache_block_greater_than_finalized_in_cache() {
+
+#[test]
+fn test_get_cache_block_greater_than_finalized_in_cache() {
     // Arrange
     let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xB", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
@@ -205,8 +207,9 @@ async fn test_get_cache_block_greater_than_finalized_in_cache() {
     assert_eq!(result.unwrap().unwrap(), "cached_data".as_bytes());
 }
 
-#[tokio::test]
-async fn test_get_cache_block_greater_than_finalized_in_head_cache() {
+
+#[test]
+fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     // Arrange
     let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xF", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
@@ -231,8 +234,9 @@ async fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     assert_eq!(result.unwrap().unwrap(), "head_cached_data".as_bytes());
 }
 
-#[tokio::test]
-async fn test_get_cache_block_number_invalid() {
+
+#[test]
+fn test_get_cache_block_number_invalid() {
     // Arrange
     let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["latest", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
