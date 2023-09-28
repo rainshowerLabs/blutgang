@@ -1,3 +1,4 @@
+use blake3::Hash;
 use memchr::memmem;
 use serde_json::{
     Error,
@@ -113,6 +114,11 @@ pub fn get_cache(
     let tx_block_number = tx_block_number.unwrap().parse::<u64>().unwrap_or(finalized);
 
     if tx_block_number < finalized {
-        return cache.get(tx_hash.as_bytes())?;
+        return Ok(cache.get(tx_hash.as_bytes())?);
     }
+
+    let head_cache_guard = head_cache.read().unwrap();
+
+    let hashmap = head_cache_guard.get(&tx_block_number);
+    Ok(hashmap[tx_hash.to_string()])
 }
