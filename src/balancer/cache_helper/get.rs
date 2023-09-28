@@ -5,6 +5,17 @@ use serde_json::{
 };
 use sled::IVec;
 
+use std::{
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
+
 struct RequestPos<'a> {
     pub method: &'a [u8],
     pub position: Option<usize>,
@@ -80,7 +91,28 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
     Ok(None)
 }
 
-// Try to get data from cache, None if not present
-pub fn get_cache(tx: Value) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
-    From
+// Try to get data from cache, return None if not present
+pub fn get_cache(
+    tx: Value,
+    tx_hash: Hash,
+    mut blocknum_rx: tokio::sync::watch::Receiver<u64>,
+    cache: &Arc<sled::Db>,
+    head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
+) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
+    // Extract the blocknumber from the tx
+    //
+    // If less than blocknum_rx querry cache, if not try head_cache
+    let tx_block_number = get_block_number_from_request(tx.clone())?;
+    // `tx_block_number` can be `None`, so just return None immediately if so
+    if tx_block_number.is_none() {
+        return Ok(None);
+    }
+
+    let finalized = blocknum_rx.borrow().clone();
+    // Parse block number as u64, if it fails, return finalized so we dont querry the disk
+    let tx_block_number = tx_block_number.unwrap().parse::<u64>().unwrap_or(finalized);
+
+    if tx_block_number < finalized {
+        return cache.get(tx_hash.as_bytes())?;
+    }
 }
