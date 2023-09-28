@@ -163,7 +163,7 @@ fn create_dummy_cache() -> Arc<sled::Db> {
 // Helper function to create a dummy head cache for testing
 fn create_dummy_head_cache() -> Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>> {
     // Replace with your actual head cache setup
-    Arc::new(RwLock::new(BTreeMap::new()))
+    Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, IVec>>::new()))
 }
 
 
@@ -194,17 +194,24 @@ fn test_get_cache_block_greater_than_finalized_in_cache() {
     let cache = create_dummy_cache();
     let head_cache = create_dummy_head_cache();
 
-    // Insert test data into the cache
-    cache
-        .insert("test_hash".as_bytes(), "cached_data".as_bytes())
-        .unwrap();
+     // Insert test data into head_cache
+    let mut hashmap = HashMap::new();
+    hashmap.insert(
+        tx_hash.to_string(),
+        tx.to_string().as_bytes().to_vec().into(),
+    );
+
+    {
+        head_cache.write().unwrap().insert(15, hashmap);
+    }
+    assert_eq!(head_cache.read().unwrap().len(), 1);
 
     // Act
-    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+    let result = get_cache(tx.clone(), tx_hash, blocknum_rx, &cache, &head_cache);
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().unwrap(), "cached_data".as_bytes());
+    assert_eq!(result.unwrap().unwrap(), to_vec(&tx).unwrap().as_slice());
 }
 
 
@@ -216,15 +223,18 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     let blocknum_rx = watch::channel(15).1; // Finalized block number
     let cache = create_dummy_cache();
     let head_cache = create_dummy_head_cache();
+    let mut hashmap = HashMap::new();
 
     // Insert test data into the head cache
-    let mut head_cache_guard = head_cache.write().unwrap();
-    let mut hashmap = HashMap::new();
-    hashmap.insert(
-        "test_hash".to_string(),
-        IVec::from("head_cached_data".as_bytes()),
-    );
-    head_cache_guard.insert(20, hashmap);
+    {
+        let mut head_cache_guard = head_cache.write().unwrap();
+        
+        hashmap.insert(
+            tx_hash.to_string(),
+            tx.to_string().as_bytes().to_vec().into(),
+        );
+        head_cache_guard.insert(20, hashmap);
+    }
 
     // Act
     let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
