@@ -1,5 +1,23 @@
-use crate::balancer::cache_helper::get::get_block_number_from_request;
+use crate::balancer::cache_helper::manage::get_block_number_from_request;
+use crate::balancer::cache_helper::manage::get_cache;
+use blake3::hash;
 use serde_json::json;
+use serde_json::to_vec;
+
+use tokio::sync::watch;
+
+use sled::IVec;
+
+use std::{
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
 
 #[test]
 fn get_block_number_from_request_test() {
@@ -134,4 +152,98 @@ fn get_block_number_from_request_test() {
     });
 
     assert_eq!(get_block_number_from_request(request).unwrap(), None);
+}
+
+// Helper function to create a dummy sled::Db for testing
+fn create_dummy_cache() -> Arc<sled::Db> {
+    // Replace with your actual sled::Db setup
+    Arc::new(sled::Config::new().temporary(true).open().unwrap())
+}
+
+// Helper function to create a dummy head cache for testing
+fn create_dummy_head_cache() -> Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>> {
+    // Replace with your actual head cache setup
+    Arc::new(RwLock::new(BTreeMap::new()))
+}
+
+#[tokio::test]
+async fn test_get_cache_block_less_than_finalized() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xa", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Act
+    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), None);
+}
+
+#[tokio::test]
+async fn test_get_cache_block_greater_than_finalized_in_cache() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xB", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(10).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Insert test data into the cache
+    cache
+        .insert("test_hash".as_bytes(), "cached_data".as_bytes())
+        .unwrap();
+
+    // Act
+    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().unwrap(), "cached_data".as_bytes());
+}
+
+#[tokio::test]
+async fn test_get_cache_block_greater_than_finalized_in_head_cache() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xF", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Insert test data into the head cache
+    let mut head_cache_guard = head_cache.write().unwrap();
+    let mut hashmap = HashMap::new();
+    hashmap.insert(
+        "test_hash".to_string(),
+        IVec::from("head_cached_data".as_bytes()),
+    );
+    head_cache_guard.insert(20, hashmap);
+
+    // Act
+    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().unwrap(), "head_cached_data".as_bytes());
+}
+
+#[tokio::test]
+async fn test_get_cache_block_number_invalid() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["latest", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Act
+    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), None);
 }

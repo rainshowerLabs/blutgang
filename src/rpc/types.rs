@@ -152,7 +152,7 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     Ok(number)
 }
 
-fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
+pub fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
     // TODO: theres a bizzare edge case where the last " isnt removed in the
     // previou step so check for that here and remove it if necessary
     let hex_string: &str = &hex_string.replace('\"', "");

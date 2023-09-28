@@ -1,3 +1,5 @@
+use crate::rpc::types::hex_to_decimal;
+
 use blake3::Hash;
 use memchr::memmem;
 use serde_json::{
@@ -96,7 +98,7 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
 pub fn get_cache(
     tx: Value,
     tx_hash: Hash,
-    mut blocknum_rx: tokio::sync::watch::Receiver<u64>,
+    blocknum_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
     head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
 ) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
@@ -109,9 +111,13 @@ pub fn get_cache(
         return Ok(None);
     }
 
+    // Parse block number as u64. If the block number is some bullshit like latest, return None
+    let tx_block_number = match hex_to_decimal(&tx_block_number.unwrap()) {
+        Ok(block_number) => block_number,
+        Err(_) => return Ok(None),
+    };
+
     let finalized = blocknum_rx.borrow().clone();
-    // Parse block number as u64, if it fails, return finalized so we dont querry the disk
-    let tx_block_number = tx_block_number.unwrap().parse::<u64>().unwrap_or(finalized);
 
     if tx_block_number < finalized {
         return Ok(cache.get(tx_hash.as_bytes())?);
@@ -119,6 +125,11 @@ pub fn get_cache(
 
     let head_cache_guard = head_cache.read().unwrap();
 
-    let hashmap = head_cache_guard.get(&tx_block_number);
-    Ok(hashmap[tx_hash.to_string()])
+    if let Some(hashmap) = head_cache_guard.get(&tx_block_number) {
+        if let Some(value) = hashmap.get(&tx_hash.to_string()) {
+            return Ok(Some(value.clone()));
+        }
+    }
+
+    Ok(None)
 }
