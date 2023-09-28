@@ -1,3 +1,3 @@
-pub mod get;
+pub mod manage;
 #[cfg(test)]
 mod tests;
