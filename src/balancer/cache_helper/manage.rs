@@ -1,5 +1,5 @@
-use serde_json::to_vec;
 use crate::rpc::types::hex_to_decimal;
+use serde_json::to_vec;
 
 use blake3::Hash;
 use memchr::memmem;
@@ -122,7 +122,6 @@ pub fn get_cache(
         Err(_) => return Ok(None),
     };
 
-
     let finalized = blocknum_rx.borrow().clone();
 
     if tx_block_number < finalized {
@@ -152,10 +151,6 @@ pub fn insert_cache(
     //
     // If less than blocknum_rx write to cache, if not head_cache
     let tx_block_number = get_block_number_from_request(tx.clone())?;
-    // `tx_block_number` can be `None`, so just return None immediately if so
-    if tx_block_number.is_none() {
-        return Ok(None);
-    }
 
     // Parse block number as u64. If the block number is some bullshit like latest, return None
     let tx_block_number = match hex_to_decimal(&tx_block_number.unwrap()) {
@@ -166,16 +161,24 @@ pub fn insert_cache(
     let finalized = blocknum_rx.borrow().clone();
 
     if tx_block_number < finalized {
-        return Ok(cache.insert(tx_hash.as_bytes(), to_vec(&tx).unwrap().as_slice()).unwrap());
+        return Ok(cache
+            .insert(tx_hash.as_bytes(), to_vec(&tx).unwrap().as_slice())
+            .unwrap());
     }
 
     let mut head_cache_guard = head_cache.write().unwrap();
 
     if let Some(hashmap) = head_cache_guard.get_mut(&tx_block_number) {
-        hashmap.insert(tx_hash.to_string(), tx.to_string().as_bytes().to_vec().into());
+        hashmap.insert(
+            tx_hash.to_string(),
+            tx.to_string().as_bytes().to_vec().into(),
+        );
     } else {
         let mut hashmap = HashMap::new();
-        hashmap.insert(tx_hash.to_string(), tx.to_string().as_bytes().to_vec().into());
+        hashmap.insert(
+            tx_hash.to_string(),
+            tx.to_string().as_bytes().to_vec().into(),
+        );
         head_cache_guard.insert(tx_block_number, hashmap);
     }
 

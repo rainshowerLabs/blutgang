@@ -166,7 +166,6 @@ fn create_dummy_head_cache() -> Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>
     Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, IVec>>::new()))
 }
 
-
 #[test]
 fn test_get_cache_block_less_than_finalized() {
     // Arrange
@@ -184,7 +183,6 @@ fn test_get_cache_block_less_than_finalized() {
     assert_eq!(result.unwrap(), None);
 }
 
-
 #[test]
 fn test_get_cache_block_greater_than_finalized_in_cache() {
     // Arrange
@@ -194,7 +192,7 @@ fn test_get_cache_block_greater_than_finalized_in_cache() {
     let cache = create_dummy_cache();
     let head_cache = create_dummy_head_cache();
 
-     // Insert test data into head_cache
+    // Insert test data into head_cache
     let mut hashmap = HashMap::new();
     hashmap.insert(
         tx_hash.to_string(),
@@ -214,7 +212,6 @@ fn test_get_cache_block_greater_than_finalized_in_cache() {
     assert_eq!(result.unwrap().unwrap(), to_vec(&tx).unwrap().as_slice());
 }
 
-
 #[test]
 fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     // Arrange
@@ -228,7 +225,7 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     // Insert test data into the head cache
     {
         let mut head_cache_guard = head_cache.write().unwrap();
-        
+
         hashmap.insert(
             tx_hash.to_string(),
             tx.to_string().as_bytes().to_vec().into(),
@@ -243,7 +240,6 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap().unwrap(), to_vec(&tx).unwrap().as_slice());
 }
-
 
 #[test]
 fn test_get_cache_block_number_invalid() {
