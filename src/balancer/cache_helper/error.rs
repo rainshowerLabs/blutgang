@@ -6,7 +6,7 @@ use std::error::Error;
 pub enum CacheManagerError {
     NumberParseError,
     CannotRetrieve,
-    InvalidResponse(String),
+    //InvalidResponse(String),
 }
 
 impl std::fmt::Display for CacheManagerError {
@@ -14,10 +14,7 @@ impl std::fmt::Display for CacheManagerError {
         match self {
             CacheManagerError::NumberParseError => write!(f, "Cannot parse number!"),
             CacheManagerError::CannotRetrieve => {
-                write!(
-                    f,
-                    "Cannot retrieve response from DB!"
-                )
+                write!(f, "Cannot retrieve response from DB!")
             }
         }
     }

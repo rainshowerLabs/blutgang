@@ -156,7 +156,7 @@ pub fn insert_cache(
     // Extract the blocknumber from the tx
     //
     // If less than blocknum_rx write to cache, if not head_cache
-        let tx_block_number = match get_block_number_from_request(tx.clone()) {
+    let tx_block_number = match get_block_number_from_request(tx.clone()) {
         Ok(block_number) => block_number,
         Err(_) => return Err(CacheManagerError::NumberParseError),
     };
