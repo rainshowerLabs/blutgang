@@ -1,4 +1,8 @@
 use crate::{
+    balancer::cache_helper::manage::{
+        get_cache,
+        insert_cache,
+    },
     balancer::format::incoming_to_value,
     balancer::selection::cache_rules::{
         cache_method,
@@ -7,6 +11,9 @@ use crate::{
     balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
+use sled::IVec;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use serde_json::to_vec;
 
@@ -36,15 +43,21 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $head_cache:expr, $blocknum_rx:expr, $cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
             .serve_connection(
                 $io,
                 service_fn(move |req| {
-                    let response =
-                        accept_request(req, Arc::clone($rpc_list_rwlock), Arc::clone($cache), $ttl);
+                    let response = accept_request(
+                        req,
+                        &Arc::clone($rpc_list_rwlock),
+                        Arc::clone($cache),
+                        $head_cache,
+                        $blocknum_rx,
+                        $ttl,
+                    );
                     response
                 }),
             )
@@ -57,8 +70,15 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $ttl:expr) => {
-        match $cache.get($tx_hash.as_bytes()) {
+    ($tx:expr, $cache:expr, $head_cache:expr, $tx_hash:expr, $blocknum_rx:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $ttl:expr) => {
+        match get_cache
+        (
+            $tx.clone(),
+            $tx_hash,
+            $blocknum_rx,
+            $cache,
+            $head_cache
+        ) {
             Ok(rax) => {
                 if let Some(rax) = rax {
                     $rpc_position = None;
@@ -178,6 +198,8 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
+    head_cache: Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
+    blocknum_rx: tokio::sync::watch::Receiver<u64>,
     ttl: u128,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
@@ -197,7 +219,17 @@ async fn forward_body(
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
-    let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, ttl);
+    let rax = get_response!(
+        tx,
+        &cache,
+        &head_cache,
+        tx_hash,
+        blocknum_rx,
+        rpc_position,
+        id,
+        rpc_list_rwlock,
+        ttl
+    );
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -217,8 +249,10 @@ async fn forward_body(
 // In case of a timeout, returns an error.
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
-    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
+    head_cache: Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
+    blocknum_rx: tokio::sync::watch::Receiver<u64>,
     ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
@@ -227,7 +261,8 @@ pub async fn accept_request(
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, &rpc_list_rwlock, cache, ttl).await;
+    (response, rpc_position) =
+        forward_body(tx, &rpc_list_rwlock, cache, head_cache, blocknum_rx, ttl).await;
     let time = time.elapsed();
     println!("Request time: {:?}", time);
 

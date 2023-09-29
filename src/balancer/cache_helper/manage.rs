@@ -1,3 +1,4 @@
+use crate::balancer::cache_helper::error::CacheManagerError;
 use crate::rpc::types::hex_to_decimal;
 use serde_json::to_vec;
 
@@ -105,11 +106,14 @@ pub fn get_cache(
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
     head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
-) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
+) -> Result<Option<IVec>, CacheManagerError> {
     // Extract the blocknumber from the tx
     //
     // If less than blocknum_rx querry cache, if not try head_cache
-    let tx_block_number = get_block_number_from_request(tx.clone())?;
+    let tx_block_number = match get_block_number_from_request(tx.clone()) {
+        Ok(block_number) => block_number,
+        Err(_) => Err(CacheManagerError::NumberParseError),
+    };
     // `tx_block_number` can be `None`, so just return None immediately if so
     if tx_block_number.is_none() {
         return Ok(None);
