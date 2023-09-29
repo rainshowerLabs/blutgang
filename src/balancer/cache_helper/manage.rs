@@ -108,8 +108,6 @@ pub fn get_cache(
     let tx_block_number = get_block_number_from_request(tx.clone())?;
     // `tx_block_number` can be `None`, so just return None immediately if so
     if tx_block_number.is_none() {
-        println!("tx_block_number is none");
-
         return Ok(None);
     }
 
@@ -119,12 +117,10 @@ pub fn get_cache(
         Err(_) => return Ok(None),
     };
 
-    println!("{:?}", tx_block_number);
 
     let finalized = blocknum_rx.borrow().clone();
 
     if tx_block_number < finalized {
-        println!("tx_block_number < finalized");
         return Ok(cache.get(tx_hash.as_bytes())?);
     }
 

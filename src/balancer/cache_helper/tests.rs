@@ -220,7 +220,7 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     // Arrange
     let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xF", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
-    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let blocknum_rx = watch::channel(14).1; // Finalized block number
     let cache = create_dummy_cache();
     let head_cache = create_dummy_head_cache();
     let mut hashmap = HashMap::new();
@@ -233,15 +233,15 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
             tx_hash.to_string(),
             tx.to_string().as_bytes().to_vec().into(),
         );
-        head_cache_guard.insert(20, hashmap);
+        head_cache_guard.insert(15, hashmap);
     }
 
     // Act
-    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+    let result = get_cache(tx.clone(), tx_hash, blocknum_rx, &cache, &head_cache);
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap().unwrap(), "head_cached_data".as_bytes());
+    assert_eq!(result.unwrap().unwrap(), to_vec(&tx).unwrap().as_slice());
 }
 
 
