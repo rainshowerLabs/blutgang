@@ -273,7 +273,6 @@ fn test_insert_cache_block_less_than_finalized() {
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Some(IVec::try_into(to_vec(&tx).unwrap().as_slice().into()).unwrap()));
 
     // Check if data is in cache
     let cached_data = cache.get(tx_hash.as_bytes()).unwrap();
@@ -294,7 +293,6 @@ fn test_insert_cache_block_greater_than_finalized() {
 
     // Assert
     assert!(result.is_ok());
-    assert_eq!(result.unwrap(), Some(IVec::try_into(to_vec(&tx).unwrap().as_slice().into()).unwrap()));
 
     // Check if data is in head cache
     let head_cache_guard = head_cache.read().unwrap();

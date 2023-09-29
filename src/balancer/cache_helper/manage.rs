@@ -157,6 +157,8 @@ pub fn insert_cache(
         Err(_) => return Ok(None),
     };
 
+    println!("tx_block_number: {}", tx_block_number);
+
     let finalized = blocknum_rx.borrow().clone();
 
     if tx_block_number < finalized {
@@ -168,18 +170,21 @@ pub fn insert_cache(
     let mut head_cache_guard = head_cache.write().unwrap();
 
     if let Some(hashmap) = head_cache_guard.get_mut(&tx_block_number) {
-        hashmap.insert(
+
+        let a = hashmap.insert(
             tx_hash.to_string(),
             tx.to_string().as_bytes().to_vec().into(),
         );
-    } else {
-        let mut hashmap = HashMap::new();
-        hashmap.insert(
-            tx_hash.to_string(),
-            tx.to_string().as_bytes().to_vec().into(),
-        );
-        head_cache_guard.insert(tx_block_number, hashmap);
+
+        return Ok(a);
     }
+
+    let mut hashmap = HashMap::new();
+    hashmap.insert(
+        tx_hash.to_string(),
+        tx.to_string().as_bytes().to_vec().into(),
+    );
+    head_cache_guard.insert(tx_block_number, hashmap);
 
     Ok(None)
 }
