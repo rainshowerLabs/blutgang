@@ -1,3 +1,4 @@
+use crate::balancer::cache_helper::manage::insert_cache;
 use crate::balancer::cache_helper::manage::get_block_number_from_request;
 use crate::balancer::cache_helper::manage::get_cache;
 use blake3::hash;
@@ -169,7 +170,7 @@ fn create_dummy_head_cache() -> Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>
 #[test]
 fn test_get_cache_block_less_than_finalized() {
     // Arrange
-    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xa", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xa", "0x0"],"id":1,"jsonrpc":"2.0"});
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
     let blocknum_rx = watch::channel(15).1; // Finalized block number
     let cache = create_dummy_cache();
@@ -186,7 +187,7 @@ fn test_get_cache_block_less_than_finalized() {
 #[test]
 fn test_get_cache_block_greater_than_finalized_in_cache() {
     // Arrange
-    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xB", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xB", "0x0"],"id":1,"jsonrpc":"2.0"});
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
     let blocknum_rx = watch::channel(10).1; // Finalized block number
     let cache = create_dummy_cache();
@@ -215,7 +216,7 @@ fn test_get_cache_block_greater_than_finalized_in_cache() {
 #[test]
 fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     // Arrange
-    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xF", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xF", "0x0"],"id":1,"jsonrpc":"2.0"});
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
     let blocknum_rx = watch::channel(14).1; // Finalized block number
     let cache = create_dummy_cache();
@@ -244,7 +245,7 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
 #[test]
 fn test_get_cache_block_number_invalid() {
     // Arrange
-    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["latest", "0x0"],"id":1,"jsonrpc":"2.0"}); // Replace with your test data
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["latest", "0x0"],"id":1,"jsonrpc":"2.0"});
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
     let blocknum_rx = watch::channel(15).1; // Finalized block number
     let cache = create_dummy_cache();
@@ -252,6 +253,66 @@ fn test_get_cache_block_number_invalid() {
 
     // Act
     let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), None);
+}
+
+#[test]
+fn test_insert_cache_block_less_than_finalized() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xa", "0x0"],"id":1,"jsonrpc":"2.0"});
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Act
+    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Some(IVec::try_into(to_vec(&tx).unwrap().as_slice().into()).unwrap()));
+
+    // Check if data is in cache
+    let cached_data = cache.get(tx_hash.as_bytes()).unwrap();
+    assert_eq!(cached_data.unwrap(), to_vec(&tx).unwrap().as_slice());
+}
+
+#[test]
+fn test_insert_cache_block_greater_than_finalized() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["0xb", "0x0"],"id":1,"jsonrpc":"2.0"});
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(10).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Act
+    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
+
+    // Assert
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Some(IVec::try_into(to_vec(&tx).unwrap().as_slice().into()).unwrap()));
+
+    // Check if data is in head cache
+    let head_cache_guard = head_cache.read().unwrap();
+    let hashmap = head_cache_guard.get(&11).unwrap();
+    assert_eq!(hashmap.get(&tx_hash.to_string()).unwrap().as_ref(), tx.to_string().as_bytes());
+}
+
+#[test]
+fn test_insert_cache_block_number_invalid() {
+    // Arrange
+    let tx = serde_json::json!({"method":"eth_getTransactionByBlockNumberAndIndex","params":["latest", "0x0"],"id":1,"jsonrpc":"2.0"});
+    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    let blocknum_rx = watch::channel(15).1; // Finalized block number
+    let cache = create_dummy_cache();
+    let head_cache = create_dummy_head_cache();
+
+    // Act
+    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
 
     // Assert
     assert!(result.is_ok());
