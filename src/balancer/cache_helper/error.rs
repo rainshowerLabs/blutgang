@@ -5,23 +5,22 @@ use std::error::Error;
 #[allow(dead_code)]
 pub enum CacheManagerError {
     NumberParseError,
-    OutOfBounds,
+    CannotRetrieve,
     InvalidResponse(String),
 }
 
 impl std::fmt::Display for CacheManagerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RpcError::Unresponsive => write!(f, "RPC is unresponsive"),
-            RpcError::OutOfBounds => {
+            CacheManagerError::NumberParseError => write!(f, "Cannot parse number!"),
+            CacheManagerError::CannotRetrieve => {
                 write!(
                     f,
-                    "Request out of bounds. Most likeley a bad response from the current RPC node."
+                    "Cannot retrieve response from DB!"
                 )
             }
-            RpcError::InvalidResponse(reason) => write!(f, "Invalid RPC response: {}", reason),
         }
     }
 }
 
-impl Error for RpcError {}
+impl Error for CacheManagerError {}

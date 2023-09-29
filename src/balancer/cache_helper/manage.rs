@@ -112,7 +112,7 @@ pub fn get_cache(
     // If less than blocknum_rx querry cache, if not try head_cache
     let tx_block_number = match get_block_number_from_request(tx.clone()) {
         Ok(block_number) => block_number,
-        Err(_) => Err(CacheManagerError::NumberParseError),
+        Err(_) => return Err(CacheManagerError::NumberParseError),
     };
     // `tx_block_number` can be `None`, so just return None immediately if so
     if tx_block_number.is_none() {
@@ -128,7 +128,10 @@ pub fn get_cache(
     let finalized = *blocknum_rx.borrow();
 
     if tx_block_number < finalized {
-        return Ok(cache.get(tx_hash.as_bytes())?);
+        return Ok(match cache.get(tx_hash.as_bytes()) {
+            Ok(value) => value,
+            Err(_) => return Err(CacheManagerError::CannotRetrieve),
+        });
     }
 
     let head_cache_guard = head_cache.read().unwrap();
@@ -149,11 +152,14 @@ pub fn insert_cache(
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
     head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
-) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
+) -> Result<Option<IVec>, CacheManagerError> {
     // Extract the blocknumber from the tx
     //
     // If less than blocknum_rx write to cache, if not head_cache
-    let tx_block_number = get_block_number_from_request(tx.clone())?;
+        let tx_block_number = match get_block_number_from_request(tx.clone()) {
+        Ok(block_number) => block_number,
+        Err(_) => return Err(CacheManagerError::NumberParseError),
+    };
 
     // Parse block number as u64. If the block number is some bullshit like latest, return None
     let tx_block_number = match hex_to_decimal(&tx_block_number.unwrap()) {
