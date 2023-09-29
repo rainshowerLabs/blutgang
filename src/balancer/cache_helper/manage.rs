@@ -1,3 +1,4 @@
+use serde_json::to_vec;
 use crate::rpc::types::hex_to_decimal;
 
 use blake3::Hash;
@@ -94,6 +95,10 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
     Ok(None)
 }
 
+// TODO: Consider making get_cache and insert_cache not compatiable with sled cache interface.
+// If so, we would be able to return things like blocknumber of the querry which can reduce
+// processing time.
+
 // Try to get data from cache, return None if not present
 pub fn get_cache(
     tx: Value,
@@ -130,6 +135,48 @@ pub fn get_cache(
         if let Some(value) = hashmap.get(&tx_hash.to_string()) {
             return Ok(Some(value.clone()));
         }
+    }
+
+    Ok(None)
+}
+
+// Insert data into the appropriate cache
+pub fn insert_cache(
+    tx: Value,
+    tx_hash: Hash,
+    blocknum_rx: tokio::sync::watch::Receiver<u64>,
+    cache: &Arc<sled::Db>,
+    head_cache: &Arc<RwLock<BTreeMap<u64, HashMap<String, IVec>>>>,
+) -> Result<Option<IVec>, Box<dyn std::error::Error>> {
+    // Extract the blocknumber from the tx
+    //
+    // If less than blocknum_rx write to cache, if not head_cache
+    let tx_block_number = get_block_number_from_request(tx.clone())?;
+    // `tx_block_number` can be `None`, so just return None immediately if so
+    if tx_block_number.is_none() {
+        return Ok(None);
+    }
+
+    // Parse block number as u64. If the block number is some bullshit like latest, return None
+    let tx_block_number = match hex_to_decimal(&tx_block_number.unwrap()) {
+        Ok(block_number) => block_number,
+        Err(_) => return Ok(None),
+    };
+
+    let finalized = blocknum_rx.borrow().clone();
+
+    if tx_block_number < finalized {
+        return Ok(cache.insert(tx_hash.as_bytes(), to_vec(&tx).unwrap().as_slice()).unwrap());
+    }
+
+    let mut head_cache_guard = head_cache.write().unwrap();
+
+    if let Some(hashmap) = head_cache_guard.get_mut(&tx_block_number) {
+        hashmap.insert(tx_hash.to_string(), tx.to_string().as_bytes().to_vec().into());
+    } else {
+        let mut hashmap = HashMap::new();
+        hashmap.insert(tx_hash.to_string(), tx.to_string().as_bytes().to_vec().into());
+        head_cache_guard.insert(tx_block_number, hashmap);
     }
 
     Ok(None)
