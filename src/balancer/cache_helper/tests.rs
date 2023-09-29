@@ -202,7 +202,7 @@ fn test_get_cache_block_greater_than_finalized_in_cache() {
     );
 
     {
-        head_cache.write().unwrap().insert(15, hashmap);
+        head_cache.write().unwrap().insert(11, hashmap);
     }
     assert_eq!(head_cache.read().unwrap().len(), 1);
 
