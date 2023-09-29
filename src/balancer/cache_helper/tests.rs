@@ -1,6 +1,6 @@
-use crate::balancer::cache_helper::manage::insert_cache;
 use crate::balancer::cache_helper::manage::get_block_number_from_request;
 use crate::balancer::cache_helper::manage::get_cache;
+use crate::balancer::cache_helper::manage::insert_cache;
 use blake3::hash;
 use serde_json::json;
 use serde_json::to_vec;
@@ -269,7 +269,13 @@ fn test_insert_cache_block_less_than_finalized() {
     let head_cache = create_dummy_head_cache();
 
     // Act
-    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
+    let result = insert_cache(
+        tx.clone(),
+        tx_hash.clone(),
+        blocknum_rx,
+        &cache,
+        &head_cache,
+    );
 
     // Assert
     assert!(result.is_ok());
@@ -289,7 +295,13 @@ fn test_insert_cache_block_greater_than_finalized() {
     let head_cache = create_dummy_head_cache();
 
     // Act
-    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
+    let result = insert_cache(
+        tx.clone(),
+        tx_hash.clone(),
+        blocknum_rx,
+        &cache,
+        &head_cache,
+    );
 
     // Assert
     assert!(result.is_ok());
@@ -297,7 +309,10 @@ fn test_insert_cache_block_greater_than_finalized() {
     // Check if data is in head cache
     let head_cache_guard = head_cache.read().unwrap();
     let hashmap = head_cache_guard.get(&11).unwrap();
-    assert_eq!(hashmap.get(&tx_hash.to_string()).unwrap().as_ref(), tx.to_string().as_bytes());
+    assert_eq!(
+        hashmap.get(&tx_hash.to_string()).unwrap().as_ref(),
+        tx.to_string().as_bytes()
+    );
 }
 
 #[test]
@@ -310,7 +325,13 @@ fn test_insert_cache_block_number_invalid() {
     let head_cache = create_dummy_head_cache();
 
     // Act
-    let result = insert_cache(tx.clone(), tx_hash.clone(), blocknum_rx, &cache, &head_cache);
+    let result = insert_cache(
+        tx.clone(),
+        tx_hash.clone(),
+        blocknum_rx,
+        &cache,
+        &head_cache,
+    );
 
     // Assert
     assert!(result.is_ok());

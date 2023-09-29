@@ -28,7 +28,7 @@ struct BlocknumIndex<'a> {
 // Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
 pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error> {
     // Return None immediately if params == 0
-    if tx["params"].as_array().unwrap().len() == 0 {
+    if tx["params"].as_array().unwrap().is_empty() {
         return Ok(None);
     }
 
@@ -80,7 +80,7 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
     // Iterate through the array and return the position, return None if not present
     for item in methods.iter() {
         if memmem::find(tx["method"].to_string().as_bytes(), item.method).is_some() {
-            let block_number = tx["params"][item.position].to_string().replace("\"", "");
+            let block_number = tx["params"][item.position].to_string().replace('\"', "");
 
             // If `null` return None
             if block_number == "null" {
@@ -121,7 +121,7 @@ pub fn get_cache(
         Err(_) => return Ok(None),
     };
 
-    let finalized = blocknum_rx.borrow().clone();
+    let finalized = *blocknum_rx.borrow();
 
     if tx_block_number < finalized {
         return Ok(cache.get(tx_hash.as_bytes())?);
@@ -159,7 +159,7 @@ pub fn insert_cache(
 
     println!("tx_block_number: {}", tx_block_number);
 
-    let finalized = blocknum_rx.borrow().clone();
+    let finalized = *blocknum_rx.borrow();
 
     if tx_block_number < finalized {
         return Ok(cache
@@ -170,7 +170,6 @@ pub fn insert_cache(
     let mut head_cache_guard = head_cache.write().unwrap();
 
     if let Some(hashmap) = head_cache_guard.get_mut(&tx_block_number) {
-
         let a = hashmap.insert(
             tx_hash.to_string(),
             tx.to_string().as_bytes().to_vec().into(),
