@@ -22,7 +22,7 @@ use std::{
 
 struct BlocknumIndex<'a> {
     pub method: &'a [u8],
-    pub position: Option<usize>,
+    pub position: usize,
 }
 
 // Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
@@ -37,51 +37,50 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
     let methods = [
         BlocknumIndex {
             method: b"eth_getBalance",
-            position: Some(1),
+            position: 1,
         },
         BlocknumIndex {
             method: b"eth_getStorageAt",
-            position: Some(2),
+            position: 2,
         },
         BlocknumIndex {
             method: b"eth_getTransactionCount",
-            position: Some(1),
+            position: 1,
         },
         BlocknumIndex {
             method: b"eth_getBlockTransactionCountByNumber",
-            position: Some(0),
+            position: 0,
         },
         BlocknumIndex {
             method: b"eth_getUncleCountByBlockNumber",
-            position: Some(0),
+            position: 0,
         },
         BlocknumIndex {
             method: b"eth_getCode",
-            position: Some(1),
+            position: 1,
         },
         BlocknumIndex {
             method: b"eth_call",
-            position: Some(1),
+            position: 1,
         },
         BlocknumIndex {
             method: b"eth_getBlockByNumber",
-            position: Some(0),
+            position: 0,
         },
         BlocknumIndex {
             method: b"eth_getTransactionByBlockNumberAndIndex",
-            position: Some(0),
+            position: 0,
         },
         BlocknumIndex {
             method: b"eth_getUncleByBlockNumberAndIndex",
-            position: Some(0),
+            position: 0,
         },
     ];
 
     // Iterate through the array and return the position, return None if not present
     for item in methods.iter() {
         if memmem::find(tx["method"].to_string().as_bytes(), item.method).is_some() {
-            let pos = item.position.unwrap();
-            let block_number = tx["params"][pos].to_string().replace("\"", "");
+            let block_number = tx["params"][item.position].to_string().replace("\"", "");
 
             // If `null` return None
             if block_number == "null" {
