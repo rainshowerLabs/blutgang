@@ -19,7 +19,7 @@ use std::{
     },
 };
 
-struct RequestPos<'a> {
+struct BlocknumIndex<'a> {
     pub method: &'a [u8],
     pub position: Option<usize>,
 }
@@ -34,43 +34,43 @@ pub fn get_block_number_from_request(tx: Value) -> Result<Option<String>, Error>
     // The JSON-RPC standard is all over the place so depending on the method, we need to look at
     // different param indexes. Why? Has i ever???
     let methods = [
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getBalance",
             position: Some(1),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getStorageAt",
             position: Some(2),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getTransactionCount",
             position: Some(1),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getBlockTransactionCountByNumber",
             position: Some(0),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getUncleCountByBlockNumber",
             position: Some(0),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getCode",
             position: Some(1),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_call",
             position: Some(1),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getBlockByNumber",
             position: Some(0),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getTransactionByBlockNumberAndIndex",
             position: Some(0),
         },
-        RequestPos {
+        BlocknumIndex {
             method: b"eth_getUncleByBlockNumberAndIndex",
             position: Some(0),
         },
