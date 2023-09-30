@@ -6,31 +6,41 @@ use std::{
     },
 };
 
+use tokio_stream::{wrappers::WatchStream, StreamExt};
 use sled::Batch;
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    mut blocknum_rx: tokio::sync::watch::Receiver<u64>,
-    mut finalized_rx: tokio::sync::watch::Receiver<u64>,
+    blocknum_rx: tokio::sync::watch::Receiver<u64>,
+    finalized_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
 ) -> Result<(), sled::Error> {
     let mut block_number = 0;
+    let mut last_finalized = 0;
+
+    let mut blocknum_stream = WatchStream::new(blocknum_rx.clone());
+
     // Loop for waiting on new values from the finalized_rx channel
-    while blocknum_rx.changed().await.is_ok() {
+    while blocknum_stream.next().await.is_some() {
         let new_block = *blocknum_rx.borrow();
+        
         println!("New block: {}", new_block);
 
         // If a new block is less or equal(todo) to the last block in our cache,
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
-            println!("Reorg detected!\n Removing stale entries from the cache...");
+            println!("Reorg detected!\nRemoving stale entries from the cache...");
             handle_reorg(&head_cache, block_number, new_block, &cache)?;
         }
 
-        if finalized_rx.changed().await.is_ok() {
-            println!("New finalized block!\n Removing stale entries from the cache...");
-            let _ = remove_stale(&head_cache, *finalized_rx.borrow());
+        // Check if finalized_stream has changed
+        if last_finalized != *finalized_rx.borrow() {
+            last_finalized = *finalized_rx.borrow();
+            println!("New finalized: {}", last_finalized);
+
+            // Remove stale entries from the head_cache
+            remove_stale(&head_cache, last_finalized)?;
         }
 
         block_number = new_block;

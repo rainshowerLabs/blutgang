@@ -52,8 +52,16 @@ async fn check(
 
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
-    // Send head blocknum to channel
-    blocknum_tx.send(agreed_head)?;
+    // Send new blocknumber if modified
+    let send_if_changed = |number: &mut u64| {
+        if number != &agreed_head {
+            *number = agreed_head;
+            return true;
+        }
+        false
+    };
+
+    blocknum_tx.send_if_modified(send_if_changed);
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
