@@ -50,7 +50,7 @@ fn handle_reorg(
 
     // Go over the head cache and get all the keys from block_number to new_block
     let mut head_cache_guard = head_cache.write().unwrap();
-    for i in block_number..new_block {
+    for i in block_number..new_block+1 {
         if let Some(keys) = head_cache_guard.get(&i) {
             for key in keys {
                 batch.remove(key.as_bytes());
@@ -80,9 +80,87 @@ fn remove_stale(
     };
 
     // Remove all entries from the head_cache up to block_number
-    for i in oldest..=block_number {
+    for i in oldest..=block_number+1 {
         head_cache_guard.remove(&i);
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sled::Config;
+
+    // #[tokio::test]
+    // async fn test_manage_cache() {
+    //     // Create test data and resources
+    //     let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
+    //     let (blocknum_tx, blocknum_rx) = tokio::sync::watch::channel(0);
+    //     let (finalized_tx, finalized_rx) = tokio::sync::watch::channel(0);
+    //     let cache = Arc::new(Config::new().temporary(true).open().unwrap());
+
+    //     // Spawn the manage_cache function in a separate thread
+    //     let manage_cache_handle = tokio::spawn(async move {
+    //         let head_cache_clone = Arc::clone(&head_cache);
+    //         let cache_clone = Arc::clone(&cache);
+
+    //         let _ = manage_cache(&head_cache_clone, blocknum_rx, finalized_rx, &cache_clone).await;
+    //     });
+
+    //     // Simulate changes in blocknum_rx and finalized_rx
+    //     blocknum_tx.send(5).unwrap();
+    //     finalized_tx.send(2).unwrap();
+
+    //     // Wait for the manage_cache function to complete
+    //     let result = manage_cache_handle.await;
+    //     assert!(result.is_ok());
+    // }
+
+    #[test]
+    fn test_handle_reorg() {
+        // Create test data and resources
+        let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
+        let cache = Arc::new(Config::new().temporary(true).open().unwrap());
+
+        // Add some data to the head_cache
+        {
+            let mut head_cache_guard = head_cache.write().unwrap();
+            head_cache_guard.insert(1, vec!["key1".to_string()]);
+            head_cache_guard.insert(2, vec!["key2".to_string()]);
+            head_cache_guard.insert(3, vec!["key3".to_string()]);
+        }
+
+        // Call handle_reorg
+        let result = handle_reorg(&head_cache, 2, 3, &cache);
+
+        // Verify the result and check if the data is removed from the cache
+        assert!(result.is_ok());
+        let head_cache_guard = head_cache.read().unwrap();
+        assert!(head_cache_guard.contains_key(&1));
+        assert!(!head_cache_guard.contains_key(&2));
+        assert!(!head_cache_guard.contains_key(&3));
+    }
+
+    #[test]
+    fn test_remove_stale() {
+        // Create test data and resources
+        let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
+
+        // Add some data to the head_cache
+        {
+            let mut head_cache_guard = head_cache.write().unwrap();
+            head_cache_guard.insert(1, vec!["key1".to_string()]);
+            head_cache_guard.insert(2, vec!["key2".to_string()]);
+        }
+
+        // Call remove_stale
+        let result = remove_stale(&head_cache, 1);
+
+        // Verify the result and check if the data is removed from the cache
+        assert!(result.is_ok());
+        let head_cache_guard = head_cache.read().unwrap();
+        assert!(!head_cache_guard.contains_key(&1));
+        assert!(!head_cache_guard.contains_key(&2));
+    }
 }
