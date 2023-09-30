@@ -21,4 +21,4 @@ RUN pwd
 RUN ls -la
 
 # Build and run the Rust project
-CMD ["cargo", "run", "--release", "--", "-c", "config.toml"]
+CMD ["cargo", "run", "--profile", "maxperf", "--", "-c", "config.toml"]
