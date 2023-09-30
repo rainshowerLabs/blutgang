@@ -58,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "true",
     );
     // Cache for storing querries near the tip
-    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, IVec>>::new()));
+    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, String>::new()));
 
     // Clear database if specified
     if config.do_clear {
