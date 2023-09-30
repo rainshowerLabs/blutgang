@@ -17,15 +17,12 @@ use crate::{
 };
 
 use std::{
-    collections::{
-        BTreeMap,
-    },
+    collections::BTreeMap,
     sync::{
         Arc,
         RwLock,
-    }, vec,
+    },
 };
-
 
 use tokio::net::TcpListener;
 use tokio::sync::watch;
@@ -79,7 +76,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if config.health_check {
         tokio::task::spawn(async move {
-            let _ = health_check(rpc_list_health, rpc_poverty_list, &blocknum_tx, finalized_tx, config.ttl, config.health_check_ttl)
+            let _ = health_check(
+                rpc_list_health,
+                rpc_poverty_list,
+                &blocknum_tx,
+                finalized_tx,
+                config.ttl,
+                config.health_check_ttl,
+            )
             .await;
         });
     }

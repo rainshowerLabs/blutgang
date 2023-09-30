@@ -1,16 +1,12 @@
 use std::{
-    collections::{
-        BTreeMap,
-    },
+    collections::BTreeMap,
     sync::{
         Arc,
         RwLock,
     },
 };
 
-use sled::{
-    Batch,
-};
+use sled::Batch;
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
@@ -69,8 +65,6 @@ fn handle_reorg(
 
     Ok(())
 }
-
-
 
 // Removes stale entries from `head_cache`
 fn remove_stale(
