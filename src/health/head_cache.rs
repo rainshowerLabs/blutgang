@@ -123,6 +123,10 @@ mod tests {
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
         let cache = Arc::new(Config::new().temporary(true).open().unwrap());
 
+        let _ = cache.insert("key1", "value1");
+        let _ = cache.insert("key2", "value2");
+        let _ = cache.insert("key3", "value3");
+
         // Add some data to the head_cache
         {
             let mut head_cache_guard = head_cache.write().unwrap();
@@ -140,6 +144,15 @@ mod tests {
         assert!(head_cache_guard.contains_key(&1));
         assert!(!head_cache_guard.contains_key(&2));
         assert!(!head_cache_guard.contains_key(&3));
+
+        // Check if the data is removed from the cache
+        let key1 = cache.get("key1").unwrap();
+        assert!(key1.is_some());
+        let key2 = cache.get("key2").unwrap();
+        assert!(key2.is_none());
+        let key3 = cache.get("key3").unwrap();
+        assert!(key3.is_none());
+
     }
 
     #[test]
