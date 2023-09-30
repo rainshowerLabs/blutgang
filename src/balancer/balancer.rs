@@ -147,6 +147,8 @@ macro_rules! get_response {
                             serde_json::from_str(&rx_str).unwrap();
                         rx_value["id"] = serde_json::Value::Null;
 
+                        // Insert the response hash into the head_cache
+
                         $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                     }
 
