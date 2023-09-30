@@ -18,15 +18,18 @@ pub async fn manage_cache(
     // Loop for waiting on new values from the finalized_rx channel
     while blocknum_rx.changed().await.is_ok() {
         let new_block = *blocknum_rx.borrow();
+        println!("New block: {}", new_block);
 
         // If a new block is less or equal(todo) to the last block in our cache,
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
+            println!("Reorg detected!\n Removing stale entries from the cache...");
             handle_reorg(&head_cache, block_number, new_block, &cache)?;
         }
 
         if finalized_rx.changed().await.is_ok() {
+            println!("New finalized block!\n Removing stale entries from the cache...");
             let _ = remove_stale(&head_cache, *finalized_rx.borrow());
         }
 
