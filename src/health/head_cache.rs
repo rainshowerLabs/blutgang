@@ -31,7 +31,7 @@ pub async fn manage_cache(
         }
 
         if finalized_rx.changed().await.is_ok() {
-            let _ = remove_stale(&head_cache, *finalized_rx.borrow(), &cache);
+            let _ = remove_stale(&head_cache, *finalized_rx.borrow());
         }
 
         block_number = new_block;
@@ -76,11 +76,7 @@ fn handle_reorg(
 fn remove_stale(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
-    cache: &Arc<sled::Db>,
 ) -> Result<(), sled::Error> {
-    // sled batch
-    let mut _batch = Batch::default();
-
     // Get the lowest block_number from the BTreeMap
     let mut head_cache_guard = head_cache.write().unwrap();
 
@@ -93,9 +89,6 @@ fn remove_stale(
     for i in oldest..=block_number {
         head_cache_guard.remove(&i);
     }
-
-    // Apply the batch to the cache
-    cache.apply_batch(_batch)?;
 
     Ok(())
 }
