@@ -246,7 +246,7 @@ mod tests {
         });
 
         assert_eq!(
-            get_block_number_from_request(request).unwrap().unwrap(),
+            get_block_number_from_request(request).unwrap(),
             "latest"
         );
 

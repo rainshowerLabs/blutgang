@@ -40,7 +40,7 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $blocknum_rx:expr, $head_cache:expr, $ttl:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -50,7 +50,7 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        $blocknum_rx,
+                        $finalized_rx,
                         $head_cache,
                         Arc::clone($cache),
                         $ttl,
@@ -67,7 +67,7 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $blocknum_rx:expr, $head_cache:expr, $ttl:expr) => {
+    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
                 if let Some(rax) = rax {
@@ -156,7 +156,14 @@ macro_rules! get_response {
                         if num.is_some() {
                             let num = num.unwrap().parse::<u64>().unwrap(); // We can unwrap this because of `cache_method()` 
 
-                            // 
+                            if num > *$finalized_rx.borrow() {
+                                let mut head_cache = $head_cache.write().unwrap();
+                                head_cache
+                                    .entry(num)
+                                    .or_insert_with(Vec::new)
+                                    .push($tx_hash.to_string());
+
+                            }
 
                             // Replace the id with 0 and insert that
                             let mut rx_value: serde_json::Value =
@@ -196,7 +203,7 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    blocknum_rx: &tokio::sync::watch::Receiver<u64>,
+    finalized_rx: &tokio::sync::watch::Receiver<u64>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -225,7 +232,7 @@ async fn forward_body(
         rpc_position,
         id,
         rpc_list_rwlock,
-        blocknum_rx,
+        finalized_rx,
         head_cache,
         ttl
     );
@@ -249,7 +256,7 @@ async fn forward_body(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    blocknum_rx: &tokio::sync::watch::Receiver<u64>,
+    finalized_rx: &tokio::sync::watch::Receiver<u64>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -261,7 +268,7 @@ pub async fn accept_request(
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let time = Instant::now();
     (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, blocknum_rx, head_cache, cache, ttl).await;
+        forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
     let time = time.elapsed();
     println!("Request time: {:?}", time);
 
