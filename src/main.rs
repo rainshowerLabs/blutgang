@@ -19,7 +19,6 @@ use crate::{
 use std::{
     collections::{
         BTreeMap,
-        HashMap,
     },
     sync::{
         Arc,
@@ -27,7 +26,7 @@ use std::{
     },
 };
 
-use sled::IVec;
+
 use tokio::net::TcpListener;
 use tokio::sync::watch;
 
@@ -75,14 +74,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let (blocknum_tx, blocknum_rx) = watch::channel(0);
+    let (finalized_tx, finalized_rx) = watch::channel(0);
 
     if config.health_check {
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 rpc_poverty_list,
-                blocknum_tx,
+                finalized_tx,
                 config.ttl,
                 config.health_check_ttl,
             )
@@ -93,9 +92,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
     let cache_clone = Arc::clone(&cache);
-    let blocknum_rx_clone = blocknum_rx.clone();
+    let finalized_rx_clone = finalized_rx.clone();
     tokio::task::spawn(async move {
-        let _ = manage_cache(&head_cache_clone, blocknum_rx_clone.clone(), &cache_clone).await;
+        let _ = manage_cache(&head_cache_clone, finalized_rx_clone.clone(), &cache_clone).await;
     });
 
     // We start a loop to continuously accept incoming connections

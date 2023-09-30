@@ -14,12 +14,12 @@ use sled::{
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, String>>>,
-    mut blocknum_rx: tokio::sync::watch::Receiver<u64>,
+    mut finalized_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Loop for waiting on new values from the blocknum_rx channel
-    while blocknum_rx.changed().await.is_ok() {
-        let new_finalized = *blocknum_rx.borrow();
+    // Loop for waiting on new values from the finalized_rx channel
+    while finalized_rx.changed().await.is_ok() {
+        let new_finalized = *finalized_rx.borrow();
 
         println!(
             "New finalized block {}, flushing head cache to disk...",
