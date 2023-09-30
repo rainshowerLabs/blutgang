@@ -22,6 +22,7 @@ use tokio::time::timeout;
 use memchr::memmem;
 
 use std::{
+    collections::BTreeMap,
     convert::Infallible,
     sync::{
         Arc,
@@ -36,15 +37,15 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $ttl:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $blocknum_rx:expr, $head_cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
             .serve_connection(
                 $io,
-                service_fn(move |req| {
+                service_fn( |req| {
                     let response =
-                        accept_request(req, Arc::clone($rpc_list_rwlock), Arc::clone($cache), $ttl);
+                        accept_request(req, Arc::clone($rpc_list_rwlock), $blocknum_rx, $head_cache, Arc::clone($cache), $ttl);
                     response
                 }),
             )
@@ -57,7 +58,7 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $ttl:expr) => {
+    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $blocknum_rx:expr, $head_cache:expr, $ttl:expr) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
                 if let Some(rax) = rax {
@@ -177,6 +178,8 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
+    blocknum_rx: &tokio::sync::watch::Receiver<u64>,
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
 ) -> (
@@ -197,7 +200,7 @@ async fn forward_body(
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
-    let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, ttl);
+    let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, blocknum_rx, head_cache, ttl);
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -218,6 +221,8 @@ async fn forward_body(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    blocknum_rx: &tokio::sync::watch::Receiver<u64>,
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -227,7 +232,7 @@ pub async fn accept_request(
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, &rpc_list_rwlock, cache, ttl).await;
+    (response, rpc_position) = forward_body(tx, &rpc_list_rwlock, blocknum_rx, head_cache, cache, ttl).await;
     let time = time.elapsed();
     println!("Request time: {:?}", time);
 

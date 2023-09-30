@@ -91,8 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
     let cache_clone = Arc::clone(&cache);
+    let blocknum_rx_clone = blocknum_rx.clone();
     tokio::task::spawn(async move {
-        let _ = manage_cache(&head_cache_clone, blocknum_rx, finalized_rx, &cache_clone).await;
+        let _ = manage_cache(&head_cache_clone, blocknum_rx_clone, finalized_rx, &cache_clone).await;
     });
 
     // We start a loop to continuously accept incoming connections
@@ -106,6 +107,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Clone the shared `rpc_list_rwlock` and cache for use in the closure
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
+        let head_cache_clone = Arc::clone(&head_cache);
+        let blocknum_rx_clone = blocknum_rx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -114,6 +117,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &rpc_list_rwlock_clone,
                 config.ma_length,
                 &cache_clone,
+                &blocknum_rx_clone,
+                &head_cache_clone,
                 config.ttl
             );
         });
