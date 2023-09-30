@@ -14,6 +14,7 @@ use sled::{
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, String>>>,
+    mut blocknum_rx: tokio::sync::watch::Receiver<u64>,
     mut finalized_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -26,18 +27,18 @@ pub async fn manage_cache(
             new_finalized
         );
 
-        let _ = flush_cache(head_cache, new_finalized, cache);
+        let _ = remove_stale(head_cache, new_finalized, cache);
     }
 
     Ok(())
 }
 
-// Flushes all cache to disk until and including the blocknumber provided
-fn flush_cache(
+// Removes stale entries from `head_cache`
+fn remove_stale(
     head_cache: &Arc<RwLock<BTreeMap<u64, String>>>,
     block_number: u64,
     cache: &Arc<sled::Db>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), sled::Error> {
     // sled batch
     let mut _batch = Batch::default();
 

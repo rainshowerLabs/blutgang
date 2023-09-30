@@ -26,13 +26,14 @@ struct HeadResult {
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
+    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
     ttl: u128,
     health_check_ttl: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, &ttl).await?;
+        check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
         get_safe_block(&rpc_list, &finalized_tx, health_check_ttl).await?;
     }
 }
@@ -40,6 +41,7 @@ pub async fn health_check(
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     print!("Checking RPC health... ");
@@ -50,6 +52,8 @@ async fn check(
 
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
+    // Send head blocknum to channel
+    blocknum_tx.send(agreed_head)?;
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
