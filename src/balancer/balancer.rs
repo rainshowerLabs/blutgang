@@ -1,7 +1,7 @@
 use crate::{
     balancer::format::{
-        incoming_to_value,
         get_block_number_from_request,
+        incoming_to_value,
     },
     balancer::selection::cache_rules::{
         cache_method,
@@ -154,7 +154,7 @@ macro_rules! get_response {
                         // Insert the response hash into the head_cache
                         let num = get_block_number_from_request($tx);
                         if num.is_some() {
-                            let num = num.unwrap().parse::<u64>().unwrap(); // We can unwrap this because of `cache_method()` 
+                            let num = num.unwrap();
 
                             if num > *$finalized_rx.borrow() {
                                 let mut head_cache = $head_cache.write().unwrap();
