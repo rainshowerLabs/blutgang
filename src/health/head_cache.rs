@@ -6,8 +6,11 @@ use std::{
     },
 };
 
-use tokio_stream::{wrappers::WatchStream, StreamExt};
 use sled::Batch;
+use tokio_stream::{
+    wrappers::WatchStream,
+    StreamExt,
+};
 
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
@@ -23,7 +26,7 @@ pub async fn manage_cache(
     // Loop for waiting on new values from the finalized_rx channel
     while blocknum_stream.next().await.is_some() {
         let new_block = *blocknum_rx.borrow();
-        
+
         // If a new block is less or equal(todo) to the last block in our cache,
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
@@ -60,7 +63,7 @@ fn handle_reorg(
 
     // Go over the head cache and get all the keys from block_number to new_block
     let mut head_cache_guard = head_cache.write().unwrap();
-    for i in block_number..new_block+1 {
+    for i in block_number..new_block + 1 {
         if let Some(keys) = head_cache_guard.get(&i) {
             for key in keys {
                 batch.remove(key.as_bytes());
@@ -90,7 +93,7 @@ fn remove_stale(
     };
 
     // Remove all entries from the head_cache up to block_number
-    for i in oldest..=block_number+1 {
+    for i in oldest..=block_number + 1 {
         head_cache_guard.remove(&i);
     }
 
@@ -162,7 +165,6 @@ mod tests {
         assert!(key2.is_none());
         let key3 = cache.get("key3").unwrap();
         assert!(key3.is_none());
-
     }
 
     #[test]

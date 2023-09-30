@@ -1,7 +1,9 @@
 use http_body_util::BodyExt;
+use hyper::{
+    body::Incoming,
+    Request,
+};
 use memchr::memmem;
-use hyper::body::Incoming;
-use hyper::Request;
 use regex::Regex;
 use serde_json::Value;
 use std::str::from_utf8;
@@ -177,10 +179,10 @@ fn extract_id_test() {
 
 #[cfg(test)]
 mod tests {
-use crate::balancer::format::get_block_number_from_request;
-use serde_json::json;
+    use crate::balancer::format::get_block_number_from_request;
+    use serde_json::json;
 
-#[test]
+    #[test]
     fn get_block_number_from_request_test() {
         let request = json!({
             "id":1,
@@ -189,10 +191,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "latest"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "latest");
 
         let request = json!({
             "id":1,
@@ -201,10 +200,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "0x1"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "0x1");
 
         let request = json!({
             "id":1,
@@ -213,7 +209,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
         });
 
-        assert_eq!(get_block_number_from_request(request),  None);
+        assert_eq!(get_block_number_from_request(request), None);
 
         let request = json!({
             "id":1,
@@ -222,10 +218,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "latest"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "latest"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "latest");
 
         let request = json!({
             "id":1,
@@ -234,10 +227,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "0x1"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "0x1"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "0x1");
 
         let request = json!({
             "id":1,
@@ -267,10 +257,7 @@ use serde_json::json;
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "0x1"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "0x1");
 
         let request = json!({
             "id":1,
@@ -288,10 +275,7 @@ use serde_json::json;
             "params":["latest"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "latest"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "latest");
 
         let request = json!({
             "id":1,
@@ -300,10 +284,7 @@ use serde_json::json;
             "params":["0x1"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request).unwrap(),
-            "0x1"
-        );
+        assert_eq!(get_block_number_from_request(request).unwrap(), "0x1");
 
         let request = json!({
             "id":1,

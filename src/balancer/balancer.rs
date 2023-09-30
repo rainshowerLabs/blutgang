@@ -1,5 +1,8 @@
 use crate::{
-    balancer::format::incoming_to_value,
+    balancer::format::{
+        incoming_to_value,
+        get_block_number_from_request,
+    },
     balancer::selection::cache_rules::{
         cache_method,
         cache_result,
@@ -43,9 +46,15 @@ macro_rules! accept {
             // `service_fn` converts our function in a `Service`
             .serve_connection(
                 $io,
-                service_fn( |req| {
-                    let response =
-                        accept_request(req, Arc::clone($rpc_list_rwlock), $blocknum_rx, $head_cache, Arc::clone($cache), $ttl);
+                service_fn(|req| {
+                    let response = accept_request(
+                        req,
+                        Arc::clone($rpc_list_rwlock),
+                        $blocknum_rx,
+                        $head_cache,
+                        Arc::clone($cache),
+                        $ttl,
+                    );
                     response
                 }),
             )
@@ -142,14 +151,21 @@ macro_rules! get_response {
 
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
-                        // Replace the id with 0 and insert that
-                        let mut rx_value: serde_json::Value =
-                            serde_json::from_str(&rx_str).unwrap();
-                        rx_value["id"] = serde_json::Value::Null;
-
                         // Insert the response hash into the head_cache
+                        let num = get_block_number_from_request($tx);
+                        if num.is_some() {
+                            let num = num.unwrap().parse::<u64>().unwrap(); // We can unwrap this because of `cache_method()` 
 
-                        $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
+                            // 
+
+                            // Replace the id with 0 and insert that
+                            let mut rx_value: serde_json::Value =
+                                serde_json::from_str(&rx_str).unwrap();
+                            rx_value["id"] = serde_json::Value::Null;
+
+                            $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
+                        }
+
                     }
 
                     rx_str
@@ -202,7 +218,17 @@ async fn forward_body(
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
-    let rax = get_response!(tx, cache, tx_hash, rpc_position, id, rpc_list_rwlock, blocknum_rx, head_cache, ttl);
+    let rax = get_response!(
+        tx,
+        cache,
+        tx_hash,
+        rpc_position,
+        id,
+        rpc_list_rwlock,
+        blocknum_rx,
+        head_cache,
+        ttl
+    );
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -234,7 +260,8 @@ pub async fn accept_request(
 
     // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, &rpc_list_rwlock, blocknum_rx, head_cache, cache, ttl).await;
+    (response, rpc_position) =
+        forward_body(tx, &rpc_list_rwlock, blocknum_rx, head_cache, cache, ttl).await;
     let time = time.elapsed();
     println!("Request time: {:?}", time);
 
