@@ -5,7 +5,7 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // If len is 1, return the only element
     if list.len() == 1 {
         return (list[0].clone(), Some(0));
-    } else if list.len() == 0 {
+    } else if list.is_empty() {
         return (Rpc::default(), None);
     }
 
@@ -23,7 +23,7 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     feature = "selection-weighed-round-robin",
     not(feature = "selection-random")
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // Sort by latency
     list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
 
@@ -42,7 +42,7 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     feature = "selection-weighed-round-robin",
     feature = "selection-random"
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     use rand::Rng;
 
     let mut rng = rand::thread_rng();

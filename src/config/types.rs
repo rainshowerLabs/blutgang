@@ -12,7 +12,6 @@ pub struct Settings {
     pub rpc_list: Vec<Rpc>,
     pub do_clear: bool,
     pub address: SocketAddr,
-    pub ma_length: f64,
     pub health_check: bool,
     pub ttl: u128,
     pub health_check_ttl: u64,
@@ -25,7 +24,7 @@ impl Settings {
 
         // Try to open the file at the path specified in the args
         let path = matches.get_one::<String>("config").unwrap();
-        let file: Option<String> = match fs::read_to_string(&path) {
+        let file: Option<String> = match fs::read_to_string(path) {
             Ok(file) => Some(file),
             Err(_) => panic!("Error opening config file at {}", path),
         };
@@ -58,7 +57,7 @@ impl Settings {
         // Replace `localhost` if it exists
         let address = address.replace("localhost", "127.0.0.1");
         // If the address contains `:` dont concatanate the port and just pass the address
-        let address = if address.contains(":") {
+        let address = if address.contains(':') {
             address.to_string()
         } else {
             format!("{}:{}", address, port)
@@ -131,7 +130,7 @@ impl Settings {
                     .unwrap() as u32;
                 let url = rpc_table.get("url").unwrap().as_str().unwrap().to_string();
 
-                let rpc = Rpc::new(url, max_consecutive);
+                let rpc = Rpc::new(url, max_consecutive, ma_length);
                 rpc_list.push(rpc);
             }
         }
@@ -143,13 +142,12 @@ impl Settings {
 
         Settings {
             rpc_list,
-            do_clear: do_clear,
-            address: address,
-            ma_length: ma_length,
-            health_check: health_check,
-            ttl: ttl,
-            health_check_ttl: health_check_ttl,
-            sled_config: sled_config,
+            do_clear,
+            address,
+            health_check,
+            ttl,
+            health_check_ttl,
+            sled_config,
         }
     }
 
@@ -159,13 +157,19 @@ impl Settings {
             .get_one::<String>("rpc_list")
             .expect("Invalid rpc_list")
             .to_string();
+
+        let ma_length = matches
+            .get_one::<String>("ma_length")
+            .expect("Invalid ma_length");
+        let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
+
         // Turn the rpc_list into a csv vec
-        let rpc_list: Vec<&str> = rpc_list.split(",").collect();
+        let rpc_list: Vec<&str> = rpc_list.split(',').collect();
         let rpc_list: Vec<String> = rpc_list.iter().map(|rpc| rpc.to_string()).collect();
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string(), 6))
+            .map(|rpc| Rpc::new(rpc.to_string(), 6, ma_length))
             .collect();
 
         // Build the SocketAddr
@@ -174,7 +178,7 @@ impl Settings {
             .expect("Invalid address");
         let port = matches.get_one::<String>("port").expect("Invalid port");
         // If the address contains `:` dont concatanate the port and just pass the address
-        let address = if address.contains(":") {
+        let address = if address.contains(':') {
             address.to_string()
         } else {
             format!("{}:{}", address, port)
@@ -203,11 +207,6 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid flush_every_ms");
 
-        let ma_length = matches
-            .get_one::<String>("ma_length")
-            .expect("Invalid ma_length");
-        let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
-
         let clear = matches.get_occurrences::<String>("clear").is_some();
         let compression = matches.get_occurrences::<String>("compression").is_some();
 
@@ -235,12 +234,11 @@ impl Settings {
         Settings {
             rpc_list,
             do_clear: clear,
-            address: address,
-            ma_length: ma_length,
-            health_check: health_check,
-            ttl: ttl,
-            health_check_ttl: health_check_ttl,
-            sled_config: sled_config,
+            address,
+            health_check,
+            ttl,
+            health_check_ttl,
+            sled_config,
         }
     }
 }

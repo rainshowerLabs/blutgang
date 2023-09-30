@@ -4,7 +4,7 @@ use clap::{
 };
 
 pub fn create_match() -> clap::Command {
-    let matches = Command::new("blutgang")
+    Command::new("blutgang")
         .version("0.1.0")
         .author("makemake <vukasin@gostovic.me>")
         .about("Tool for replaying historical transactions. Designed to be used with anvil or hardhat.")
@@ -80,7 +80,5 @@ pub fn create_match() -> clap::Command {
             .long("health_check_ttl")
             .num_args(1..)
             .default_value("2000")
-            .help("How often to perform the health check"));
-
-    return matches;
+            .help("How often to perform the health check"))
 }

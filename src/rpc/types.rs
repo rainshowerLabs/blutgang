@@ -16,6 +16,7 @@ pub struct Status {
     // The latency is a moving average of the last n calls
     pub latency: f64,
     pub latency_data: Vec<f64>,
+    ma_length: f64,
     // ???
     // pub throughput: f64,
 }
@@ -47,12 +48,15 @@ impl Default for Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String, max_consecutive: u32) -> Self {
+    pub fn new(url: String, max_consecutive: u32, ma_length: f64) -> Self {
         Self {
-            url: url,
+            url,
             client: Client::new(),
-            status: Status::default(),
-            max_consecutive: max_consecutive,
+            status: Status {
+                ma_length,
+                ..Default::default()
+            },
+            max_consecutive,
             consecutive: 0,
         }
     }
@@ -116,10 +120,11 @@ impl Rpc {
         Ok(return_number)
     }
 
-    // Update the latency of the last n calls
-    pub fn update_latency(&mut self, latest: f64, ma_length: f64) {
+    // Update the latency of the last n calls.
+    // We don't do it within send_request because we might kill it if it times out.
+    pub fn update_latency(&mut self, latest: f64) {
         // If we have data >= to ma_length, remove the first one in line
-        if self.status.latency_data.len() >= ma_length as usize {
+        if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
         }
 
@@ -147,10 +152,10 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
     Ok(number)
 }
 
-fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
+pub fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> {
     // TODO: theres a bizzare edge case where the last " isnt removed in the
     // previou step so check for that here and remove it if necessary
-    let hex_string: &str = &hex_string.replace("\"", "");
+    let hex_string: &str = &hex_string.replace('\"', "");
 
     // remove 0x prefix if it exists
     let hex_string = if hex_string.starts_with("0x") {

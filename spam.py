@@ -1,13 +1,15 @@
 import multiprocessing as mp
 import requests
 import json
+import random
 
 def get_block_number(hex_num):
+    random_id = random.randint(1, 1000000)
     payload = {
         "jsonrpc": "2.0",
         "method": "eth_getBlockByNumber",
         "params": [hex_num, False],
-        "id": 1,
+        "id": random_id,
     }
     response = requests.post("http://127.0.0.1:3000", json=payload)
     result = response.json()
@@ -16,6 +18,11 @@ def get_block_number(hex_num):
     except Exception as e:
         return e
     # block_number = result
+
+    # throw if id doesnt match
+    if result["id"] != random_id:
+        raise ValueError("Invalid response id: %s" % result["id"])
+
     return block_number
 
 def my_func(x):

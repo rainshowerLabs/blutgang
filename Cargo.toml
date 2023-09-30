@@ -2,13 +2,13 @@
 name = "blutgang"
 version = "0.1.0"
 edition = "2021"
-authors = ["makemake <vukasin@gostovic.me>"]
+authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, github contributors"]
 license = "AGPL-3.0-only"
-description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSOM-RPC calls."
+description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSON-RPC calls."
 readme = "README.md"
-homepage = "https://github.com/rainshowerLabs/sothis"
-repository = "https://github.com/rainshowerLabs/sothis"
-keywords = ["cli", "ethereum", "foundry", "reth", "revm"]
+homepage = "https://github.com/rainshowerLabs/blutgang"
+repository = "https://github.com/rainshowerLabs/blutgang"
+keywords = ["cli", "ethereum"]
 categories = ["command-line-utilities"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -31,6 +31,14 @@ memchr = "2.5.0"
 rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
+tokio-stream = {version = "0.1.14", features = ["sync"]}
+
+
+[profile.maxperf]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
+incremental = false
 
 [features]
 default = ["selection-weighed-round-robin"]

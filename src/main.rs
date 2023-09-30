@@ -9,15 +9,15 @@ use crate::{
         cli_args::create_match,
         types::Settings,
     },
-    health::check::health_check,
+    health::{
+        check::health_check,
+        head_cache::manage_cache,
+    },
     rpc::types::Rpc,
 };
 
 use std::{
-    collections::{
-        BTreeMap,
-        HashMap,
-    },
+    collections::BTreeMap,
     sync::{
         Arc,
         RwLock,
@@ -25,6 +25,7 @@ use std::{
 };
 
 use tokio::net::TcpListener;
+use tokio::sync::watch;
 
 use hyper::{
     server::conn::http1,
@@ -53,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "true",
     );
     // Cache for storing querries near the tip
-    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, HashMap<String, String>>::new()));
+    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
     // Clear database if specified
     if config.do_clear {
@@ -70,20 +71,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let finalized = Arc::new(RwLock::new(0));
+    let (blocknum_tx, blocknum_rx) = watch::channel(0);
+    let (finalized_tx, finalized_rx) = watch::channel(0);
 
     if config.health_check {
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 rpc_poverty_list,
-                finalized,
+                &blocknum_tx,
+                finalized_tx,
                 config.ttl,
                 config.health_check_ttl,
             )
             .await;
         });
     }
+
+    // Spawn a thread for the head cache
+    let head_cache_clone = Arc::clone(&head_cache);
+    let cache_clone = Arc::clone(&cache);
+    let finalized_rxclone = finalized_rx.clone();
+    tokio::task::spawn(async move {
+        let _ = manage_cache(
+            &head_cache_clone,
+            blocknum_rx,
+            finalized_rxclone,
+            &cache_clone,
+        )
+        .await;
+    });
 
     // We start a loop to continuously accept incoming connections
     loop {
@@ -96,6 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Clone the shared `rpc_list_rwlock` and cache for use in the closure
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
+        let head_cache_clone = Arc::clone(&head_cache);
+        let finalized_rx_clone = finalized_rx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -104,6 +123,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &rpc_list_rwlock_clone,
                 config.ma_length,
                 &cache_clone,
+                &finalized_rx_clone,
+                &head_cache_clone,
                 config.ttl
             );
         });

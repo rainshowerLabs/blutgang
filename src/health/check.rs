@@ -26,38 +26,50 @@ struct HeadResult {
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
-    finalized: Arc<RwLock<u64>>,
+    blocknum_tx: &tokio::sync::watch::Sender<u64>,
+    finalized_tx: tokio::sync::watch::Sender<u64>,
     ttl: u128,
     health_check_ttl: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, &ttl).await?;
-        get_safe_block(&rpc_list, &finalized, health_check_ttl).await?;
+        check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
+        get_safe_block(&rpc_list, &finalized_tx, health_check_ttl).await?;
     }
 }
 
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
     print!("Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
-    let heads = head_check(&rpc_list, *ttl).await?;
+    let heads = head_check(rpc_list, *ttl).await?;
 
     // Remove RPCs that are falling behind
-    let agreed_head = make_poverty(&rpc_list, poverty_list, heads)?;
+    let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
+    // Send new blocknumber if modified
+    let send_if_changed = |number: &mut u64| {
+        if number != &agreed_head {
+            *number = agreed_head;
+            return true;
+        }
+        false
+    };
+
+    blocknum_tx.send_if_modified(send_if_changed);
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
 
     // Do a head check over the current poverty list to see if any nodes are back to normal
-    let poverty_heads = head_check(&poverty_list, (*ttl).into()).await?;
+    let poverty_heads = head_check(poverty_list, *ttl).await?;
 
-    escape_poverty(&rpc_list, poverty_list, poverty_heads, agreed_head)?;
+    escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
     println!("OK!");
 
@@ -156,7 +168,7 @@ fn make_poverty(
     }
 
     // Go over rpc_list_guard and remove all erroring rpcs
-    rpc_list_guard.retain(|rpc| rpc.status.is_erroring == false);
+    rpc_list_guard.retain(|rpc| !rpc.status.is_erroring);
 
     Ok(highest_head)
 }
@@ -188,7 +200,7 @@ fn escape_poverty(
     }
 
     // Only retain erroring RPCs
-    poverty_list_guard.retain(|rpc| rpc.status.is_erroring == true);
+    poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
     Ok(())
 }
