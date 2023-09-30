@@ -32,7 +32,7 @@ pub async fn manage_cache(
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
             println!("Reorg detected!\nRemoving stale entries from the cache...");
-            handle_reorg(&head_cache, block_number, new_block, &cache)?;
+            handle_reorg(head_cache, block_number, new_block, cache)?;
         }
 
         // Check if finalized_stream has changed
@@ -40,7 +40,7 @@ pub async fn manage_cache(
             last_finalized = *finalized_rx.borrow();
             println!("New finalized block!\nRemoving stale entries from the cache...");
             // Remove stale entries from the head_cache
-            remove_stale(&head_cache, last_finalized)?;
+            remove_stale(head_cache, last_finalized)?;
         }
 
         block_number = new_block;
