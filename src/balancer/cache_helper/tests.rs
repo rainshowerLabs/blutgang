@@ -235,7 +235,7 @@ fn test_get_cache_block_greater_than_finalized_in_head_cache() {
     }
 
     // Act
-    let result = get_cache(tx, tx_hash, blocknum_rx, &cache, &head_cache);
+    let result = get_cache(tx.clone(), tx_hash, blocknum_rx, &cache, &head_cache);
 
     // Assert
     assert!(result.is_ok());
