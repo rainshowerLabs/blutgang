@@ -251,10 +251,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
-        assert_eq!(
-            get_block_number_from_request(request),
-            None
-        );
+        assert_eq!(get_block_number_from_request(request), None);
 
         let request = json!({
             "id":1,
