@@ -31,7 +31,7 @@ use hyper::{
     server::conn::http1,
     service::service_fn,
 };
-use hyper_util::rt::TokioIo;
+use hyper_util_blutgang::rt::TokioIo;
 
 // jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
