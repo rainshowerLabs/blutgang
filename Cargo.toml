@@ -17,7 +17,7 @@ categories = ["command-line-utilities"]
 clap = "4.3.0"
 hyper = { version = "1.0.0-rc.4", features = ["full"] }
 http-body-util = "0.1.0-rc.3"
-hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }
+# hyper-util = { git = "https://github.com/hyperium/hyper-util.git" }
 reqwest = { version = "0.11.18", features = ["blocking", "json"] }
 serde = { version = "1.0.163", features = ["derive"] }
 serde_json = "1.0.96"
@@ -32,6 +32,7 @@ rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
+hyper-util-blutgang = "0.1.0"
 
 
 [profile.maxperf]
