@@ -1,31 +1,38 @@
-# Blutgang - the wd40 of alpha ethereum load balancers
+# Blutgang - the wd40 of ethereum load balancers
 ![blutgang](https://github.com/rainshowerLabs/blutgang/assets/55022497/06fe1dd3-0bc4-4b5d-bfc8-5573d6f78db3)
 
 Join the discussion on our [discord](https://discord.gg/92TfQWdjEh), [telegram](https://t.me/rainshower), or [matrix!](https://matrix.to/#/%23rainshower:matrix.org)
 
-**Note: Blutgang is alpha software. Unexpected behavior and bugs are to be expected. Please report any issues you encounter.**   
+Blutgang is a blazing fast, caching, minimalistic load balancer designed with Ethereum's JSON-RPC in mind. Historical RPC queries are cached in a local database, bypassing the need for slow, repeating calls to your node.
 
-Blutgang is a blazing fast, caching, minimalistic load balancer designed with Ethereum's json-rpc in mind.
-
-Blutgang's main advantage compared to other load balancers is the speed of its cache. Historical RPC queries are cached in a local database, bypassing the need for slow, repeating calls to your node.
-
-## Load Balancing
-
-Blutgang is designed to be used in front of a cluster of Ethereum RPC nodes, distributing the load between them. By default, the load is balanced in a weighted round-robin configuration. Thanks to its modularity, the load balancing algorithm can be customized to support any load balancing schema.
-
-### Local usage
-
-If you are a developer or a power user, you can use blutgang as an intermediary between you and your RPC endpoint to cache historical queries. This speeds up usage dramatically, as well as increasing privacy.
+For more info about blutgang and how to use it, please check out the [wiki](https://github.com/rainshowerLabs/blutgang/wiki).
 
 ## How to run 
 
-For detailed instructions on how to use blutgang, please read the [wiki]().
+For detailed instructions on how to use blutgang, please read the [wiki](https://github.com/rainshowerLabs/blutgang/wiki).
 
-### Tldr
+### Using cargo
+
+To install blutgang via cargo, run the following command:
+
+```bash
+cargo install blutgang
+```
+Once done, grab the `example_config.toml` from this repository, modify it to your liking, and start blutgang with it.
+
+### From source
 
 Clone the repository, and find the `example_config.toml` file. Edit it to your liking, and run `cargo run --release -- -c example_config.toml`.   
 
 If you want to use command line arguments instead, please run `cargo run --release -- --help` for more info. Keep in mind that the recommended way to run blutgang is via a config file.
+
+### Max performance
+
+If you need the absolute maximum performance from blutgang, compile it using the command below:
+
+```bash
+RUSTFLAGS='-C target-cpu=native' cargo build --profile maxperf
+```
 
 ### Docker
 
