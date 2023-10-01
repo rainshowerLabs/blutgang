@@ -276,7 +276,16 @@ pub async fn accept_request(
     if rpc_position.is_some() {
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
-        rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
+        if rpc_list_rwlock_guard.len() == 0 {
+            return response;
+        }
+
+        if rpc_list_rwlock_guard.len() == 1 {
+            rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
+        } else {
+            rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
+        }
+        
         println!(
             "LA {}",
             rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency

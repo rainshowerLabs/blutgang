@@ -17,6 +17,11 @@ struct BlocknumIndex<'a> {
 
 // Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
 pub fn get_block_number_from_request(tx: Value) -> Option<u64> {
+    // If the `params` field does not exist return None
+    if !tx["params"].is_array() {
+        return None;
+    }
+
     // Return None immediately if params == 0
     if tx["params"].as_array().unwrap().is_empty() {
         return None;
