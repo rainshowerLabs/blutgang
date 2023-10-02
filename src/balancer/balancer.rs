@@ -224,7 +224,6 @@ async fn forward_body(
     let mut rpc_position;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
-    // TODO: This is poverty and can be made to be like 2x faster but this is an alpha and idc that much at this point
     let rax = get_response!(
         tx,
         cache,
@@ -265,7 +264,6 @@ pub async fn accept_request(
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
 
-    // TODO: make this timeout mechanism more robust. if an rpc times out, remove it from the active pool and pick a new one.
     let time = Instant::now();
     (response, rpc_position) =
         forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
