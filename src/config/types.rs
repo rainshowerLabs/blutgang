@@ -30,7 +30,7 @@ impl Settings {
         };
 
         if file.is_some() {
-            println!("Using config file at {}...", path);
+            println!("Using config file at {}", path);
             return Settings::create_from_file(file.unwrap()).await;
         }
         println!("Using command line arguments for settings...");
@@ -76,7 +76,7 @@ impl Settings {
             .as_bool()
             .unwrap();
         let ttl = blutgang_table.get("ttl").unwrap().as_integer().unwrap() as u128;
-        
+
         let health_check_ttl = if health_check {
             blutgang_table
                 .get("health_check_ttl")
