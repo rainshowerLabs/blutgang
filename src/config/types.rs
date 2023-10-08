@@ -76,11 +76,16 @@ impl Settings {
             .as_bool()
             .unwrap();
         let ttl = blutgang_table.get("ttl").unwrap().as_integer().unwrap() as u128;
-        let health_check_ttl = blutgang_table
-            .get("health_check_ttl")
-            .unwrap()
-            .as_integer()
-            .unwrap() as u64;
+        
+        let health_check_ttl = if health_check {
+            blutgang_table
+                .get("health_check_ttl")
+                .unwrap()
+                .as_integer()
+                .unwrap() as u64
+        } else {
+            u64::MAX
+        };
 
         // Parse `sled` table
         let sled_table = parsed_toml.get("sled").unwrap().as_table().unwrap();

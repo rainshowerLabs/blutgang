@@ -283,7 +283,7 @@ pub async fn accept_request(
         } else {
             rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
         }
-        
+
         println!(
             "LA {}",
             rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
