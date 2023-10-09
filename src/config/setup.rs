@@ -4,6 +4,11 @@ use tokio::sync::mpsc;
 
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
 pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Vec<Rpc> {
+    // Return empty vec if we dont supply any RPCs
+    if rpc_list.is_empty() {
+        return Vec::new();
+    }
+
     let (tx, mut rx) = mpsc::channel(rpc_list.len());
 
     // Iterate over each RPC
