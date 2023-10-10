@@ -21,7 +21,7 @@ use std::{
     sync::{
         Arc,
         RwLock,
-    },
+    }, println,
 };
 
 use tokio::net::TcpListener;
@@ -50,9 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
     let _ = cache.insert(
-        "172cf910abc64d0fe6b243766b3ae9f56f32978d7c144ddadde9c615ea38891d",
-        "true",
+        "b04c016d0d7f8619376f1cb6529b878fcca135049e8c16db8a053996089a11fc",
+        "blutgang v0.1.1 nc",
     );
+    
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
