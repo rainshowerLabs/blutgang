@@ -27,6 +27,7 @@ use memchr::memmem;
 use std::{
     collections::BTreeMap,
     convert::Infallible,
+    println,
     sync::{
         Arc,
         RwLock,
@@ -34,7 +35,7 @@ use std::{
     time::{
         Duration,
         Instant,
-    }, println,
+    },
 };
 
 // Macros for accepting requests

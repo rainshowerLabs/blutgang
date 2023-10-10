@@ -18,10 +18,11 @@ use crate::{
 
 use std::{
     collections::BTreeMap,
+    println,
     sync::{
         Arc,
         RwLock,
-    }, println,
+    },
 };
 
 use tokio::net::TcpListener;
@@ -33,7 +34,7 @@ use hyper::{
 };
 use hyper_util_blutgang::rt::TokioIo;
 
-// jeemallocator *should* offer faster mallocs when dealing with lots of threads which is what we're doing
+// jeemalloc offers faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
@@ -50,7 +51,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
     let _ = cache.insert(
-        [176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53, 4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252],
+        [
+            176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53,
+            4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252,
+        ],
         "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang v0.1.1 nc\"}",
     );
 

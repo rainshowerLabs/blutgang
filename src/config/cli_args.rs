@@ -5,9 +5,9 @@ use clap::{
 
 pub fn create_match() -> clap::Command {
     Command::new("blutgang")
-        .version("0.1.0")
+        .version("0.1.1")
         .author("makemake <vukasin@gostovic.me>")
-        .about("Tool for replaying historical transactions. Designed to be used with anvil or hardhat.")
+        .about("Blutgang load balancer and cache. For more info read the wiki: https://github.com/rainshowerLabs/blutgang/wiki")
         .arg(Arg::new("rpc_list")
             .long("rpc_list")
             .short('r')
