@@ -26,14 +26,14 @@ impl Settings {
         let path = matches.get_one::<String>("config").unwrap();
         let file: Option<String> = match fs::read_to_string(path) {
             Ok(file) => Some(file),
-            Err(_) => panic!("Error opening config file at {}", path),
+            Err(_) => panic!("\x1b[31mErr:\x1b[0m Error opening config file at {}", path),
         };
 
         if file.is_some() {
-            println!("Using config file at {}", path);
+            println!("\x1b[35mInfo:\x1b[0m Using config file at {}", path);
             return Settings::create_from_file(file.unwrap()).await;
         }
-        println!("Using command line arguments for settings...");
+        println!("\x1b[35mInfo:\x1b[0m Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
 

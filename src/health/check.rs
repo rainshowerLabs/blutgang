@@ -44,7 +44,7 @@ async fn check(
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    print!("Checking RPC health... ");
+    print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent

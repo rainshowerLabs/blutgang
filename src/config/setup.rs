@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Vec<Rpc> {
     // Return empty vec if we dont supply any RPCs
     if rpc_list.is_empty() {
+        println!("\x1b[31mErr:\x1b[0m No RPCs supplied!");
         return Vec::new();
     }
 

@@ -31,14 +31,14 @@ pub async fn manage_cache(
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
-            println!("Reorg detected!\nRemoving stale entries from the cache.");
+            println!("\x1b[93mWrn:\x1b[0m Reorg detected!\nRemoving stale entries from the cache.");
             handle_reorg(head_cache, block_number, new_block, cache)?;
         }
 
         // Check if finalized_stream has changed
         if last_finalized != *finalized_rx.borrow() {
             last_finalized = *finalized_rx.borrow();
-            println!("New finalized block!\nRemoving stale entries from the cache.");
+            println!("\x1b[35mInfo:\x1b[0m New finalized block!\nRemoving stale entries from the cache.");
             // Remove stale entries from the head_cache
             remove_stale(head_cache, last_finalized)?;
         }

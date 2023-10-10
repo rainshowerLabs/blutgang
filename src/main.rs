@@ -59,12 +59,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Clear database if specified
     if config.do_clear {
         cache.clear().unwrap();
-        println!("All data cleared from the database.");
+        println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(config.address).await?;
-    println!("Bound to: {}", config.address);
+    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", config.address);
 
     // Spawn a thread for the health check
     //

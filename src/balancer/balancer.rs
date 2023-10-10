@@ -99,7 +99,7 @@ macro_rules! get_response {
                             let mut rpc_list = $rpc_list_rwlock.write().unwrap();
                             (rpc, $rpc_position) = pick(&mut rpc_list);
                         }
-                        println!("Forwarding to: {}", rpc.url);
+                        println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
 
                         // Check if we have any RPCs in the list, if not return error
                         if $rpc_position == None {
@@ -180,7 +180,7 @@ macro_rules! get_response {
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
-                println!("!!! Cache error! Check the DB !!!");
+                println!("\x1b[31m!!! Cache error! Check the DB !!!\x1b[0m");
                 println!("To recover, please stop blutgang, delete your cache folder, and start blutgang again.");
                 println!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
                 $rpc_position = None;
