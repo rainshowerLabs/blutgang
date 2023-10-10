@@ -88,17 +88,6 @@ macro_rules! get_response {
                     if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
                         std::process::exit(0);
                     }
-                    if memmem::find(&tx_string.as_bytes(), "blutgang_is_lb".as_bytes()).is_some() {
-                        return (
-                            Ok(hyper::Response::builder()
-                                .status(200)
-                                .body(Full::new(Bytes::from(
-                                    "{message: \"blutgang v0.1.1 nc\"}".to_string(),
-                                )))
-                                .unwrap()),
-                            None,
-                        );
-                    }
 
                     // Loop until we get a response
                     let rx;

@@ -50,10 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
     let _ = cache.insert(
-        "b04c016d0d7f8619376f1cb6529b878fcca135049e8c16db8a053996089a11fc",
-        "blutgang v0.1.1 nc",
+        [176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53, 4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252],
+        "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang v0.1.1 nc\"}",
     );
-    
+
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
