@@ -269,7 +269,7 @@ pub async fn accept_request(
     (response, rpc_position) =
         forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
     let time = time.elapsed();
-    println!("Request time: {:?}", time);
+    println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
     // Get lock for the rpc list and add it to the moving average if we picked an rpc
     if rpc_position.is_some() {
