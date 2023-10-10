@@ -30,12 +30,11 @@ pub async fn health_check(
     finalized_tx: tokio::sync::watch::Sender<u64>,
     ttl: u128,
     health_check_ttl: u64,
-    rolling_finality: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
-        get_safe_block(&rpc_list, &finalized_tx, health_check_ttl, rolling_finality).await?;
+        get_safe_block(&rpc_list, &finalized_tx, health_check_ttl).await?;
     }
 }
 
@@ -78,7 +77,7 @@ async fn check(
 }
 
 // Check what heads are reported by each RPC
-pub async fn head_check(
+async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
 ) -> Result<Vec<HeadResult>, Box<dyn std::error::Error>> {
