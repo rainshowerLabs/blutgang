@@ -219,7 +219,7 @@ macro_rules! get_response {
                     Ok(hyper::Response::builder()
                         .status(500)
                         .body(Full::new(Bytes::from(
-                            "{code:-32003, message:\"error: Cache error! Try again later...\"".to_string(),
+                            "{code:-32003, message:\"error: Cache error! Try again later...\"}".to_string(),
                         )))
                         .unwrap()),
                     $rpc_position,
