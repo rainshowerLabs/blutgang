@@ -158,7 +158,7 @@ macro_rules! get_response {
                                     }
                                 }
                                 // Wait for updates
-                                $rpc_index_rx.changed().await;
+                                let _ = $rpc_index_rx.changed().await;
 
                                 retries += 1;
                             },
@@ -235,7 +235,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    rpc_index_rx: &mut tokio::sync::watch::Receiver<Option<usize>>,
+    mut rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -289,7 +289,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    rpc_index_rx: &mut tokio::sync::watch::Receiver<Option<usize>>,
+    rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,

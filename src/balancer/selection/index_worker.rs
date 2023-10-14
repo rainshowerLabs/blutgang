@@ -36,7 +36,7 @@ pub fn pick_index(
         // Send new index if modified
         let len_clone = len.clone();
         len = rpc_list_rwlock_guard.len();
-        
+
         let send_if_changed = |ch_index: &mut Option<usize>| {
             if ch_index != &index {
                 *ch_index = index;
@@ -51,7 +51,6 @@ pub fn pick_index(
 
             false
         };
-
 
         rpc_index_tx.send_if_modified(send_if_changed);
     }
