@@ -1,12 +1,12 @@
 use crate::Rpc;
 
-// Generic entry point fn to select the next rpc and return its position
-pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+// Generic entry point fn to select the position of the next RPC
+pub fn pick(list: &mut Vec<Rpc>) -> Option<usize> {
     // If len is 1, return the only element
     if list.len() == 1 {
-        return (list[0].clone(), Some(0));
+        return Some(0);
     } else if list.is_empty() {
-        return (Rpc::default(), None);
+        return None;
     }
 
     algo(list)
@@ -23,7 +23,7 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     feature = "selection-weighed-round-robin",
     not(feature = "selection-random")
 ))]
-fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> Option<usize> {
     // Sort by latency
     list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
 
@@ -31,11 +31,11 @@ fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     if list[0].max_consecutive <= list[0].consecutive {
         list[1].consecutive = 1;
         list[0].consecutive = 0;
-        return (list[1].clone(), Some(1));
+        return Some(1);
     }
 
     list[0].consecutive += 1;
-    (list[0].clone(), Some(0))
+    Some(0)
 }
 
 #[cfg(all(

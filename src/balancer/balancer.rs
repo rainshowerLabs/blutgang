@@ -280,6 +280,7 @@ pub async fn accept_request(
             return response;
         }
 
+        // Bizzare edge case where the index is sometimes 1 when the len is 1???
         if rpc_list_rwlock_guard.len() == 1 {
             rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
         } else {
