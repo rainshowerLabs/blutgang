@@ -4,7 +4,10 @@ mod health;
 mod rpc;
 
 use crate::{
-    balancer::balancer::accept_request,
+    balancer::{
+        balancer::accept_request,
+        selection::pick_index,
+    },
     config::{
         cli_args::create_match,
         types::Settings,
@@ -103,6 +106,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             blocknum_rx,
             finalized_rxclone,
             &cache_clone,
+        )
+        .await;
+    });
+
+    // Spawn a thread for the index worker
+    let (rpc_index_tx, rpc_index_rx) = watch::channel(Option::None);
+    let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
+    tokio::task::spawn(async move {
+        let _ = pick_index(
+            &rpc_list_rwlock_clone,
+            400,
+            rpc_index_tx,
         )
         .await;
     });
