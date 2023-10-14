@@ -25,7 +25,8 @@ use std::{
     sync::{
         Arc,
         RwLock,
-    }, time::Duration,
+    },
+    time::Duration,
 };
 
 use tokio::net::TcpListener;
@@ -120,7 +121,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             rpc_index_tx,
         );
     });
-
 
     // We start a loop to continuously accept incoming connections
     loop {

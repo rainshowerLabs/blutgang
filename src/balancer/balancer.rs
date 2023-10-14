@@ -40,7 +40,16 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $finalized_rx:expr, $rpc_index_rx:expr, $head_cache:expr, $ttl:expr) => {
+    (
+        $io:expr,
+        $rpc_list_rwlock:expr,
+        $ma_length:expr,
+        $cache:expr,
+        $finalized_rx:expr,
+        $rpc_index_rx:expr,
+        $head_cache:expr,
+        $ttl:expr
+    ) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -68,7 +77,18 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $rpc_index_rx:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
+    (
+        $tx:expr,
+        $cache:expr,
+        $tx_hash:expr,
+        $rpc_position:expr,
+        $id:expr,
+        $rpc_list_rwlock:expr,
+        $rpc_index_rx:expr,
+        $finalized_rx:expr,
+        $head_cache:expr,
+        $ttl:expr
+    ) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
                 if let Some(rax) = rax {
@@ -279,8 +299,16 @@ pub async fn accept_request(
     let rpc_position: Option<usize>;
 
     let time = Instant::now();
-    (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, finalized_rx, rpc_index_rx, head_cache, cache, ttl).await;
+    (response, rpc_position) = forward_body(
+        tx,
+        &rpc_list_rwlock,
+        finalized_rx,
+        rpc_index_rx,
+        head_cache,
+        cache,
+        ttl,
+    )
+    .await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
