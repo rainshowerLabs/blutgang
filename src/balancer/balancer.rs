@@ -7,7 +7,6 @@ use crate::{
         cache_method,
         cache_result,
     },
-    balancer::selection::selection::pick,
     rpc::types::Rpc,
 };
 
@@ -69,7 +68,7 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
+    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $rpc_index_rx:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
                 if let Some(rax) = rax {
@@ -97,10 +96,11 @@ macro_rules! get_response {
                     let mut retries = 0;
                     loop {
                         // Get the next Rpc in line.
-                        let mut rpc;
+                        let rpc;
                         {
-                            let mut rpc_list = $rpc_list_rwlock.write().unwrap();
-                            (rpc, $rpc_position) = pick(&mut rpc_list);
+                            let rpc_list_guard = $rpc_list_rwlock.read().unwrap();
+                            $rpc_position = $rpc_index_rx.borrow().clone();
+                            rpc = rpc_list_guard[$rpc_position.unwrap()].clone();
                         }
                         println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
 
@@ -131,7 +131,15 @@ macro_rules! get_response {
                                 break;
                             },
                             Err(_) => {
-                                rpc.update_latency($ttl as f64);
+                                {
+                                    let mut rpc_list_guard = $rpc_list_rwlock.write().unwrap();
+                                    if $rpc_position.is_some() {
+                                        rpc_list_guard[$rpc_position.unwrap()].update_latency($ttl as f64);
+                                    }
+                                }
+                                // Wait for updates
+                                $rpc_index_rx.changed().await;
+
                                 retries += 1;
                             },
                         };
@@ -207,7 +215,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    rpc_index_rx: &tokio::sync::watch::Receiver<Option<usize>>,
+    rpc_index_rx: &mut tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -235,6 +243,7 @@ async fn forward_body(
         rpc_position,
         id,
         rpc_list_rwlock,
+        rpc_index_rx,
         finalized_rx,
         head_cache,
         ttl
@@ -260,7 +269,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    rpc_index_rx: &tokio::sync::watch::Receiver<Option<usize>>,
+    rpc_index_rx: &mut tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,

@@ -6,7 +6,7 @@ mod rpc;
 use crate::{
     balancer::{
         balancer::accept_request,
-        selection::pick_index,
+        selection::index_worker::pick_index,
     },
     config::{
         cli_args::create_match,
@@ -25,7 +25,7 @@ use std::{
     sync::{
         Arc,
         RwLock,
-    },
+    }, time::Duration,
 };
 
 use tokio::net::TcpListener;
@@ -116,11 +116,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::task::spawn(async move {
         let _ = pick_index(
             &rpc_list_rwlock_clone,
-            400,
+            Duration::from_millis(400), // TODO: 1) What
             rpc_index_tx,
-        )
-        .await;
+        );
     });
+
 
     // We start a loop to continuously accept incoming connections
     loop {
@@ -135,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cache_clone = Arc::clone(&cache);
         let head_cache_clone = Arc::clone(&head_cache);
         let finalized_rx_clone = finalized_rx.clone();
-        let rpc_index_rx_clone = rpc_index_rx.clone();
+        let mut rpc_index_rx_clone = rpc_index_rx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -145,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.ma_length,
                 &cache_clone,
                 &finalized_rx_clone,
-                &rpc_index_rx_clone,
+                &mut rpc_index_rx_clone,
                 &head_cache_clone,
                 config.ttl
             );
