@@ -41,7 +41,7 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
+    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $finalized_rx:expr, $rpc_index_rx:expr, $head_cache:expr, $ttl:expr) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -52,6 +52,7 @@ macro_rules! accept {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         $finalized_rx,
+                        $rpc_index_rx,
                         $head_cache,
                         Arc::clone($cache),
                         $ttl,
@@ -206,6 +207,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    rpc_index_rx: &tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -258,6 +260,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    rpc_index_rx: &tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -268,7 +271,7 @@ pub async fn accept_request(
 
     let time = Instant::now();
     (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
+        forward_body(tx, &rpc_list_rwlock, finalized_rx, rpc_index_rx, head_cache, cache, ttl).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
