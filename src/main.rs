@@ -136,6 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let head_cache_clone = Arc::clone(&head_cache);
         let finalized_rx_clone = finalized_rx.clone();
         // Yes, we really have to clone it twice to statisfy the borrow checker :/
+        // TODO: maybe rewrite it so we dont you dum dum?
         let rpc_index_rx_clone = rpc_index_rx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
