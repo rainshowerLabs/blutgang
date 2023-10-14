@@ -113,10 +113,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn a thread for the index worker
     let (rpc_index_tx, rpc_index_rx) = watch::channel(Option::None);
-    let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
+    let mut rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = pick_index(
-            &rpc_list_rwlock_clone,
+            &mut rpc_list_rwlock_clone,
             Duration::from_millis(400), // TODO: 1) What
             rpc_index_tx,
         );

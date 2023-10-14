@@ -19,11 +19,10 @@ use super::selection::pick;
 // RPC call, so we can just do it periodically and send the results via
 // a channel to our thread managing the call.
 pub fn pick_index(
-    rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
+    rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     selection_ttl: Duration,
     rpc_index_tx: watch::Sender<Option<usize>>,
 ) -> Option<usize> {
-    let mut current_index: Option<usize> = None;
     let mut len: usize = 0;
     loop {
         let _ = sleep(selection_ttl);
