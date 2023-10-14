@@ -164,7 +164,7 @@ macro_rules! get_response {
                             },
                         };
 
-                        if retries == 128 {
+                        if retries == 32 {
                             return (
                                 Ok(hyper::Response::builder()
                                     .status(408)

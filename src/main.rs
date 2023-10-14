@@ -117,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::task::spawn(async move {
         let _ = pick_index(
             &mut rpc_list_rwlock_clone,
-            Duration::from_millis(400), // TODO: 1) What
+            Duration::from_millis(100), // TODO: 1) What
             rpc_index_tx,
         );
     });
