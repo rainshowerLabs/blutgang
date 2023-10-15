@@ -277,6 +277,10 @@ pub async fn accept_request(
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
         if rpc_list_rwlock_guard.len() == 0 {
+            println!(
+                "LA {}",
+                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
+            );
             return response;
         }
 
