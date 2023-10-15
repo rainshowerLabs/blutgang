@@ -282,14 +282,19 @@ pub async fn accept_request(
 
         if rpc_list_rwlock_guard.len() == 1 {
             rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
+            println!(
+                "LA {}",
+                rpc_list_rwlock_guard[0].status.latency
+            );
         } else {
             rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
+            println!(
+                "LA {}",
+                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
+            );
         }
 
-        println!(
-            "LA {}",
-            rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
-        );
+
     }
 
     response
