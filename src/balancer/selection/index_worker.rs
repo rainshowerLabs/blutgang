@@ -1,3 +1,4 @@
+use crate::LatencyData;
 use std::{
     sync::{
         Arc,
@@ -9,7 +10,10 @@ use std::{
 use crate::Rpc;
 
 use tokio::{
-    sync::watch,
+    sync::{
+        watch,
+        mpsc,
+    },
     time::sleep,
 };
 
@@ -22,6 +26,7 @@ pub async fn pick_index(
     rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     selection_ttl: Duration,
     rpc_index_tx: watch::Sender<Option<usize>>,
+    latency_rx: mpsc::UnboundedReceiver<LatencyData>,
 ) -> Option<usize> {
     let mut len: usize = 0;
     loop {

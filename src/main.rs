@@ -7,6 +7,7 @@ use crate::{
     balancer::{
         balancer::accept_request,
         selection::index_worker::pick_index,
+        selection::types::LatencyData,
     },
     config::{
         cli_args::create_match,
@@ -29,8 +30,13 @@ use std::{
     time::Duration,
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use tokio::{
+    net::TcpListener,
+    sync::{
+        watch,
+        mpsc,
+    }
+};
 
 use hyper::{
     server::conn::http1,
@@ -113,12 +119,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn a thread for the index worker
     let (rpc_index_tx, rpc_index_rx) = watch::channel(Option::None);
+    let (latency_tx, latency_rx) = mpsc::unbounded_channel::<LatencyData>();
     let mut rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = pick_index(
             &mut rpc_list_rwlock_clone,
             Duration::from_millis(100), // TODO: 1) What
             rpc_index_tx,
+            latency_rx,
         ).await;
     });
 
