@@ -18,14 +18,14 @@ use super::selection::pick;
 // We don't really need to update whats the best RPC on *every* external
 // RPC call, so we can just do it periodically and send the results via
 // a channel to our thread managing the call.
-pub fn pick_index(
+pub async fn pick_index(
     rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     selection_ttl: Duration,
     rpc_index_tx: watch::Sender<Option<usize>>,
 ) -> Option<usize> {
     let mut len: usize = 0;
     loop {
-        let _ = sleep(selection_ttl);
+        let _ = sleep(selection_ttl).await;
 
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 

@@ -154,7 +154,7 @@ macro_rules! get_response {
                                 {
                                     let mut rpc_list_guard = $rpc_list_rwlock.write().unwrap();
                                     if $rpc_position.is_some() {
-                                        rpc_list_guard[$rpc_position.unwrap()].update_latency($ttl as f64);
+                                        rpc_list_guard[$rpc_position.unwrap()].update_latency(vec![$ttl as f64]);
                                     }
                                 }
                                 // Wait for updates
@@ -326,10 +326,11 @@ pub async fn accept_request(
 
         // Bizzare edge case where the index is sometimes 1 when the len is 1???
         if rpc_list_rwlock_guard.len() == 1 {
-            rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
+            rpc_list_rwlock_guard[0].update_latency(vec![time.as_nanos() as f64]);
             println!("LA {}", rpc_list_rwlock_guard[0].status.latency);
         } else {
-            rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
+            rpc_list_rwlock_guard[rpc_position.unwrap()]
+                .update_latency(vec![time.as_nanos() as f64]);
             println!(
                 "LA {}",
                 rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency

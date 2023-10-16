@@ -123,15 +123,17 @@ impl Rpc {
     // Update the latency of the last n calls.
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: Vec<f64>) {
-        // If we have data  to ma_length, remove the first n elements to fit the MA 
+        // Remove the first n elements to fit the MA
         if self.status.latency_data.len() + latest.len() > self.status.ma_length as usize {
-            let to_remove = self.status.latency_data.len() + latest.len() - self.status.ma_length as usize;
+            let to_remove =
+                self.status.latency_data.len() + latest.len() - self.status.ma_length as usize;
             self.status.latency_data.drain(0..to_remove);
-        
         }
 
+        // Add the new elements
+        self.status.latency_data.extend(latest);
+
         // Update latency
-        self.status.latency_data.push(latest);
         self.status.latency =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
     }

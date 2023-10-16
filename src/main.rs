@@ -119,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut rpc_list_rwlock_clone,
             Duration::from_millis(100), // TODO: 1) What
             rpc_index_tx,
-        );
+        ).await;
     });
 
     // We start a loop to continuously accept incoming connections

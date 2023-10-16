@@ -29,7 +29,7 @@ pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Vec<Rpc>
             }
 
             let avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
-            rpc.update_latency(avg_latency);
+            rpc.update_latency(vec![avg_latency]);
 
             println!("{}: {}ns", rpc.url, rpc.status.latency);
 
