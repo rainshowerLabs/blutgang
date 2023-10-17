@@ -14,6 +14,7 @@ pub struct Settings {
     pub address: SocketAddr,
     pub health_check: bool,
     pub ttl: u128,
+    pub latency_update_ttl: u64,
     pub health_check_ttl: u64,
     pub sled_config: Config,
 }
@@ -69,6 +70,12 @@ impl Settings {
             .unwrap()
             .as_integer()
             .unwrap() as f64;
+
+        let latency_update_ttl = blutgang_table
+            .get("latency_update_ttl")
+            .unwrap()
+            .as_integer()
+            .unwrap() as u64;
 
         let health_check = blutgang_table
             .get("health_check")
@@ -152,6 +159,7 @@ impl Settings {
             health_check,
             ttl,
             health_check_ttl,
+            latency_update_ttl,
             sled_config,
         }
     }
@@ -236,6 +244,12 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid health_check_ttl");
 
+        let latency_update_ttl = matches
+            .get_one::<String>("latency_update_ttl")
+            .expect("Invalid latency_update_ttl")
+            .parse::<u64>()
+            .expect("Invalid latency_update_ttl");
+
         Settings {
             rpc_list,
             do_clear: clear,
@@ -243,6 +257,7 @@ impl Settings {
             health_check,
             ttl,
             health_check_ttl,
+            latency_update_ttl,
             sled_config,
         }
     }

@@ -81,4 +81,9 @@ pub fn create_match() -> clap::Command {
             .num_args(1..)
             .default_value("2000")
             .help("How often to perform the health check"))
+        .arg(Arg::new("latency_update_ttl")
+            .long("latency_update_ttl")
+            .num_args(1..)
+            .default_value("2000")
+            .help("How often to perform the latency updates"))
 }
