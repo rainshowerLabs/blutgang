@@ -1,6 +1,6 @@
+use crate::LatencyData;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use crate::LatencyData;
 use std::{
     sync::{
         Arc,
@@ -13,12 +13,11 @@ use crate::Rpc;
 
 use tokio::{
     sync::{
-        watch,
         broadcast,
+        watch,
     },
     time::sleep,
 };
-
 
 use super::selection::pick;
 
@@ -70,7 +69,7 @@ pub async fn pick_index(
 
 // Update the latencies from the `latency_rx` channel
 async fn update_latency(
-    rpc_list_rwlock : &mut Arc<RwLock<Vec<Rpc>>>,
+    rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     mut latency_rx: broadcast::Receiver<LatencyData>,
 ) -> Option<()> {
     let mut latency_map: HashMap<usize, Vec<f64>> = HashMap::new();
@@ -83,10 +82,13 @@ async fn update_latency(
         let latency_data = latency_rx.recv().await;
 
         match latency_map.entry(latency_data.as_ref().unwrap().index) {
-            Entry::Vacant(e) => { e.insert(vec![latency_data.as_ref().unwrap().latency as f64]); },
-            Entry::Occupied(mut e) => { e.get_mut().push(latency_data.unwrap().latency as f64); }
+            Entry::Vacant(e) => {
+                e.insert(vec![latency_data.as_ref().unwrap().latency as f64]);
+            }
+            Entry::Occupied(mut e) => {
+                e.get_mut().push(latency_data.unwrap().latency as f64);
+            }
         }
-
     }
 
     // Iter over the map and update the latencies

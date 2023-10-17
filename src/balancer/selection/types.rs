@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, Copy)]
 pub struct LatencyData {
-	pub index: usize,
-	pub latency: u64,
+    pub index: usize,
+    pub latency: u64,
 }

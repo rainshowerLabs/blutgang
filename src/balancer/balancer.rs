@@ -1,3 +1,4 @@
+use crate::LatencyData;
 use crate::{
     balancer::format::{
         get_block_number_from_request,
@@ -47,6 +48,7 @@ macro_rules! accept {
         $cache:expr,
         $finalized_rx:expr,
         $rpc_index_rx:expr,
+        $latency_tx:expr,
         $head_cache:expr,
         $ttl:expr
     ) => {
@@ -61,6 +63,7 @@ macro_rules! accept {
                         Arc::clone($rpc_list_rwlock),
                         $finalized_rx,
                         $rpc_index_rx,
+                        $latency_tx,
                         $head_cache,
                         Arc::clone($cache),
                         $ttl,
@@ -76,6 +79,7 @@ macro_rules! accept {
 }
 
 // Macro for getting responses from either the cache or RPC nodes
+// TODO: please rewrite this to be more wieldly. this is awful to work with.
 macro_rules! get_response {
     (
         $tx:expr,
@@ -86,6 +90,7 @@ macro_rules! get_response {
         $rpc_list_rwlock:expr,
         $rpc_index_rx:expr,
         $finalized_rx:expr,
+        $latency_tx:expr,
         $head_cache:expr,
         $ttl:expr
     ) => {
@@ -152,9 +157,11 @@ macro_rules! get_response {
                             },
                             Err(_) => {
                                 {
-                                    let mut rpc_list_guard = $rpc_list_rwlock.write().unwrap();
                                     if $rpc_position.is_some() {
-                                        rpc_list_guard[$rpc_position.unwrap()].update_latency(vec![$ttl as f64]);
+                                        let _ = $latency_tx.send(LatencyData {
+                                            index: $rpc_position.unwrap(),
+                                            latency: $ttl as u64,
+                                        });
                                     }
                                 }
                                 // Wait for updates
@@ -237,6 +244,7 @@ async fn forward_body(
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
     mut rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    latency_tx: tokio::sync::broadcast::Sender<LatencyData>,
     cache: Arc<Db>,
     ttl: u128,
 ) -> (
@@ -265,6 +273,7 @@ async fn forward_body(
         rpc_list_rwlock,
         rpc_index_rx,
         finalized_rx,
+        latency_tx,
         head_cache,
         ttl
     );
@@ -290,6 +299,7 @@ pub async fn accept_request(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
     rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
+    latency_tx: tokio::sync::broadcast::Sender<LatencyData>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -305,6 +315,7 @@ pub async fn accept_request(
         finalized_rx,
         rpc_index_rx,
         head_cache,
+        latency_tx.clone(),
         cache,
         ttl,
     )
@@ -314,7 +325,7 @@ pub async fn accept_request(
 
     // Get lock for the rpc list and add it to the moving average if we picked an rpc
     if rpc_position.is_some() {
-        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
+        let rpc_list_rwlock_guard = rpc_list_rwlock.read().unwrap();
 
         if rpc_list_rwlock_guard.len() == 0 {
             println!(
@@ -326,11 +337,16 @@ pub async fn accept_request(
 
         // Bizzare edge case where the index is sometimes 1 when the len is 1???
         if rpc_list_rwlock_guard.len() == 1 {
-            rpc_list_rwlock_guard[0].update_latency(vec![time.as_nanos() as f64]);
+            let _ = latency_tx.send(LatencyData {
+                index: 0,
+                latency: time.as_nanos() as u64,
+            });
             println!("LA {}", rpc_list_rwlock_guard[0].status.latency);
         } else {
-            rpc_list_rwlock_guard[rpc_position.unwrap()]
-                .update_latency(vec![time.as_nanos() as f64]);
+            let _ = latency_tx.send(LatencyData {
+                index: rpc_position.unwrap(),
+                latency: time.as_nanos() as u64,
+            });
             println!(
                 "LA {}",
                 rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency

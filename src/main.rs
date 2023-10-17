@@ -33,9 +33,9 @@ use std::{
 use tokio::{
     net::TcpListener,
     sync::{
-        watch,
         broadcast,
-    }
+        watch,
+    },
 };
 
 use hyper::{
@@ -127,7 +127,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Duration::from_millis(100), // TODO: 1) What
             rpc_index_tx,
             latency_rx,
-        ).await;
+        )
+        .await;
     });
 
     // We start a loop to continuously accept incoming connections
@@ -146,6 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Yes, we really have to clone it twice to statisfy the borrow checker :/
         // TODO: maybe rewrite it so we dont you dum dum?
         let rpc_index_rx_clone = rpc_index_rx.clone();
+        let latency_tx_clone = latency_tx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -156,6 +158,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &cache_clone,
                 &finalized_rx_clone,
                 rpc_index_rx_clone.clone(),
+                latency_tx_clone.clone(),
                 &head_cache_clone,
                 config.ttl
             );
