@@ -45,7 +45,7 @@ pub async fn pick_index(
         let index = pick(&mut rpc_list_rwlock_guard);
 
         // Send new index if modified
-        let len_clone = len.clone();
+        let len_clone = len.clone(); // we have to clone due to the closure
         len = rpc_list_rwlock_guard.len();
 
         let send_if_changed = |ch_index: &mut Option<usize>| {
@@ -75,7 +75,7 @@ async fn update_latency(
     let mut latency_map: HashMap<usize, Vec<f64>> = HashMap::new();
 
     loop {
-        if latency_rx.len() == 0 {
+        if latency_rx.is_empty() {
             break;
         }
 
