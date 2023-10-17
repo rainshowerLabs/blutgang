@@ -34,7 +34,7 @@ use tokio::{
     net::TcpListener,
     sync::{
         watch,
-        mpsc,
+        broadcast,
     }
 };
 
@@ -119,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn a thread for the index worker
     let (rpc_index_tx, rpc_index_rx) = watch::channel(Option::None);
-    let (latency_tx, latency_rx) = mpsc::unbounded_channel::<LatencyData>();
+    let (latency_tx, latency_rx) = broadcast::channel::<LatencyData>(1024);
     let mut rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = pick_index(

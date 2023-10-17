@@ -14,10 +14,11 @@ use crate::Rpc;
 use tokio::{
     sync::{
         watch,
-        mpsc,
+        broadcast,
     },
     time::sleep,
 };
+
 
 use super::selection::pick;
 
@@ -28,14 +29,15 @@ pub async fn pick_index(
     rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     selection_ttl: Duration,
     rpc_index_tx: watch::Sender<Option<usize>>,
-    latency_rx: Arc<mpsc::UnboundedReceiver<LatencyData>>,
+    latency_rx: broadcast::Receiver<LatencyData>,
 ) -> Option<usize> {
     let mut len: usize = 0;
     loop {
         let _ = sleep(selection_ttl).await;
 
         // Update the latencies
-        update_latency(rpc_list_rwlock, latency_rx.clone()).await;
+        let rx2 = latency_rx.resubscribe();
+        update_latency(rpc_list_rwlock, rx2).await;
 
         let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
 
@@ -69,16 +71,16 @@ pub async fn pick_index(
 // Update the latencies from the `latency_rx` channel
 async fn update_latency(
     rpc_list_rwlock : &mut Arc<RwLock<Vec<Rpc>>>,
-    mut latency_rx: Arc<mpsc::UnboundedReceiver<LatencyData>>,
+    mut latency_rx: broadcast::Receiver<LatencyData>,
 ) -> Option<()> {
     let mut latency_map: HashMap<usize, Vec<f64>> = HashMap::new();
 
     loop {
-        let latency_data = latency_rx.recv().await;
-
-        if latency_data.is_none() {
+        if latency_rx.len() == 0 {
             break;
         }
+
+        let latency_data = latency_rx.recv().await;
 
         match latency_map.entry(latency_data.as_ref().unwrap().index) {
             Entry::Vacant(e) => { e.insert(vec![latency_data.as_ref().unwrap().latency as f64]); },
