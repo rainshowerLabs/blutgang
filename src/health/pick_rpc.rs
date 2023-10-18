@@ -1,7 +1,7 @@
 use crate::{
-    Rpc,
-    LatencyData,
     balancer::selection::selection::pick,
+    LatencyData,
+    Rpc,
 };
 
 use std::collections::hash_map::Entry;
@@ -21,7 +21,6 @@ use tokio::{
     },
     time::sleep,
 };
-
 
 // We don't really need to update whats the best RPC on *every* external
 // RPC call, so we can just do it periodically and send the results via

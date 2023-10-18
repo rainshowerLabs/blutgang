@@ -1,4 +1,3 @@
-use crate::LatencyData;
 use crate::{
     balancer::format::{
         get_block_number_from_request,
@@ -8,7 +7,12 @@ use crate::{
         cache_method,
         cache_result,
     },
+    cache_error,
+    no_rpc_available,
+    print_cache_error,
     rpc::types::Rpc,
+    timed_out,
+    LatencyData,
 };
 
 use serde_json::to_vec;
@@ -24,11 +28,11 @@ use hyper::{
 use sled::Db;
 
 use tokio::{
-    time::timeout,
     sync::{
         broadcast,
         watch,
     },
+    time::timeout,
 };
 
 use memchr::memmem;
@@ -140,15 +144,7 @@ macro_rules! get_response {
 
                         // Check if we have any RPCs in the list, if not return error
                         if $rpc_position == None {
-                            return (
-                                Ok(hyper::Response::builder()
-                                    .status(500)
-                                    .body(Full::new(Bytes::from(
-                                        "{code:-32002, message:\"error: No working RPC available! Try again later...\"}".to_string(),
-                                    )))
-                                    .unwrap()),
-                                None,
-                            );
+                            return (no_rpc_available!(), None);
                         }
 
                         // Send the request. And return a timeout if it takes too long
@@ -181,15 +177,7 @@ macro_rules! get_response {
                         };
 
                         if retries == 32 {
-                            return (
-                                Ok(hyper::Response::builder()
-                                    .status(408)
-                                    .body(Full::new(Bytes::from(
-                                        "{code:-32001, message:\"error: Request timed out! Try again later...\"}".to_string(),
-                                    )))
-                                    .unwrap()),
-                                $rpc_position,
-                            );
+                            return (timed_out!(), $rpc_position,);
                         }
 
                     }
@@ -227,19 +215,9 @@ macro_rules! get_response {
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
-                println!("\x1b[31m!!! Cache error! Check the DB !!!\x1b[0m");
-                println!("To recover, please stop blutgang, delete your cache folder, and start blutgang again.");
-                println!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
+                print_cache_error!();
                 $rpc_position = None;
-                return (
-                    Ok(hyper::Response::builder()
-                        .status(500)
-                        .body(Full::new(Bytes::from(
-                            "{code:-32003, message:\"error: Cache error! Try again later...\"}".to_string(),
-                        )))
-                        .unwrap()),
-                    $rpc_position,
-                );
+                return (cache_error!(), $rpc_position);
             }
         }
     };

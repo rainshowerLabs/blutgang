@@ -143,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
         let head_cache_clone = Arc::clone(&head_cache);
-        
+
         // Yes, we really have to clone these twice to statisfy the borrow checker :/
         // TODO: maybe rewrite it so we dont you dum dum?
         let finalized_rx_clone = finalized_rx.clone();
