@@ -14,13 +14,22 @@ use crate::{
 use serde_json::to_vec;
 
 use blake3::hash;
+
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
     Request,
 };
+
 use sled::Db;
-use tokio::time::timeout;
+
+use tokio::{
+    time::timeout,
+    sync::{
+        broadcast,
+        watch,
+    },
+};
 
 use memchr::memmem;
 
@@ -241,10 +250,10 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    mut rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
+    finalized_rx: &watch::Receiver<u64>,
+    mut rpc_index_rx: watch::Receiver<Option<usize>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    latency_tx: tokio::sync::broadcast::Sender<LatencyData>,
+    latency_tx: broadcast::Sender<LatencyData>,
     cache: Arc<Db>,
     ttl: u128,
 ) -> (
@@ -297,9 +306,9 @@ async fn forward_body(
 pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
-    rpc_index_rx: tokio::sync::watch::Receiver<Option<usize>>,
-    latency_tx: tokio::sync::broadcast::Sender<LatencyData>,
+    finalized_rx: &watch::Receiver<u64>,
+    rpc_index_rx: watch::Receiver<Option<usize>>,
+    latency_tx: broadcast::Sender<LatencyData>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
