@@ -6,7 +6,6 @@ mod rpc;
 use crate::{
     balancer::{
         balancer::accept_request,
-        selection::index_worker::pick_index,
         selection::types::LatencyData,
     },
     config::{
@@ -16,6 +15,7 @@ use crate::{
     health::{
         check::health_check,
         head_cache::manage_cache,
+        pick_rpc::pick_index,
     },
     rpc::types::Rpc,
 };
