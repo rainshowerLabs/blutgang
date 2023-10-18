@@ -14,6 +14,7 @@ macro_rules! no_rpc_available {
     };
 }
 
+// Return this if we surpassed our max retries. We didn't really time out so might be misleading.
 #[macro_export]
 macro_rules! timed_out {
     () => {
@@ -27,6 +28,7 @@ macro_rules! timed_out {
     };
 }
 
+// Give additional context to `cache_error`
 #[macro_export]
 macro_rules! print_cache_error {
     () => {
