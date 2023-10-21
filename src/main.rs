@@ -151,15 +151,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let latency_tx_clone = latency_tx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
-        tokio::task::spawn(async move {
+        tokio::task::spawn(async {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
                 config.ma_length,
                 &cache_clone,
                 &finalized_rx_clone,
-                rpc_index_rx_clone.clone(),
-                latency_tx_clone.clone(),
+                rpc_index_rx_clone,
+                latency_tx_clone,
                 &head_cache_clone,
                 config.ttl
             );
