@@ -58,6 +58,14 @@ pub async fn pick_index(
         let send_if_changed = |ch_rpc: &mut Option<CurrentRpc>| {
             if index.is_none() {
                 return false;
+            } else if ch_rpc.is_none() {
+                let current_rpc = CurrentRpc {
+                    rpc: rpc_list_rwlock_guard[index.unwrap()].clone(),
+                    index: index.unwrap(),
+                };
+
+                *ch_rpc = Some(current_rpc);
+                return true;
             }
 
             // reqwest::Client doesnst impl PartialEq so do just compare the urls. yay for storing redundant data!
