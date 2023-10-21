@@ -30,7 +30,7 @@ rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
-hyper-util-blutgang = "0.1.1"
+hyper-util-blutgang = "0.1.2"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
