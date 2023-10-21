@@ -166,7 +166,7 @@ dependencies = [
 
 [[package]]
 name = "blutgang"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "blake3",
  "chrono",
@@ -666,9 +666,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util-blutgang"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94815e490a0da2810878a2cda7a88d57309edc4bcb8933b6cc674cff93b38d26"
+checksum = "571072e7b3df4757c4fff0c8fe3d2f65496a0c6ef8c2108d4e73ee602d2ad6a6"
 dependencies = [
  "bytes",
  "futures-channel",
