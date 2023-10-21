@@ -231,7 +231,6 @@ macro_rules! get_response {
 // read and return from the cache.
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &watch::Receiver<u64>,
     mut rpc_rx: watch::Receiver<Option<CurrentRpc>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
@@ -302,7 +301,6 @@ pub async fn accept_request(
     let time = Instant::now();
     (response, rpc_position) = forward_body(
         tx,
-        &rpc_list_rwlock,
         finalized_rx,
         rpc_rx,
         head_cache,
