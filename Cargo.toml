@@ -11,8 +11,6 @@ repository = "https://github.com/rainshowerLabs/blutgang"
 keywords = ["cli", "ethereum"]
 categories = ["command-line-utilities"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 clap = "4.3.0"
 hyper = { version = "1.0.0-rc.4", features = ["full"] }
@@ -32,17 +30,20 @@ rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
-hyper-util-blutgang = "0.1.1"
+hyper-util-blutgang = "0.1.2"
 
-
+# Maxperf profile for absolute maximum performance
+# Only use for builds that are going to get used by end users
 [profile.maxperf]
 inherits = "release"
 lto = "fat"
 codegen-units = 1
 incremental = false
 
+# Optional Blutgang features
 [features]
 default = ["selection-weighed-round-robin"]
-no-cache = []
-selection-weighed-round-robin = []
-selection-random = ["rand"]
+no-cache = [] # enable this to disable caching
+selection-weighed-round-robin = [] # default algo
+selection-random = ["rand"] # optional random algo
+# add your own below
