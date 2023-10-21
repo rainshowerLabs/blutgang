@@ -22,13 +22,19 @@ use tokio::{
     time::sleep,
 };
 
+#[derive(Clone, Debug)]
+pub struct CurrentRpc {
+    pub rpc: Rpc,
+    pub index: usize,
+}
+
 // We don't really need to update whats the best RPC on *every* external
 // RPC call, so we can just do it periodically and send the results via
 // a channel to our thread managing the call.
 pub async fn pick_index(
     rpc_list_rwlock: &mut Arc<RwLock<Vec<Rpc>>>,
     selection_ttl: Duration,
-    rpc_index_tx: watch::Sender<Option<usize>>,
+    rpc_index_tx: watch::Sender<Option<CurrentRpc>>,
     latency_rx: broadcast::Receiver<LatencyData>,
 ) -> Option<usize> {
     let mut len: usize = 0;
@@ -49,15 +55,25 @@ pub async fn pick_index(
         let len_clone = len.clone(); // we have to clone due to the closure
         len = rpc_list_rwlock_guard.len();
 
-        let send_if_changed = |ch_index: &mut Option<usize>| {
-            if ch_index != &index {
-                *ch_index = index;
+        let send_if_changed = |ch_rpc: &mut Option<CurrentRpc>| {
+            if index.is_none() {
+                return false;
+            }
+
+            // reqwest::Client doesnst impl PartialEq so do just compare the urls. yay for storing redundant data!
+            if ch_rpc.clone().unwrap().rpc.url != rpc_list_rwlock_guard[index.unwrap()].url {
+                let current_rpc = CurrentRpc {
+                    rpc: rpc_list_rwlock_guard[index.unwrap()].clone(),
+                    index: index.unwrap(),
+                };
+
+                *ch_rpc = Some(current_rpc);
                 return true;
             }
 
             // The index might be the same but the rpc in the index might have changed
             if len_clone != rpc_list_rwlock_guard.len() {
-                // *ch_index = index; // prob dont need this since index !changed?
+                // *ch_rpc = index; // prob dont need this since index !changed?
                 return true;
             }
 

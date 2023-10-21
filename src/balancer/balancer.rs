@@ -1,3 +1,4 @@
+use crate::health::pick_rpc::CurrentRpc;
 use crate::{
     balancer::format::{
         get_block_number_from_request,
@@ -101,7 +102,7 @@ macro_rules! get_response {
         $rpc_position:expr,
         $id:expr,
         $rpc_list_rwlock:expr,
-        $rpc_index_rx:expr,
+        $rpc_rx:expr,
         $finalized_rx:expr,
         $latency_tx:expr,
         $head_cache:expr,
@@ -132,27 +133,27 @@ macro_rules! get_response {
                     // Loop until we get a response
                     let rx;
                     let mut retries = 0;
+                    // TODO: we're unwrapping Nones. Not good.
                     loop {
-                        // Get the next Rpc in line.
-                        let rpc;
-                        {
-                            let rpc_list_guard = $rpc_list_rwlock.read().unwrap();
-                            $rpc_position = $rpc_index_rx.borrow().clone();
-                            rpc = rpc_list_guard[$rpc_position.unwrap()].clone();
-                        }
-                        println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
-
                         // Check if we have any RPCs in the list, if not return error
-                        if $rpc_position == None {
+                        if $rpc_rx.borrow().clone().is_none() {
                             return (no_rpc_available!(), None);
                         }
+
+                        // Get the next Rpc in line.
+                        println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", $rpc_rx.borrow().clone().unwrap().rpc.url);
+
+                        $rpc_position = Some($rpc_rx.borrow().clone().unwrap().index);
 
                         // Send the request. And return a timeout if it takes too long
                         //
                         // Check if it contains any errors or if its `latest` and insert it if it isn't
+                        let send_tx = $rpc_rx.borrow().clone().unwrap().rpc.send_request($tx.clone());
+
                         match timeout(
                             Duration::from_millis($ttl.try_into().unwrap()),
-                            rpc.send_request($tx.clone()),
+                            // TODO: surely theres a better way to do this?
+                            send_tx,
                         )
                         .await
                         {
@@ -170,7 +171,7 @@ macro_rules! get_response {
                                     }
                                 }
                                 // Wait for updates
-                                let _ = $rpc_index_rx.changed().await;
+                                let _ = $rpc_rx.changed().await;
 
                                 retries += 1;
                             },
@@ -229,7 +230,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &watch::Receiver<u64>,
-    mut rpc_index_rx: watch::Receiver<Option<usize>>,
+    mut rpc_rx: watch::Receiver<Option<CurrentRpc>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     latency_tx: broadcast::Sender<LatencyData>,
     cache: Arc<Db>,
@@ -258,7 +259,7 @@ async fn forward_body(
         rpc_position,
         id,
         rpc_list_rwlock,
-        rpc_index_rx,
+        rpc_rx,
         finalized_rx,
         latency_tx,
         head_cache,
@@ -285,7 +286,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &watch::Receiver<u64>,
-    rpc_index_rx: watch::Receiver<Option<usize>>,
+    rpc_rx: watch::Receiver<Option<CurrentRpc>>,
     latency_tx: broadcast::Sender<LatencyData>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
@@ -300,7 +301,7 @@ pub async fn accept_request(
         tx,
         &rpc_list_rwlock,
         finalized_rx,
-        rpc_index_rx,
+        rpc_rx,
         head_cache,
         latency_tx.clone(),
         cache,
