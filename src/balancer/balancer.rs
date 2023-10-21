@@ -150,10 +150,13 @@ macro_rules! get_response {
                         // Send the request. And return a timeout if it takes too long
                         //
                         // Check if it contains any errors or if its `latest` and insert it if it isn't
+
+                        let rpc: Rpc = $rpc_rx.borrow().clone().unwrap().rpc.clone();
+
                         match timeout(
                             Duration::from_millis($ttl.try_into().unwrap()),
                             // TODO: surely theres a better way to do this?
-                            rpc_rx_owned.borrow().clone().unwrap().rpc.send_request($tx.clone()),
+                            rpc.send_request($tx.clone()),
                         )
                         .await
                         {
