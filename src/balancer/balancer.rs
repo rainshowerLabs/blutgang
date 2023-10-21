@@ -135,8 +135,10 @@ macro_rules! get_response {
                     let mut retries = 0;
                     // TODO: we're unwrapping Nones. Not good.
                     loop {
+                        let rpc_rx_owned = $rpc_rx.to_owned();
+
                         // Check if we have any RPCs in the list, if not return error
-                        if $rpc_rx.borrow().clone().is_none() {
+                        if rpc_rx_owned.borrow().is_none() {
                             return (no_rpc_available!(), None);
                         }
 
@@ -148,12 +150,10 @@ macro_rules! get_response {
                         // Send the request. And return a timeout if it takes too long
                         //
                         // Check if it contains any errors or if its `latest` and insert it if it isn't
-                        let send_tx = $rpc_rx.borrow().clone().unwrap().rpc.send_request($tx.clone());
-
                         match timeout(
                             Duration::from_millis($ttl.try_into().unwrap()),
                             // TODO: surely theres a better way to do this?
-                            send_tx,
+                            rpc_rx_owned.borrow().clone().unwrap().rpc.send_request($tx.clone()),
                         )
                         .await
                         {
