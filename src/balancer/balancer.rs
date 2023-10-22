@@ -25,13 +25,7 @@ use hyper::{
 };
 use sled::Db;
 
-use tokio::{
-    sync::{
-        broadcast,
-        watch,
-    },
-    time::timeout,
-};
+use tokio::time::timeout;
 
 use memchr::memmem;
 
@@ -52,7 +46,15 @@ use std::{
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
-    ($io:expr, $rpc_list_rwlock:expr, $ma_length:expr, $cache:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
+    (
+        $io:expr,
+        $rpc_list_rwlock:expr,
+        $ma_length:expr,
+        $cache:expr,
+        $finalized_rx:expr,
+        $head_cache:expr,
+        $ttl:expr
+    ) => {
         // Finally, we bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
@@ -79,7 +81,17 @@ macro_rules! accept {
 
 // Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
-    ($tx:expr, $cache:expr, $tx_hash:expr, $rpc_position:expr, $id:expr, $rpc_list_rwlock:expr, $finalized_rx:expr, $head_cache:expr, $ttl:expr) => {
+    (
+        $tx:expr,
+        $cache:expr,
+        $tx_hash:expr,
+        $rpc_position:expr,
+        $id:expr,
+        $rpc_list_rwlock:expr,
+        $finalized_rx:expr,
+        $head_cache:expr,
+        $ttl:expr
+    ) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
                 if let Some(rax) = rax {
