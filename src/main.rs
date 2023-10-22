@@ -55,7 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53,
             4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252,
         ],
-        "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang v0.1.1 nc\"}",
+        "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang v0.1.2 nc \
+        Dedicated to the spirit that lives inside of the computer\"}",
     );
 
     // Cache for storing querries near the tip
