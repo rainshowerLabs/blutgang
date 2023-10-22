@@ -8,7 +8,11 @@ use crate::{
         cache_result,
     },
     balancer::selection::selection::pick,
+    cache_error,
+    no_rpc_available,
+    print_cache_error,
     rpc::types::Rpc,
+    timed_out,
 };
 
 use serde_json::to_vec;
@@ -20,7 +24,14 @@ use hyper::{
     Request,
 };
 use sled::Db;
-use tokio::time::timeout;
+
+use tokio::{
+    sync::{
+        broadcast,
+        watch,
+    },
+    time::timeout,
+};
 
 use memchr::memmem;
 
@@ -85,7 +96,7 @@ macro_rules! get_response {
                     let tx_string = $tx.to_string();
 
                     // Quit blutgang if `tx_string` contains the word `blutgang_quit`
-                    // Only for debugging, remove this for production builds.
+                    // Only for debugging, remove this for production builds *manually*.
                     if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
                         let _ = $cache.flush_async().await;
                         std::process::exit(0);
@@ -105,15 +116,7 @@ macro_rules! get_response {
 
                         // Check if we have any RPCs in the list, if not return error
                         if $rpc_position == None {
-                            return (
-                                Ok(hyper::Response::builder()
-                                    .status(500)
-                                    .body(Full::new(Bytes::from(
-                                        "{code:-32002, message:\"error: No working RPC available! Try again later...\"}".to_string(),
-                                    )))
-                                    .unwrap()),
-                                None,
-                            );
+                            return (no_rpc_available!(), None);
                         }
 
                         // Send the request. And return a timeout if it takes too long
@@ -135,16 +138,8 @@ macro_rules! get_response {
                             },
                         };
 
-                        if retries == 128 {
-                            return (
-                                Ok(hyper::Response::builder()
-                                    .status(408)
-                                    .body(Full::new(Bytes::from(
-                                        "{code:-32001, message:\"error: Request timed out! Try again later...\"".to_string(),
-                                    )))
-                                    .unwrap()),
-                                $rpc_position,
-                            );
+                        if retries == 32 {
+                            return (timed_out!(), $rpc_position,);
                         }
 
                     }
@@ -182,19 +177,9 @@ macro_rules! get_response {
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
-                println!("\x1b[31m!!! Cache error! Check the DB !!!\x1b[0m");
-                println!("To recover, please stop blutgang, delete your cache folder, and start blutgang again.");
-                println!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
+                print_cache_error!();
                 $rpc_position = None;
-                return (
-                    Ok(hyper::Response::builder()
-                        .status(500)
-                        .body(Full::new(Bytes::from(
-                            "{code:-32003, message:\"error: Cache error! Try again later...\"".to_string(),
-                        )))
-                        .unwrap()),
-                    $rpc_position,
-                );
+                return (cache_error!(), $rpc_position);
             }
         }
     };
