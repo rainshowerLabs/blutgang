@@ -89,12 +89,17 @@ mod tests {
         let mut rpc3 = Rpc::default();
 
         rpc1.status.latency = 1.0;
-        rpc2.status.latency = 2.0;
+        rpc1.max_consecutive = 10;
+        rpc2.status.latency = 6.0;
+        rpc2.max_consecutive = 10;
         rpc3.status.latency = 3.0;
+        rpc3.max_consecutive = 10;
+
 
         let mut rpc_list = vec![rpc1, rpc2, rpc3];
 
         let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc: {:?}", rpc);
         assert_eq!(rpc.status.latency, 1.0);
         assert_eq!(index, Some(0));
 
