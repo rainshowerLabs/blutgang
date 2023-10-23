@@ -33,7 +33,7 @@ def my_func(x):
 def main():
     pool = mp.Pool(mp.cpu_count())
     while True:
-        pool.map(my_func, range(0, 10000))
+        pool.map(my_func, range(0, 1000))
 
 if __name__ == "__main__":
     main()
