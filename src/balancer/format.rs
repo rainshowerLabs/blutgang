@@ -5,8 +5,8 @@ use hyper::{
 };
 use memchr::memmem;
 use regex::Regex;
-use simd_json;
 use serde_json::Value;
+use simd_json;
 use std::str::from_utf8;
 
 use crate::rpc::error::RpcError;

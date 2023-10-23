@@ -95,7 +95,6 @@ mod tests {
     //     rpc3.status.latency = 3.0;
     //     rpc3.max_consecutive = 10;
 
-
     //     let mut rpc_list = vec![rpc1, rpc2, rpc3];
 
     //     let (rpc, index) = pick(&mut rpc_list);

@@ -4,6 +4,7 @@ use serde_json::{
     json,
     Value,
 };
+use simd_json;
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
@@ -112,7 +113,8 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let number: Value = serde_json::from_str(&self.send_request(request).await?).unwrap();
+        let number: Value =
+            unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?).unwrap() };
         let number = &number["result"]["number"];
 
         let return_number = hex_to_decimal(number.as_str().unwrap()).unwrap();
@@ -137,7 +139,10 @@ impl Rpc {
 
 // Take in the result of eth_getBlockByNumber, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
-    let json: Value = serde_json::from_str(rx).unwrap();
+    // TODO: maybe this is too slow?
+    let mut rx = rx.to_string();
+
+    let json: Value = unsafe { simd_json::serde::from_str(&mut rx).unwrap() };
 
     let number = match json["result"].as_str() {
         Some(number) => number,
