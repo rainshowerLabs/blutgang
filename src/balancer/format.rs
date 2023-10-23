@@ -5,6 +5,7 @@ use hyper::{
 };
 use memchr::memmem;
 use regex::Regex;
+use simd_json;
 use serde_json::Value;
 use std::str::from_utf8;
 
@@ -97,9 +98,12 @@ pub fn get_block_number_from_request(tx: Value) -> Option<u64> {
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, Box<dyn std::error::Error>> {
     let tx = tx.collect().await?.to_bytes().clone();
-    let tx = from_utf8(&tx).unwrap();
-    let tx: Value = serde_json::from_str(tx).unwrap_or(tx.into());
-    Ok(tx)
+    let mut tx = from_utf8(&tx).unwrap().to_owned();
+    let ret: Value;
+    unsafe {
+        ret = simd_json::serde::from_str(&mut tx).unwrap();
+    }
+    Ok(ret)
 }
 
 pub fn _extract_id(request: &str) -> Option<String> {

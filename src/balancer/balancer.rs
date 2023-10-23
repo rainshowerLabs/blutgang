@@ -15,7 +15,9 @@ use crate::{
     timed_out,
 };
 
+use simd_json;
 use serde_json::to_vec;
+use serde_json::Value;
 
 use blake3::hash;
 use http_body_util::Full;
@@ -98,7 +100,10 @@ macro_rules! get_response {
                     $rpc_position = None;
 
                     // Reconstruct ID
-                    let mut cached: serde_json::Value = serde_json::from_slice(&rax).unwrap();
+                    let mut cached: Value;
+                    unsafe {
+                        cached = simd_json::serde::from_slice(&rax).unwrap()
+                    }
                     cached["id"] = $id.into();
                     cached.to_string()
                 } else {
@@ -175,9 +180,11 @@ macro_rules! get_response {
                             }
 
                             // Replace the id with 0 and insert that
-                            let mut rx_value: serde_json::Value =
-                                serde_json::from_str(&rx_str).unwrap();
-                            rx_value["id"] = serde_json::Value::Null;
+                            let mut rx_value: Value;
+                            unsafe {
+                                rx_value = simd_json::serde::from_str(&rx_str).unwrap()
+                            }
+                            rx_value["id"] = Value::Null;
 
                             $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                         }
