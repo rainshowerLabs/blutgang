@@ -5,7 +5,7 @@ use clap::{
 
 pub fn create_match() -> clap::Command {
     Command::new("blutgang")
-        .version("0.1.2")
+        .version("0.2.0")
         .author("makemake <vukasin@gostovic.me>")
         .about("Blutgang load balancer and cache. For more info read the wiki: https://github.com/rainshowerLabs/blutgang/wiki")
         .arg(Arg::new("rpc_list")
