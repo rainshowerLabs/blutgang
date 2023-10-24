@@ -24,7 +24,7 @@ struct BlocknumIndex<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Blocknumber {
+enum NamedNumber {
     Latest,
     Earliest,
     Safe,
@@ -33,25 +33,25 @@ enum Blocknumber {
     Null,
 }
 
-// Returns the corresponding Blocknumber enum value for the named number
+// Returns the corresponding NamedNumber enum value for the named number
 // Null if n/a
-fn has_named_number(param: &str) -> Blocknumber {
+fn has_named_number(param: &str) -> NamedNumber {
     let named_list = ["latest", "earliest", "safe", "finalized", "pending"];
 
     for (index, item) in named_list.iter().enumerate() {
         if memmem::find(param.as_bytes(), item.as_bytes()).is_some() {
             match index {
-                0 => return Blocknumber::Latest,
-                1 => return Blocknumber::Earliest,
-                2 => return Blocknumber::Safe,
-                3 => return Blocknumber::Finalized,
-                4 => return Blocknumber::Pending,
-                _ => Blocknumber::Null,
+                0 => return NamedNumber::Latest,
+                1 => return NamedNumber::Earliest,
+                2 => return NamedNumber::Safe,
+                3 => return NamedNumber::Finalized,
+                4 => return NamedNumber::Pending,
+                _ => NamedNumber::Null,
             };
         }
     }
 
-    Blocknumber::Null
+    NamedNumber::Null
 }
 
 // Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
@@ -126,15 +126,15 @@ pub fn get_block_number_from_request(
 
             // Return the corresponding named parameter from the RwLock is present
             let nn = has_named_number(&block_number);
-            if nn != Blocknumber::Null {
+            if nn != NamedNumber::Null {
                 let rwlock_guard = named_blocknumbers.read().unwrap();
 
                 match nn {
-                    Blocknumber::Latest => return Some(rwlock_guard.latest),
-                    Blocknumber::Earliest => return Some(rwlock_guard.earliest),
-                    Blocknumber::Safe => return Some(rwlock_guard.safe),
-                    Blocknumber::Finalized => return Some(rwlock_guard.finalized),
-                    Blocknumber::Pending => return Some(rwlock_guard.pending),
+                    NamedNumber::Latest => return Some(rwlock_guard.latest),
+                    NamedNumber::Earliest => return Some(rwlock_guard.earliest),
+                    NamedNumber::Safe => return Some(rwlock_guard.safe),
+                    NamedNumber::Finalized => return Some(rwlock_guard.finalized),
+                    NamedNumber::Pending => return Some(rwlock_guard.pending),
                     _ => continue, // continue and try to decode as decimal just in case
                 }
             }
@@ -258,14 +258,14 @@ mod tests {
 
     #[test]
     fn has_named_number_test() {
-        assert_eq!(has_named_number("latest"), Blocknumber::Latest);
-        assert_eq!(has_named_number("earliest"), Blocknumber::Earliest);
-        assert_eq!(has_named_number("safe"), Blocknumber::Safe);
-        assert_eq!(has_named_number("finalized"), Blocknumber::Finalized);
-        assert_eq!(has_named_number("pending"), Blocknumber::Pending);
-        assert_eq!(has_named_number("0x1"), Blocknumber::Null);
-        assert_eq!(has_named_number("0x"), Blocknumber::Null);
-        assert_eq!(has_named_number("0"), Blocknumber::Null);
+        assert_eq!(has_named_number("latest"), NamedNumber::Latest);
+        assert_eq!(has_named_number("earliest"), NamedNumber::Earliest);
+        assert_eq!(has_named_number("safe"), NamedNumber::Safe);
+        assert_eq!(has_named_number("finalized"), NamedNumber::Finalized);
+        assert_eq!(has_named_number("pending"), NamedNumber::Pending);
+        assert_eq!(has_named_number("0x1"), NamedNumber::Null);
+        assert_eq!(has_named_number("0x"), NamedNumber::Null);
+        assert_eq!(has_named_number("0"), NamedNumber::Null);
     }
 
     #[test]
