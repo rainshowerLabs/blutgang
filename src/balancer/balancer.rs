@@ -1,4 +1,5 @@
 use crate::{
+    NamedBlocknumbers,
     balancer::format::{
         get_block_number_from_request,
         incoming_to_value,
@@ -56,6 +57,7 @@ macro_rules! accept {
         $ma_length:expr,
         $cache:expr,
         $finalized_rx:expr,
+        $named_numbers:expr,
         $head_cache:expr,
         $ttl:expr
     ) => {
@@ -69,6 +71,7 @@ macro_rules! accept {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         $finalized_rx,
+                        $named_numbers,
                         $head_cache,
                         Arc::clone($cache),
                         $ttl,
@@ -93,6 +96,7 @@ macro_rules! get_response {
         $id:expr,
         $rpc_list_rwlock:expr,
         $finalized_rx:expr,
+        $named_numbers:expr,
         $head_cache:expr,
         $ttl:expr
     ) => {
@@ -166,7 +170,7 @@ macro_rules! get_response {
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
-                        let num = get_block_number_from_request($tx);
+                        let num = get_block_number_from_request(tx, $named_numbers);
                         if num.is_some() {
                             let num = num.unwrap();
 
@@ -210,6 +214,7 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -238,6 +243,7 @@ async fn forward_body(
         id,
         rpc_list_rwlock,
         finalized_rx,
+        named_numbers,
         head_cache,
         ttl
     );
@@ -262,6 +268,7 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
@@ -272,7 +279,7 @@ pub async fn accept_request(
 
     let time = Instant::now();
     (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
+        forward_body(tx, &rpc_list_rwlock, finalized_rx, named_numbers, head_cache, cache, ttl).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 

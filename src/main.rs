@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cache_clone = Arc::clone(&cache);
         let head_cache_clone = Arc::clone(&head_cache);
         let finalized_rx_clone = finalized_rx.clone();
-
+        let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept!(
@@ -125,6 +125,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 config.ma_length,
                 &cache_clone,
                 &finalized_rx_clone,
+                &named_blocknumbers_clone,
                 &head_cache_clone,
                 config.ttl
             );
