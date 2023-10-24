@@ -79,6 +79,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+    let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
@@ -89,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 rpc_poverty_list,
                 &blocknum_tx,
                 finalized_tx,
-                &Arc::clone(&named_blocknumbers),
+                &named_blocknumbers_health,
                 config.ttl,
                 config.health_check_ttl,
             )
