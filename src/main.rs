@@ -12,6 +12,7 @@ use crate::{
     health::{
         check::health_check,
         head_cache::manage_cache,
+        safe_block::NamedBlocknumbers,
     },
     rpc::types::Rpc,
 };
@@ -77,19 +78,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
     if config.health_check {
         tokio::task::spawn(async move {
-            let _ = health_check(
-                rpc_list_health,
-                rpc_poverty_list,
-                &blocknum_tx,
-                finalized_tx,
-                config.ttl,
-                config.health_check_ttl,
-            )
+            let _ = health_check(rpc_list_health, rpc_poverty_list, &blocknum_tx, finalized_tx, &named_blocknumbers, config.ttl, config.health_check_ttl)
             .await;
         });
     }

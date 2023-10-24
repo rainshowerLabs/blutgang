@@ -1,5 +1,12 @@
-use crate::health::safe_block::get_safe_block;
-use crate::Rpc;
+use crate::{
+    health::{
+        safe_block::{
+            get_safe_block,
+            NamedBlocknumbers,
+        },
+    },
+    Rpc
+};
 
 use std::println;
 use std::sync::{
@@ -28,13 +35,14 @@ pub async fn health_check(
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
+    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     ttl: u128,
     health_check_ttl: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
-        get_safe_block(&rpc_list, &finalized_tx, health_check_ttl).await?;
+        get_safe_block(&rpc_list, &finalized_tx, &named_numbers_rwlock, health_check_ttl).await?;
     }
 }
 

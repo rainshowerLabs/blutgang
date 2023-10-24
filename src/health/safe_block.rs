@@ -28,8 +28,9 @@ pub struct NamedBlocknumbers {
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     finalized_tx: &tokio::sync::watch::Sender<u64>,
+    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     ttl: u64,
-) -> Result<NamedBlocknumbers, RpcError> {
+) -> Result<u64, RpcError> {
     let len = rpc_list.read().unwrap().len();
     let mut safe = 0;
 
@@ -96,8 +97,8 @@ pub async fn get_safe_block(
     // println!("Safe block: {}", safe);
 
     // Return as NamedBlocknumbers
-    let mut nn = NamedBlocknumbers::default();
-    nn.safe = safe;
+    let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+    nn_rwlock.safe = safe;
 
-    Ok(nn)
+    Ok(safe)
 }
