@@ -7,7 +7,13 @@ use memchr::memmem;
 use regex::Regex;
 use serde_json::Value;
 use simd_json;
-use std::str::from_utf8;
+use std::{
+    str::from_utf8,
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
 
 use crate::rpc::error::RpcError;
 
@@ -16,16 +22,60 @@ struct BlocknumIndex<'a> {
     pub position: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NamedBlocknumbers {
+    pub latest: u64,
+    pub earliest: u64,
+    pub safe: u64,
+    pub finalized: u64,
+    pub pending: u64,
+    pub number: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Blocknumber {
+    Latest,
+    Earliest,
+    Safe,
+    Finalized,
+    Pending,
+    Null,
+}
+
+// Returns the corresponding Blocknumber enum value for the named number
+// Null if n/a
+fn has_named_number(param: &str) -> Blocknumber {
+    let named_list = ["latest", "earliest", "safe", "finalized", "pending"];
+
+    for (index, item) in named_list.iter().enumerate() {
+        if memmem::find(param.as_bytes(), item.as_bytes()).is_some() {
+            match index {
+                0 => return Blocknumber::Latest,
+                1 => return Blocknumber::Earliest,
+                2 => return Blocknumber::Safe,
+                3 => return Blocknumber::Finalized,
+                4 => return Blocknumber::Pending,
+                _ => Blocknumber::Null,
+            };
+        }
+    }
+
+    Blocknumber::Null
+}
+
 // Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
-pub fn get_block_number_from_request(tx: Value) -> Option<u64> {
+pub fn get_block_number_from_request(
+    tx: Value,
+    named_blocknumbers: Arc<RwLock<NamedBlocknumbers>>,
+) -> Result<Option<u64>, Box<dyn std::error::Error>> {
     // If the `params` field does not exist return None
     if !tx["params"].is_array() {
-        return None;
+        return Ok(None);
     }
 
     // Return None immediately if params == 0
     if tx["params"].as_array().unwrap().is_empty() {
-        return None;
+        return Ok(None);
     }
 
     // The JSON-RPC standard is all over the place so depending on the method, we need to look at
@@ -80,20 +130,35 @@ pub fn get_block_number_from_request(tx: Value) -> Option<u64> {
 
             // If `null` return None
             if block_number == "null" {
-                return None;
+                return Ok(None);
+            }
+
+            // Return the corresponding named parameter from the RwLock is present
+            let nn = has_named_number(&block_number);
+            if nn != Blocknumber::Null {
+                let rwlock_guard = named_blocknumbers.read().unwrap();
+
+                match nn {
+                    Blocknumber::Latest => return Ok(Some(rwlock_guard.latest)),
+                    Blocknumber::Earliest => return Ok(Some(rwlock_guard.earliest)),
+                    Blocknumber::Safe => return Ok(Some(rwlock_guard.safe)),
+                    Blocknumber::Finalized => return Ok(Some(rwlock_guard.finalized)),
+                    Blocknumber::Pending => return Ok(Some(rwlock_guard.pending)),
+                    _ => continue, // continue and try to decode as decimal just in case
+                }
             }
 
             // Convert to decimal
             let block_number = match u64::from_str_radix(&block_number[2..], 16) {
                 Ok(block_number) => block_number,
-                Err(_) => return None,
+                Err(_) => return Ok(None),
             };
 
-            return Some(block_number);
+            return Ok(Some(block_number));
         }
     }
 
-    None
+    Ok(None)
 }
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, Box<dyn std::error::Error>> {

@@ -82,6 +82,7 @@ mod tests {
         assert_eq!(v[0].url, vx[0].url);
     }
 
+    // TODO: fix tests
     // #[test]
     // fn test_pick() {
     //     let mut rpc1 = Rpc::default();
