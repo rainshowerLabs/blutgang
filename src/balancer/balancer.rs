@@ -1,5 +1,4 @@
 use crate::{
-    NamedBlocknumbers,
     balancer::format::{
         get_block_number_from_request,
         incoming_to_value,
@@ -14,6 +13,7 @@ use crate::{
     print_cache_error,
     rpc::types::Rpc,
     timed_out,
+    NamedBlocknumbers,
 };
 
 use serde_json::{
@@ -170,7 +170,7 @@ macro_rules! get_response {
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
-                        let num = get_block_number_from_request(tx, $named_numbers);
+                        let num = get_block_number_from_request($tx, $named_numbers);
                         if num.is_some() {
                             let num = num.unwrap();
 
@@ -278,8 +278,16 @@ pub async fn accept_request(
     let rpc_position: Option<usize>;
 
     let time = Instant::now();
-    (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, finalized_rx, named_numbers, head_cache, cache, ttl).await;
+    (response, rpc_position) = forward_body(
+        tx,
+        &rpc_list_rwlock,
+        finalized_rx,
+        named_numbers,
+        head_cache,
+        cache,
+        ttl,
+    )
+    .await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 

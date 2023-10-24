@@ -1,11 +1,9 @@
 use crate::{
-    health::{
-        safe_block::{
-            get_safe_block,
-            NamedBlocknumbers,
-        },
+    health::safe_block::{
+        get_safe_block,
+        NamedBlocknumbers,
     },
-    Rpc
+    Rpc,
 };
 
 use std::println;
@@ -42,7 +40,13 @@ pub async fn health_check(
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
-        get_safe_block(&rpc_list, &finalized_tx, &named_numbers_rwlock, health_check_ttl).await?;
+        get_safe_block(
+            &rpc_list,
+            &finalized_tx,
+            &named_numbers_rwlock,
+            health_check_ttl,
+        )
+        .await?;
     }
 }
 
