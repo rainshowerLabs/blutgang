@@ -289,6 +289,18 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
+            Some(1)
+        );
+
+        let request = json!({
+            "id":1,
+            "jsonrpc":"2.0",
+            "method":"eth_getBalance",
+            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "adiuasiudagbdiad"]
+        });
+
+        assert_eq!(
+            get_block_number_from_request(request, &named_blocknumbers),
             None
         );
 
@@ -433,7 +445,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            None
+            Some(1)
         );
 
         let request = json!({
