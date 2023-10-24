@@ -1,3 +1,4 @@
+use crate::NamedBlocknumbers;
 use http_body_util::BodyExt;
 use hyper::{
     body::Incoming,
@@ -57,15 +58,15 @@ fn has_named_number(param: &str) -> Blocknumber {
 pub fn get_block_number_from_request(
     tx: Value,
     named_blocknumbers: Arc<RwLock<NamedBlocknumbers>>,
-) -> Result<Option<u64>, Box<dyn std::error::Error>> {
+) -> Option<u64> {
     // If the `params` field does not exist return None
     if !tx["params"].is_array() {
-        return Ok(None);
+        return None;
     }
 
     // Return None immediately if params == 0
     if tx["params"].as_array().unwrap().is_empty() {
-        return Ok(None);
+        return None;
     }
 
     // The JSON-RPC standard is all over the place so depending on the method, we need to look at
@@ -120,7 +121,7 @@ pub fn get_block_number_from_request(
 
             // If `null` return None
             if block_number == "null" {
-                return Ok(None);
+                return None;
             }
 
             // Return the corresponding named parameter from the RwLock is present
@@ -129,11 +130,11 @@ pub fn get_block_number_from_request(
                 let rwlock_guard = named_blocknumbers.read().unwrap();
 
                 match nn {
-                    Blocknumber::Latest => return Ok(Some(rwlock_guard.latest)),
-                    Blocknumber::Earliest => return Ok(Some(rwlock_guard.earliest)),
-                    Blocknumber::Safe => return Ok(Some(rwlock_guard.safe)),
-                    Blocknumber::Finalized => return Ok(Some(rwlock_guard.finalized)),
-                    Blocknumber::Pending => return Ok(Some(rwlock_guard.pending)),
+                    Blocknumber::Latest => return Some(rwlock_guard.latest),
+                    Blocknumber::Earliest => return Some(rwlock_guard.earliest),
+                    Blocknumber::Safe => return Some(rwlock_guard.safe),
+                    Blocknumber::Finalized => return Some(rwlock_guard.finalized),
+                    Blocknumber::Pending => return Some(rwlock_guard.pending),
                     _ => continue, // continue and try to decode as decimal just in case
                 }
             }
@@ -141,14 +142,14 @@ pub fn get_block_number_from_request(
             // Convert to decimal
             let block_number = match u64::from_str_radix(&block_number[2..], 16) {
                 Ok(block_number) => block_number,
-                Err(_) => return Ok(None),
+                Err(_) => return None,
             };
 
-            return Ok(Some(block_number));
+            return Some(block_number);
         }
     }
 
-    Ok(None)
+    None
 }
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, Box<dyn std::error::Error>> {
@@ -251,9 +252,34 @@ fn extract_id_test() {
 mod tests {
     use crate::balancer::format::get_block_number_from_request;
     use serde_json::json;
+    use super::*;
+    use std::sync::Arc;
+    use std::sync::RwLock;
+
+    #[test]
+    fn has_named_number_test() {
+        assert_eq!(has_named_number("latest"), Blocknumber::Latest);
+        assert_eq!(has_named_number("earliest"),Blocknumber::Earliest);
+        assert_eq!(has_named_number("safe"), Blocknumber::Safe);
+        assert_eq!(has_named_number("finalized"), Blocknumber::Finalized);
+        assert_eq!(has_named_number("pending"), Blocknumber::Pending);
+        assert_eq!(has_named_number("0x1"), Blocknumber::Null);
+        assert_eq!(has_named_number("0x"), Blocknumber::Null);
+        assert_eq!(has_named_number("0"), Blocknumber::Null);
+    }
 
     #[test]
     fn get_block_number_from_request_test() {
+        // Set up a fake NamedBlocknumbers
+        let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers {
+            latest: 1,
+            earliest: 2,
+            safe: 3,
+            finalized: 4,
+            pending: 5,
+            number: 6,
+        }));
+
         let request = json!({
             "id":1,
             "jsonrpc":"2.0",
@@ -261,7 +287,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
 
         let request = json!({
             "id":1,
@@ -270,7 +296,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
-        assert_eq!(get_block_number_from_request(request), Some(1));
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
 
         let request = json!({
             "id":1,
@@ -279,7 +305,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
 
         let request = json!({
             "id":1,
@@ -288,7 +314,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "latest"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
 
         let request = json!({
             "id":1,
@@ -297,7 +323,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "0x1"]
         });
 
-        assert_eq!(get_block_number_from_request(request).unwrap(), 1);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
 
         let request = json!({
             "id":1,
@@ -306,7 +332,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
 
         let request = json!({
             "id":1,
@@ -315,7 +341,34 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
+
+        let request = json!({
+            "id":1,
+            "jsonrpc":"2.0",
+            "method":"eth_getTransactionCount",
+            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "safe"]
+        });
+
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(3));
+
+        let request = json!({
+            "id":1,
+            "jsonrpc":"2.0",
+            "method":"eth_getTransactionCount",
+            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "finalized"]
+        });
+
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(4));
+
+        let request = json!({
+            "id":1,
+            "jsonrpc":"2.0",
+            "method":"eth_getTransactionCount",
+            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "pending"]
+        });
+
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(5));
 
         let request = json!({
             "id":1,
@@ -324,7 +377,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
-        assert_eq!(get_block_number_from_request(request).unwrap(), 1);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
 
         let request = json!({
             "id":1,
@@ -333,7 +386,7 @@ mod tests {
             "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
 
         let request = json!({
             "id":1,
@@ -342,7 +395,7 @@ mod tests {
             "params":["latest"]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
 
         let request = json!({
             "id":1,
@@ -351,7 +404,7 @@ mod tests {
             "params":["0x1"]
         });
 
-        assert_eq!(get_block_number_from_request(request).unwrap(), 1);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), Some(1));
 
         let request = json!({
             "id":1,
@@ -360,6 +413,6 @@ mod tests {
             "params":[]
         });
 
-        assert_eq!(get_block_number_from_request(request), None);
+        assert_eq!(get_block_number_from_request(request, named_blocknumbers), None);
     }
 }
