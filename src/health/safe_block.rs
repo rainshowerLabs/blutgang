@@ -14,12 +14,22 @@ use tokio::{
     },
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct NamedBlocknumbers {
+    pub latest: u64,
+    pub earliest: u64,
+    pub safe: u64,
+    pub finalized: u64,
+    pub pending: u64,
+    pub number: u64,
+}
+
 // Get the latest finalized block
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     finalized_tx: &tokio::sync::watch::Sender<u64>,
     ttl: u64,
-) -> Result<u64, RpcError> {
+) -> Result<NamedBlocknumbers, RpcError> {
     let len = rpc_list.read().unwrap().len();
     let mut safe = 0;
 
@@ -85,5 +95,9 @@ pub async fn get_safe_block(
 
     // println!("Safe block: {}", safe);
 
-    Ok(safe)
+    // Return as NamedBlocknumbers
+    let mut nn = NamedBlocknumbers::default();
+    nn.safe = safe;
+
+    Ok(nn)
 }

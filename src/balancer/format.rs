@@ -23,16 +23,6 @@ struct BlocknumIndex<'a> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NamedBlocknumbers {
-    pub latest: u64,
-    pub earliest: u64,
-    pub safe: u64,
-    pub finalized: u64,
-    pub pending: u64,
-    pub number: u64,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Blocknumber {
     Latest,
     Earliest,
