@@ -154,6 +154,7 @@ macro_rules! get_response {
                                 break;
                             },
                             Err(_) => {
+                                println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
                                 rpc.update_latency($ttl as f64);
                                 retries += 1;
                             },
@@ -184,10 +185,9 @@ macro_rules! get_response {
                             }
 
                             // Replace the id with 0 and insert that
-                            let mut rx_value: Value;
-                            unsafe {
-                                rx_value = simd_json::serde::from_str(&mut rx_str).unwrap()
-                            }
+                            let mut rx_value: Value = unsafe {
+                                simd_json::serde::from_str(&mut rx_str).unwrap()
+                            };
                             rx_value["id"] = Value::Null;
 
                             $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
