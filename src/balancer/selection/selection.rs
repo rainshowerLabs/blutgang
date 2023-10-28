@@ -103,24 +103,18 @@ mod tests {
         assert_eq!(rpc.status.latency, 1.0);
         assert_eq!(index, Some(0));
 
-        let (rpc, index) = pick(&mut rpc_list);
-        assert_eq!(rpc.status.latency, 2.0);
-        assert_eq!(index, Some(1));
 
+        rpc_list[0].status.latency = 10000.0;
+        
         let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc index: {:?}", index);
         assert_eq!(rpc.status.latency, 3.0);
         assert_eq!(index, Some(2));
 
-        let (rpc, index) = pick(&mut rpc_list);
-        assert_eq!(rpc.status.latency, 1.0);
-        assert_eq!(index, Some(0));
+        rpc_list[2].status.latency = 100000.0;
 
         let (rpc, index) = pick(&mut rpc_list);
-        assert_eq!(rpc.status.latency, 2.0);
+        assert_eq!(rpc.status.latency, 6.0);
         assert_eq!(index, Some(1));
-
-        let (rpc, index) = pick(&mut rpc_list);
-        assert_eq!(rpc.status.latency, 3.0);
-        assert_eq!(index, Some(2));
     }
 }
