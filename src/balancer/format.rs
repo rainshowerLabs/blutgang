@@ -7,7 +7,7 @@ use hyper::{
 use memchr::memmem;
 use regex::Regex;
 use serde_json::Value;
-use simd_json;
+use simd_json::serde::from_str;
 use std::{
     str::from_utf8,
     sync::{
@@ -157,7 +157,7 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, Box<dyn s
     let mut tx = from_utf8(&tx).unwrap().to_owned();
     let ret: Value;
     unsafe {
-        ret = simd_json::serde::from_str(&mut tx).unwrap();
+        ret = from_str(&mut tx).unwrap();
     }
     Ok(ret)
 }

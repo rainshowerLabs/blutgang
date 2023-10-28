@@ -43,7 +43,7 @@ pub async fn health_check(
         get_safe_block(
             &rpc_list,
             &finalized_tx,
-            &named_numbers_rwlock,
+            named_numbers_rwlock,
             health_check_ttl,
         )
         .await?;

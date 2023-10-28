@@ -82,7 +82,9 @@ mod tests {
         assert_eq!(v[0].url, vx[0].url);
     }
 
-    // TODO: fix tests
+    // Test picking the fastest RPC
+    // Change the latencies of the other ones to simulate
+    // real network fluctuations.
     #[test]
     fn test_pick() {
         let mut rpc1 = Rpc::default();
@@ -103,9 +105,8 @@ mod tests {
         assert_eq!(rpc.status.latency, 1.0);
         assert_eq!(index, Some(0));
 
-
         rpc_list[0].status.latency = 10000.0;
-        
+
         let (rpc, index) = pick(&mut rpc_list);
         println!("rpc index: {:?}", index);
         assert_eq!(rpc.status.latency, 3.0);
