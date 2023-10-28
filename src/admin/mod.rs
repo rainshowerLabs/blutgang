@@ -1,2 +1,2 @@
-pub mod admin_functions;
-mod parser;
+mod admin_functions;
+pub mod service;
