@@ -116,7 +116,7 @@ macro_rules! get_response {
 
                     let tx_string = $tx.to_string();
 
-
+                    // TODO: idk about this ["method"]
                     if memmem::find($tx["method"].unwrap().as_bytes(), "blutgang_".as_bytes()).is_some() {
                         // Flush because we're probably doing something volatile.
                         let _ = $cache.flush_async().await;
