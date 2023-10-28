@@ -47,3 +47,16 @@ macro_rules! cache_error {
             .unwrap())
     };
 }
+
+#[allow(unused_macros)]
+macro_rules! rpc_response {
+    (
+        $status:expr,
+        $body:expr
+    ) => {
+        Ok(hyper::Response::builder()
+            .status($status)
+            .body($body)
+            .unwrap())
+    };
+}
