@@ -25,7 +25,7 @@ pub async fn admin_service(
         // TODO: this is retarded, dont clone here
         let mut admin_msg_str = admin_msg.to_string();
         let val: Value = unsafe { simd_json::serde::from_str(&mut admin_msg_str)? };
-        execute_method(val["method"].as_str().unwrap());
+        execute_method(val["method"].as_str(), val["params"].as_str());
     }
     Ok(())
 }

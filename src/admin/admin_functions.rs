@@ -1,6 +1,9 @@
-pub fn execute_method(method: &str) {
+pub fn execute_method(
+	method: Option<&str>,
+	params: Option<&str>,
+) {
     match method {
-        "blutgang_quit" => admin_blutgang_quit(),
+        Some("blutgang_quit") => admin_blutgang_quit(),
         // "blutgang_rpc_list" => _,
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
