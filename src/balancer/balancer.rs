@@ -61,7 +61,7 @@ macro_rules! accept {
         $head_cache:expr,
         $ttl:expr
     ) => {
-        // Finally, we bind the incoming connection to our service
+        // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
             .serve_connection(
@@ -226,12 +226,16 @@ async fn forward_body(
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // Get the id of the request and set it to 0 for caching
+    //
+    // We're doing this ID gymnastics because we're hashing the
+    // whole request and we don't want the ID as it's arbitrary
+    // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
     // read tx as bytes
     let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
 
-    // TODO: Current RPC position. idk of a better way for now so this will do
+    // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
