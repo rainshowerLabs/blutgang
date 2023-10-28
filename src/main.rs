@@ -2,6 +2,7 @@ mod balancer;
 mod config;
 mod health;
 mod rpc;
+mod admin;
 
 use crate::{
     balancer::balancer::accept_request,
