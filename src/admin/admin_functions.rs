@@ -8,7 +8,7 @@ use std::sync::{
 pub fn execute_method(
     method: Option<&str>,
     params: Option<&str>,
-) -> Result<String /*fill in l8r*/> {
+) -> Result<String, AdminError> {
     match method {
         Some("blutgang_quit") => admin_blutgang_quit(),
         // "blutgang_rpc_list" => _,
