@@ -1,3 +1,4 @@
+mod admin;
 mod balancer;
 mod config;
 mod health;
@@ -6,6 +7,7 @@ mod rpc;
 use crate::{
     balancer::balancer::accept_request,
     config::{
+        cache_setup::setup_data,
         cli_args::create_match,
         types::Settings,
     },
@@ -49,16 +51,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
-    // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
-    // `blutgang_is_lb` is cached as a blake3 cache
-    let _ = cache.insert(
-        [
-            176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53,
-            4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252,
-        ],
-        "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang v0.2.0 nc \
-        Dedicated to the spirit that lives inside of the computer\"}",
-    );
 
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
@@ -68,6 +60,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
+    // Insert data about blutgang and our settings into the DB
+    //
+    // Print any relevant warnings about a misconfigured DB. Check docs for more
+    setup_data(Arc::clone(&cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(config.address).await?;
