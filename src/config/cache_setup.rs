@@ -30,5 +30,4 @@ pub fn setup_data(cache: Arc<Db>) {
                 Please remove all cache entries and try again.");
         }
     }
-
 }
