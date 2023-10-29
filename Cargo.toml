@@ -46,7 +46,7 @@ incremental = false
 
 # Optional Blutgang features
 [features]
-default = ["selection-weighed-round-robin"]
+default = ["selection-weighed-round-robin", "xxhash"]
 xxhash = ["xxhash-rust"] # 4x faster caching but potentially less secure
 no-cache = [] # enable this to disable caching
 selection-weighed-round-robin = [] # default algo

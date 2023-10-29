@@ -22,7 +22,14 @@ use serde_json::{
 };
 use simd_json;
 
+#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
+
+#[cfg(feature = "xxhash")]
+use xxhash_rust::{
+    xxh3::xxh3_64,
+};
+
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -232,8 +239,14 @@ async fn forward_body(
     // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
-    // read tx as bytes
-    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    // Hash the request with either blake3 or xxhash depending on the enabled feature
+    let tx_hash;
+    #[cfg(not(feature = "xxhash"))] {
+        tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    }
+    #[cfg(feature = "xxhash")] {
+        tx_hash = xxh3_64(to_vec(&tx).unwrap().as_slice());
+    }
 
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
