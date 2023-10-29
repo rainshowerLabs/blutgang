@@ -120,8 +120,6 @@ macro_rules! get_response {
                     // Kinda jank but set the id back to what it was before
                     $tx["id"] = $id.into();
 
-                    let tx_string = $tx.to_string();
-
                     // TODO: idk about this ["method"]
                     if memmem::find($tx["method"].unwrap().as_bytes(), "blutgang_".as_bytes()).is_some() {
                         // Flush because we're probably doing something volatile.
@@ -129,6 +127,8 @@ macro_rules! get_response {
 
 
                     }
+
+                    let tx_string = $tx.to_string();
 
                     // Loop until we get a response
                     let rx;
