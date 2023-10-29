@@ -7,6 +7,7 @@ pub enum AdminError {
     InvalidMethod,
     InvalidSecret,
     RwError,
+    Innacessible,
     OutOfBounds,
     InvalidResponse(String),
 }
@@ -17,11 +18,9 @@ impl std::fmt::Display for AdminError {
             AdminError::InvalidMethod => write!(f, "Requested method does not exist."),
             AdminError::InvalidSecret => write!(f, "Invalid secret for protected method."),
             AdminError::RwError => write!(f, "Error while trying to read or write fromt/to disk."),
+            AdminError::Innacessible => write!(f, "Could not access shared resource."),
             AdminError::OutOfBounds => {
-                write!(
-                    f,
-                    "Request out of bounds."
-                )
+                write!(f, "Request out of bounds.")
             }
             AdminError::InvalidResponse(reason) => write!(f, "Invalid RPC response: {}", reason),
         }

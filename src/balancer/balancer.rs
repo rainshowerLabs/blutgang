@@ -113,7 +113,7 @@ macro_rules! get_response {
                     cached.to_string()
                 } else {
                     // Return error if theres no method in request since its going to 100% error later.
-                    if $tx["method"].is_none() {
+                    if $tx["method"] == Value::Null {
                         return (rpc_response!(400, "{code:-32004, message:\"error: no method in request!\"}"), None);
                     }
 
@@ -121,7 +121,7 @@ macro_rules! get_response {
                     $tx["id"] = $id.into();
 
                     // TODO: idk about this ["method"]
-                    if memmem::find($tx["method"].unwrap().as_bytes(), "blutgang_".as_bytes()).is_some() {
+                    if memmem::find($tx["method"].as_str().unwrap().as_bytes(), "blutgang_".as_bytes()).is_some() {
                         // Flush because we're probably doing something volatile.
                         let _ = $cache.flush_async().await;
 
