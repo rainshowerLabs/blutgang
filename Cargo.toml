@@ -32,7 +32,7 @@ rand = {version = "0.8.5", optional = true}
 chrono = "0.4.28"
 regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
-hyper-util-blutgang = "0.1.2"
+hyper-util-blutgang = "0.1.3"
 simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_impl"] }
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
 
