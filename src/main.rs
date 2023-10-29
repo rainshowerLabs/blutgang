@@ -1,4 +1,3 @@
-mod admin;
 mod balancer;
 mod config;
 mod health;

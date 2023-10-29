@@ -34,6 +34,7 @@ regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
 hyper-util-blutgang = "0.1.2"
 simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_impl"] }
+xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
@@ -46,6 +47,7 @@ incremental = false
 # Optional Blutgang features
 [features]
 default = ["selection-weighed-round-robin"]
+xxhash = ["xxhash-rust"] # 4x faster caching but potentially less secure
 no-cache = [] # enable this to disable caching
 selection-weighed-round-robin = [] # default algo
 selection-random = ["rand"] # optional random algo
