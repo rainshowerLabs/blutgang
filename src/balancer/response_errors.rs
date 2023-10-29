@@ -49,6 +49,18 @@ macro_rules! cache_error {
 }
 
 #[macro_export]
+macro_rules! no_method_error {
+    () => {
+        Ok(hyper::Response::builder()
+            .status(400)
+            .body(Full::new(Bytes::from(
+                "{code:-32004, message:\"error: no method in request!\"}".to_string(),
+            )))
+            .unwrap())
+    };
+}
+
+#[macro_export]
 macro_rules! rpc_response {
     (
         $status:expr,

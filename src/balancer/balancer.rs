@@ -9,10 +9,10 @@ use crate::{
     },
     balancer::selection::selection::pick,
     cache_error,
+    no_method_error,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
-    rpc_response,
     timed_out,
     NamedBlocknumbers,
 };
@@ -114,7 +114,7 @@ macro_rules! get_response {
                 } else {
                     // Return error if theres no method in request since its going to 100% error later.
                     if $tx["method"] == Value::Null {
-                        return (rpc_response!(400, "{code:-32004, message:\"error: no method in request!\"}"), None);
+                        return (no_method_error!(), None);
                     }
 
                     // Kinda jank but set the id back to what it was before
