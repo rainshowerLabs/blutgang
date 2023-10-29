@@ -12,6 +12,7 @@ use crate::{
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
+    rpc_response,
     timed_out,
     NamedBlocknumbers,
 };
@@ -111,6 +112,11 @@ macro_rules! get_response {
                     cached["id"] = $id.into();
                     cached.to_string()
                 } else {
+                    // Return error if theres no method in request since its going to 100% error later.
+                    if $tx["method"].is_none() {
+                        return (rpc_response!(400, "{code:-32004, message:\"error: no method in request!\"}"), None);
+                    }
+
                     // Kinda jank but set the id back to what it was before
                     $tx["id"] = $id.into();
 
@@ -121,7 +127,7 @@ macro_rules! get_response {
                         // Flush because we're probably doing something volatile.
                         let _ = $cache.flush_async().await;
 
-                        
+
                     }
 
                     // Loop until we get a response

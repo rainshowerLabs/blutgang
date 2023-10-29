@@ -3,9 +3,7 @@ use crate::Rpc;
 use clap::ArgMatches;
 use clap::Command;
 use sled::Config;
-use std::fs::{
-    self,
-};
+use std::fs::{self,};
 use std::net::SocketAddr;
 use toml::Value;
 

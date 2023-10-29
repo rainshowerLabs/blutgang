@@ -6,9 +6,9 @@ use std::sync::{
 };
 
 pub fn execute_method(
-	method: Option<&str>,
-	params: Option<&str>,
-) -> Result<String, /*fill in l8r*/>{
+    method: Option<&str>,
+    params: Option<&str>,
+) -> Result<String /*fill in l8r*/> {
     match method {
         Some("blutgang_quit") => admin_blutgang_quit(),
         // "blutgang_rpc_list" => _,
@@ -26,7 +26,4 @@ fn admin_blutgang_quit() {
     std::process::exit(0);
 }
 
-fn admin_list_rpc(rpc_list: Arc<RwLock<Vec<Rpc>>>,) {
-
-
-}
+fn admin_list_rpc(rpc_list: Arc<RwLock<Vec<Rpc>>>) {}

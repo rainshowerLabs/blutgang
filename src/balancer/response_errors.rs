@@ -48,7 +48,7 @@ macro_rules! cache_error {
     };
 }
 
-#[allow(unused_macros)]
+#[macro_export]
 macro_rules! rpc_response {
     (
         $status:expr,
@@ -56,7 +56,7 @@ macro_rules! rpc_response {
     ) => {
         Ok(hyper::Response::builder()
             .status($status)
-            .body($body)
+            .body(Full::new(Bytes::from($body)))
             .unwrap())
     };
 }
