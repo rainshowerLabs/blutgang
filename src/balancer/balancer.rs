@@ -1,4 +1,5 @@
 use crate::{
+    admin::service::process_request,
     balancer::format::{
         get_block_number_from_request,
         incoming_to_value,
@@ -122,9 +123,7 @@ macro_rules! get_response {
 
                     // TODO: idk about this ["method"]
                     if memmem::find($tx["method"].as_str().unwrap().as_bytes(), "blutgang_".as_bytes()).is_some() {
-                        // Flush because we're probably doing something volatile.
-                        let _ = $cache.flush_async().await;
-
+                        return (process_request($tx, $rpc_list_rwlock, $cache), None)
 
                     }
 

@@ -8,19 +8,18 @@ use std::sync::{
     RwLock,
 };
 
-// use sled::Db;
+use sled::Db;
 
-pub fn execute_method(
+pub async fn execute_method(
     method: Option<&str>,
     params: Option<&str>,
-    rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    poverty_list: Arc<RwLock<Vec<Rpc>>>,
-    // cache: Arc<Db>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    cache: Arc<Db>,
 ) -> Result<String, AdminError> {
     match method {
-        Some("blutgang_quit") => admin_blutgang_quit(),
+        Some("blutgang_quit") => admin_blutgang_quit(cache).await,
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
-        Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
+        // Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
         // "blutgang_cache" => _,
@@ -34,14 +33,15 @@ pub fn execute_method(
 // Quit Blutgang upon receiving this method
 // We're returning a string and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
-fn admin_blutgang_quit() -> Result<String, AdminError> {
+async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<String, AdminError> {
+    let _ = cache.flush_async().await;
     std::process::exit(0);
     Ok("".to_string())
 }
 
 // List generic Fn to list RPCs from a Arc<RwLock<Vec<Rpc>>>
 // Used for `blutgang_rpc_list` and `blutgang_poverty_list`
-fn admin_list_rpc(rpc_list: Arc<RwLock<Vec<Rpc>>>) -> Result<String, AdminError> {
+fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<String, AdminError> {
     let rpc_list = rpc_list.read().map_err(|_| AdminError::Innacessible)?;
     let mut rpc_list_str = String::new();
     for rpc in rpc_list.iter() {
