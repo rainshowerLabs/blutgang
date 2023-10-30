@@ -184,6 +184,7 @@ macro_rules! get_response {
                             let num = num.unwrap();
 
                             if num > *$finalized_rx.borrow() {
+                                // TODO: test this
                                 let mut head_cache = $head_cache.write().unwrap();
                                 head_cache
                                     .entry(num)
