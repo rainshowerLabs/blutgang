@@ -168,10 +168,10 @@ macro_rules! get_response {
                             },
                         };
 
+                        // TODO: dont hardcode this
                         if retries == 32 {
                             return (timed_out!(), $rpc_position,);
                         }
-
                     }
 
                     let mut rx_str = rx.as_str().to_string();
