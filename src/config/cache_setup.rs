@@ -22,12 +22,14 @@ pub fn setup_data(cache: Arc<Db>) {
         if cache.get(b"blake3").unwrap().is_some() {
             println!("\x1b[31mErr:\x1b[0m Blutgang has detected that your DB is using blake3 while we're currently using xxhash! \
                 Please remove all cache entries and try again.");
+            println!("If you believe this is an error, please open a pull request!");
         }
     } else {
         let _ = cache.insert(b"blake3", b"true");
         if cache.get(b"xxhash").unwrap().is_some() {
             println!("\x1b[31mErr:\x1b[0m Blutgang has detected that your DB is using xxhash while we're currently using blake3! \
                 Please remove all cache entries and try again.");
+            println!("If you believe this is an error, please open a pull request!");
         }
     }
 }
