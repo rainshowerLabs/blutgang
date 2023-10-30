@@ -1,7 +1,10 @@
 use crate::{
-    health::safe_block::{
-        get_safe_block,
-        NamedBlocknumbers,
+    health::{
+        error::HealthError,
+        safe_block::{
+            get_safe_block,
+            NamedBlocknumbers,
+        },
     },
     Rpc,
 };
@@ -36,7 +39,7 @@ pub async fn health_check(
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     ttl: u128,
     health_check_ttl: u64,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), HealthError> {
     loop {
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
@@ -55,7 +58,7 @@ async fn check(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), HealthError> {
     print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
@@ -92,7 +95,7 @@ async fn check(
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
-) -> Result<Vec<HeadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<HeadResult>, HealthError> {
     let len = rpc_list.read().unwrap().len();
     let mut heads = Vec::<HeadResult>::new();
 
@@ -156,7 +159,7 @@ fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     heads: Vec<HeadResult>,
-) -> Result<u64, Box<dyn std::error::Error>> {
+) -> Result<u64, HealthError> {
     // Get the highest head reported by the RPCs
     let mut highest_head = 0;
     for head in &heads {
@@ -195,7 +198,7 @@ fn escape_poverty(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_heads: Vec<HeadResult>,
     agreed_head: u64,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), HealthError> {
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
