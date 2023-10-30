@@ -27,9 +27,7 @@ use simd_json;
 use blake3::hash;
 
 #[cfg(feature = "xxhash")]
-use xxhash_rust::{
-    xxh3::xxh3_64,
-};
+use xxhash_rust::xxh3::xxh3_64;
 #[cfg(feature = "xxhash")]
 use zerocopy::AsBytes; // Impls AsBytes trait for u64
 
@@ -244,10 +242,12 @@ async fn forward_body(
 
     // Hash the request with either blake3 or xxhash depending on the enabled feature
     let tx_hash;
-    #[cfg(not(feature = "xxhash"))] {
+    #[cfg(not(feature = "xxhash"))]
+    {
         tx_hash = hash(to_vec(&tx).unwrap().as_slice());
     }
-    #[cfg(feature = "xxhash")] {
+    #[cfg(feature = "xxhash")]
+    {
         tx_hash = xxh3_64(to_vec(&tx).unwrap().as_slice());
     }
 
