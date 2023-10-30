@@ -77,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
+    let finalized_rx_arc = Arc::new(finalized_rx);
 
     if config.health_check {
         tokio::task::spawn(async move {
@@ -96,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
     let cache_clone = Arc::clone(&cache);
-    let finalized_rxclone = finalized_rx.clone();
+    let finalized_rxclone = Arc::clone(&finalized_rx_arc);
     tokio::task::spawn(async move {
         let _ = manage_cache(
             &head_cache_clone,
@@ -120,7 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
         let head_cache_clone = Arc::clone(&head_cache);
-        let finalized_rx_clone = finalized_rx.clone();
+        let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
