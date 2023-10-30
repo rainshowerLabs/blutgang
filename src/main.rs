@@ -109,7 +109,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // We start a loop to continuously accept incoming connections
     loop {
-        let (stream, _) = listener.accept().await?;
+        let (stream, socketaddr) = listener.accept().await?;
+        println!("\x1b[35mInfo:\x1b[0m Connection from: {}", socketaddr);
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.
