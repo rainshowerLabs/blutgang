@@ -255,6 +255,8 @@ async fn forward_body(
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
 
+    // TODO: admin namespace here?
+
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
