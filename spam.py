@@ -27,13 +27,16 @@ def get_block_number(hex_num):
 
 def my_func(x):
     for i in range(x): 
-        block_number = get_block_number(hex(i+17905056))
-        print(f"Block Number: {block_number}")
+        block_number = get_block_number(hex(i+17975056))
+        # print(f"Block Number: {block_number}")
 
 def main():
     pool = mp.Pool(mp.cpu_count())
-    while True:
+    i = 0
+    while i < 10:
         pool.map(my_func, range(0, 1000))
+        print("done: ", i)
+        i += 1
 
 if __name__ == "__main__":
     main()
