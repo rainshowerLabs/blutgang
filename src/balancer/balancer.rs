@@ -22,6 +22,7 @@ use serde_json::{
 };
 use simd_json;
 
+// Select either blake3 or xxhash based on the features
 #[cfg(not(feature = "xxhash"))]
 use blake3::hash;
 
@@ -29,6 +30,8 @@ use blake3::hash;
 use xxhash_rust::{
     xxh3::xxh3_64,
 };
+#[cfg(feature = "xxhash")]
+use zerocopy::AsBytes; // Impls AsBytes trait for u64
 
 use http_body_util::Full;
 use hyper::{

@@ -200,6 +200,7 @@ dependencies = [
  "toml",
  "url",
  "xxhash-rust",
+ "zerocopy",
 ]
 
 [[package]]
@@ -710,9 +711,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util-blutgang"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "571072e7b3df4757c4fff0c8fe3d2f65496a0c6ef8c2108d4e73ee602d2ad6a6"
+checksum = "9ece730fd41c66bec14496c3d818d8f0d8c2a70b35a1f80b5f230b46ec9dc06f"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2058,18 +2059,19 @@ checksum = "9828b178da53440fa9c766a3d2f73f7cf5d0ac1fe3980c1e5018d899fd19e07b"
 
 [[package]]
 name = "zerocopy"
-version = "0.7.11"
+version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c19fae0c8a9efc6a8281f2e623db8af1db9e57852e04cde3e754dd2dc29340f"
+checksum = "dd66a62464e3ffd4e37bd09950c2b9dd6c4f8767380fabba0d523f9a775bc85a"
 dependencies = [
+ "byteorder",
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.11"
+version = "0.7.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc56589e9ddd1f1c28d4b4b5c773ce232910a6bb67a70133d61c9e347585efe9"
+checksum = "255c4596d41e6916ced49cfafea18727b24d67878fa180ddfd69b9df34fd1726"
 dependencies = [
  "proc-macro2",
  "quote",
