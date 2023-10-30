@@ -18,7 +18,9 @@ impl std::fmt::Display for HealthError {
         match self {
             HealthError::Unresponsive => write!(f, "RPC is unresponsive"),
             HealthError::TimedOut => write!(f, "Health check timed out!"),
-            HealthError::GetSafeBlockError(reason) => write!(f, "Could not get safe block: {}", reason),
+            HealthError::GetSafeBlockError(reason) => {
+                write!(f, "Could not get safe block: {}", reason)
+            }
             HealthError::OutOfBounds => {
                 write!(
                     f,
