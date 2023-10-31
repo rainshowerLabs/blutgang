@@ -2,27 +2,44 @@
 
 # Config for blutgang goes here
 [blutgang]
-do_clear = false # Clear the cache DB on startup
-address = "localhost:3000" # Where to bind blutgang to
-ma_length = 10 # Moving average length for the latency
-sort_on_startup = true # Sort RPCs by latency on startup. Recommended to leave on.
-health_check = true # Enable health checking
-ttl = 300 # Acceptable time to wait for a response in ms
-health_check_ttl = 12000 # Time between health checks in ms
+# Clear the cache DB on startup
+do_clear = false
+# Where to bind blutgang to
+address = "localhost:3000"
+# Moving average length for the latency
+ma_length = 10
+# Sort RPCs by latency on startup. Recommended to leave on.
+sort_on_startup = true
+# Enable health checking
+health_check = true
+# Acceptable time to wait for a response in ms
+ttl = 300
+# Time between health checks in ms
+health_check_ttl = 12000
 
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
 [sled]
-db_path = "./blutgang-cache" # Path to db
-mode = "HighThroughput" # sled mode. Can be HighThroughput/LowSpace
-cache_capacity = 1000000000 # Cache size in bytes. Doesn't matter too much as you OS should also be caching.
-compression = false # Use zstd compression. Reduces size 60-70%, and increases CPU and latency by around 10% for db writes and 2% for reads
-print_profile = false # Print DB profile when dropped. Doesn't do anything for now.
-flush_every_ms = 24000 # Frequency of flushes in ms
+# Path to db
+db_path = "./blutgang-cache"
+# sled mode. Can be HighThroughput/LowSpace
+mode = "HighThroughput"
+ # Cache size in bytes. Doesn't matter too much as you OS should also be caching.
+cache_capacity = 1000000000
+# Use zstd compression. Reduces size 60-70%,
+# and increases CPU and latency by around 10% for db writes and 2% for reads
+compression = false
+# Print DB profile when dropped. Doesn't do anything for now.
+print_profile = false
+# Frequency of flushes in ms
+flush_every_ms = 24000
 
 # Add seperate RPCs as TOML tables
 # DO NOT name an rpc `blutgang` or `sled`
 [llama]
-url = "https://eth.llamarpc.com" # RPC url
-max_consecutive = 5 # The maximum ammount of time we can use this rpc in a row.
-max_per_second = 0 # Max ammount of querries per second. Doesn't do anything for now.
+# RPC url
+url = "https://eth.llamarpc.com"
+# The maximum ammount of time we can use this rpc in a row.
+max_consecutive = 5
+# Max ammount of querries per second. Doesn't do anything for now.
+max_per_second = 0
