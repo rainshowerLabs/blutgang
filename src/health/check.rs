@@ -1,4 +1,5 @@
 use crate::{
+    Settings,
     health::{
         error::HealthError,
         safe_block::{
@@ -37,10 +38,12 @@ pub async fn health_check(
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
-    ttl: u128,
-    health_check_ttl: u64,
+    config: &Arc<RwLock<Settings>>,
 ) -> Result<(), HealthError> {
     loop {
+        let health_check_ttl = config.read().unwrap().health_check_ttl;
+        let ttl = config.read().unwrap().ttl;
+
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
         get_safe_block(
