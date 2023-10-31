@@ -18,7 +18,7 @@ ttl = 300
 health_check_ttl = 12000
 
 # Note: the admin namespace contains volatile functions and
-# should not be exposed publically.
+# should not be exposed publicly.
 [admin]
 # Enable the admin namespace
 enabled = true
@@ -28,7 +28,7 @@ address = "localhost:5715"
 # Recommended `true` unless you 100% need write methods
 readonly = true
 # Enable AES encryption of admin namespace requests
-# MUST BE ENABLED IN PROD
+# Must be enabled in prod if exposing to the internet
 encrypted = false
 # 128-bit AES key for the namespace
 key = "FILL THIS IN"
