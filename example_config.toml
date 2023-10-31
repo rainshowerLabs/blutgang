@@ -17,6 +17,19 @@ ttl = 300
 # Time between health checks in ms
 health_check_ttl = 12000
 
+# Note: the admin namespace contains volatile functions and
+# should not be exposed publically.
+[admin]
+# Enable the admin namespace
+enabled = true
+# Address for the admin RPC
+address = "localhost:5715"
+# Enable AES encryption of admin namespace requests
+# MUST BE ENABLED IN PROD
+encrypted = false
+# 128-bit AES key for the namespace
+key = "FILL THIS IN"
+
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
 [sled]
@@ -35,7 +48,7 @@ print_profile = false
 flush_every_ms = 24000
 
 # Add seperate RPCs as TOML tables
-# DO NOT name an rpc `blutgang` or `sled`
+# DO NOT name an rpc `blutgang`, `admin`, or `sled`
 [llama]
 # RPC url
 url = "https://eth.llamarpc.com"
