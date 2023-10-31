@@ -152,6 +152,35 @@ impl Settings {
             }
         }
 
+        // Admin namespace things
+        let admin;
+        let admin_table = parsed_toml.get("admin").unwrap().as_table().unwrap();
+        let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
+        if enabled {
+            let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
+            let address = admin_table.get("address").unwrap().as_str().unwrap();
+            let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
+            let encrypted = admin_table.get("encrypted").unwrap().as_bool().unwrap();
+            let key = admin_table.get("key").unwrap().as_str().unwrap().to_string();
+            
+            admin = AdminSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+                readonly,
+                encrypted,
+                key,
+            };
+        } else {
+            admin = AdminSettings {
+                enabled: false,
+                address: "::1:3001".parse::<SocketAddr>().unwrap(),
+                readonly: false,
+                encrypted: false,
+                key: "".to_string(),
+            };
+        }
+
+
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
             rpc_list = sort_by_latency(rpc_list, ma_length).await;
@@ -165,6 +194,7 @@ impl Settings {
             ttl,
             health_check_ttl,
             sled_config,
+            admin,
         }
     }
 
@@ -248,6 +278,34 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid health_check_ttl");
 
+        // Admin thing setup
+        let admin;
+        let enabled = matches.get_occurrences::<String>("admin").is_some();
+        if enabled {
+            let address = matches
+                .get_one::<String>("admin_address")
+                .expect("Invalid admin_address");
+            let readonly = matches.get_occurrences::<String>("readonly").is_some();
+            let encrypted = matches.get_occurrences::<String>("encrypted").is_some();
+            let key = matches.get_one::<String>("key").expect("Invalid key");
+            
+            admin = AdminSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+                readonly,
+                encrypted,
+                key: key.to_string(),
+            };
+        } else {
+            admin = AdminSettings {
+                enabled: false,
+                address: "::1:3001".parse::<SocketAddr>().unwrap(),
+                readonly: false,
+                encrypted: false,
+                key: "".to_string(),
+            };
+        }
+
         Settings {
             rpc_list,
             do_clear: clear,
@@ -256,6 +314,7 @@ impl Settings {
             ttl,
             health_check_ttl,
             sled_config,
+            admin,
         }
     }
 }
