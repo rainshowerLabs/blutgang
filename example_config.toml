@@ -24,6 +24,9 @@ health_check_ttl = 12000
 enabled = true
 # Address for the admin RPC
 address = "localhost:5715"
+# Only allow read-only methods
+# Recommended `true` unless you 100% need write methods
+readonly = true
 # Enable AES encryption of admin namespace requests
 # MUST BE ENABLED IN PROD
 encrypted = false
