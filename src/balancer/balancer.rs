@@ -182,10 +182,8 @@ macro_rules! get_response {
                         let num = get_block_number_from_request($tx, $named_numbers);
                         if num.is_some() {
                             let num = num.unwrap();
-                                println!("finalized_rx: {}", *$finalized_rx.borrow());
 
                             if num > *$finalized_rx.borrow() {
-                                println!("finalized_rx (real): {}", *$finalized_rx.borrow());
                                 let mut head_cache = $head_cache.write().unwrap();
                                 head_cache
                                     .entry(num)
