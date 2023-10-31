@@ -138,7 +138,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
-                config.ma_length,
                 &cache_clone,
                 &finalized_rx_clone,
                 &named_blocknumbers_clone,

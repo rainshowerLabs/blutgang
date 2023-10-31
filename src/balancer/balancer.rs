@@ -63,7 +63,6 @@ macro_rules! accept {
     (
         $io:expr,
         $rpc_list_rwlock:expr,
-        $ma_length:expr,
         $cache:expr,
         $finalized_rx:expr,
         $named_numbers:expr,
