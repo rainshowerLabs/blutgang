@@ -10,6 +10,15 @@ use std::net::SocketAddr;
 use toml::Value;
 
 #[derive(Debug, Clone)]
+pub struct AdminSettings {
+    pub enabled: bool,
+    pub address: SocketAddr,
+    pub readonly: bool,
+    pub encrypted: bool,
+    pub key: String,
+}
+
+#[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
     pub do_clear: bool,
@@ -18,6 +27,7 @@ pub struct Settings {
     pub ttl: u128,
     pub health_check_ttl: u64,
     pub sled_config: Config,
+    pub admin: AdminSettings,
 }
 
 impl Settings {
