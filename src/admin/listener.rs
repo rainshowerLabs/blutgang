@@ -1,3 +1,5 @@
+use hyper_util_blutgang::rt::TokioIo;
+
 pub async fn listen_for_admin_requests() {
     loop {
         let (stream, socketaddr) = listener.accept().await?;
@@ -9,16 +11,33 @@ pub async fn listen_for_admin_requests() {
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            accept!(
+            accept_admin!(
                 io,
-                &rpc_list_rwlock_clone,
-                config.ma_length,
-                &cache_clone,
-                &finalized_rx_clone,
-                &named_blocknumbers_clone,
-                &head_cache_clone,
-                &config_clone
             );
         });
     }
+}
+
+#[macro_use]
+macro_rules! accept_admin {
+    (
+        $io:expr,
+    ) => {
+        // Bind the incoming connection to our service
+        if let Err(err) = http1::Builder::new()
+            // `service_fn` converts our function in a `Service`
+            .serve_connection(
+                $io,
+                service_fn(|req| {
+                    let response = accept_admin_request(
+                        req,
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("error serving admin connection: {:?}", err);
+        }
+    };
 }
