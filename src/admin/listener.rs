@@ -1,4 +1,16 @@
-use crate::admin::accept::accept_admin_request;
+use std::sync::{
+    Arc,
+    RwLock,
+};
+
+use sled::Db;
+
+use crate::{
+    Settings,
+    Rpc,
+    admin::accept::accept_admin_request
+};
+
 use tokio::net::TcpListener;
 use hyper::{
     server::conn::http1,
@@ -9,6 +21,9 @@ use hyper_util_blutgang::rt::TokioIo;
 macro_rules! accept_admin {
     (
         $io:expr,
+        $rpc_list_rwlock:expr,
+        $cache:expr,
+        $config:expr,
     ) => {
         // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
@@ -18,6 +33,9 @@ macro_rules! accept_admin {
                 service_fn(|req| {
                     let response = accept_admin_request(
                         req,
+                        $rpc_list_rwlock,
+                        $cache,
+                        $config,
                     );
                     response
                 }),
@@ -29,10 +47,16 @@ macro_rules! accept_admin {
     };
 }
 
-pub async fn listen_for_admin_requests() -> Result<(), Box<dyn std::error::Error>>{
+pub async fn listen_for_admin_requests(
+    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    cache: Arc<Db>,
+    config: Arc<RwLock<Settings>>,
+) -> Result<(), Box<dyn std::error::Error>>{
+    let config_guard = config.read().unwrap();
+
     // Create a listener and bind to it
-    // TODO: dont hardcode
-    let listener = TcpListener::bind("127.0.0.1:5975").await?;
+    let listener = TcpListener::bind(config_guard.admin.address).await?;
+    drop(config_guard);
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;
@@ -42,12 +66,16 @@ pub async fn listen_for_admin_requests() -> Result<(), Box<dyn std::error::Error
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
+        let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept_admin!(
                 io,
+                rpc_list_rwlock_clone,
+                cache,
+                config,
             );
         });
     }
 }
-
