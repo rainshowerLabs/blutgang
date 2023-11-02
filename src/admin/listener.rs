@@ -60,6 +60,7 @@ pub async fn listen_for_admin_requests(
 
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
+    println!("\x1b[35mInfo:\x1b[0m Bound admin to: {}", address);
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;
