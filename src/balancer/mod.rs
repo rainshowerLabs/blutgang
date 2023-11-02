@@ -1,4 +1,4 @@
 pub mod balancer;
-mod format;
+pub mod format;
 mod response_errors;
 pub mod selection;
