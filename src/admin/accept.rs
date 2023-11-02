@@ -41,6 +41,8 @@ macro_rules! get_response {
         $tx["id"] = $id.into();
 
         let tx_string = $tx.to_string();
+        // Admin rpc response serde::Value
+        let rx;
 
         let mut rx_str = "sdas";
 
