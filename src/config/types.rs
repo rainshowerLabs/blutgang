@@ -161,8 +161,13 @@ impl Settings {
             let address = admin_table.get("address").unwrap().as_str().unwrap();
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
             let encrypted = admin_table.get("encrypted").unwrap().as_bool().unwrap();
-            let key = admin_table.get("key").unwrap().as_str().unwrap().to_string();
-            
+            let key = admin_table
+                .get("key")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
@@ -179,7 +184,6 @@ impl Settings {
                 key: "".to_string(),
             };
         }
-
 
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
@@ -288,7 +292,7 @@ impl Settings {
             let readonly = matches.get_occurrences::<String>("readonly").is_some();
             let encrypted = matches.get_occurrences::<String>("encrypted").is_some();
             let key = matches.get_one::<String>("key").expect("Invalid key");
-            
+
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),

@@ -1,10 +1,10 @@
-use std::time::Instant;
-use std::convert::Infallible;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
     Request,
 };
+use std::convert::Infallible;
+use std::time::Instant;
 
 use std::sync::{
     Arc,
@@ -14,11 +14,9 @@ use std::sync::{
 use sled::Db;
 
 use crate::{
-    Settings,
+    balancer::format::incoming_to_value,
     Rpc,
-    balancer::format::{
-        incoming_to_value,
-    },
+    Settings,
 };
 
 // use tokio::net::TcpListener;
@@ -38,21 +36,16 @@ macro_rules! get_response {
         $id:expr,
         $rpc_list_rwlock:expr,
         //$config:expr
-    ) => {
-        {
-            // Kinda jank but set the id back to what it was before
-            $tx["id"] = $id.into();
+    ) => {{
+        // Kinda jank but set the id back to what it was before
+        $tx["id"] = $id.into();
 
-            let tx_string = $tx.to_string();
+        let tx_string = $tx.to_string();
 
+        let mut rx_str = "sdas";
 
-            let mut rx_str = "sdas";
-
-            rx_str
-        }
-    };
-
-            
+        rx_str
+    }};
 }
 
 // Execute requesst and construct a HTTP response
@@ -99,16 +92,10 @@ pub async fn accept_admin_request(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-	let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
+    let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
 
     let time = Instant::now();
-    response = forward_body(
-        tx,
-        &rpc_list_rwlock,
-        cache,
-        config,
-    )
-    .await;
+    response = forward_body(tx, &rpc_list_rwlock, cache, config).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 

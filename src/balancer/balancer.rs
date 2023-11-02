@@ -1,5 +1,4 @@
 use crate::{
-    Settings,
     balancer::format::{
         get_block_number_from_request,
         incoming_to_value,
@@ -15,6 +14,7 @@ use crate::{
     rpc::types::Rpc,
     timed_out,
     NamedBlocknumbers,
+    Settings,
 };
 
 use serde_json::{

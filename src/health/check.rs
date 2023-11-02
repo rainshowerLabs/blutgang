@@ -1,5 +1,4 @@
 use crate::{
-    Settings,
     health::{
         error::HealthError,
         safe_block::{
@@ -8,6 +7,7 @@ use crate::{
         },
     },
     Rpc,
+    Settings,
 };
 
 use std::println;

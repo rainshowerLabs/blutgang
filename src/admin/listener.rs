@@ -6,17 +6,17 @@ use std::sync::{
 use sled::Db;
 
 use crate::{
-    Settings,
+    admin::accept::accept_admin_request,
     Rpc,
-    admin::accept::accept_admin_request
+    Settings,
 };
 
-use tokio::net::TcpListener;
 use hyper::{
     server::conn::http1,
     service::service_fn,
 };
 use hyper_util_blutgang::rt::TokioIo;
+use tokio::net::TcpListener;
 
 macro_rules! accept_admin {
     (
@@ -51,7 +51,7 @@ pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
-) -> Result<(), Box<dyn std::error::Error>>{
+) -> Result<(), Box<dyn std::error::Error>> {
     let address;
     {
         let config_guard = config.read().unwrap();
@@ -75,12 +75,7 @@ pub async fn listen_for_admin_requests(
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            accept_admin!(
-                io,
-                &rpc_list_rwlock_clone,
-                &cache_clone,
-                &config_clone,
-            );
+            accept_admin!(io, &rpc_list_rwlock_clone, &cache_clone, &config_clone,);
         });
     }
 }
