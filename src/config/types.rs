@@ -137,7 +137,7 @@ impl Settings {
         // Sort RPCs by latency if enabled
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
-            if table_name != "blutgang" && table_name != "sled" {
+            if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
 
                 let max_consecutive = rpc_table
@@ -173,7 +173,7 @@ impl Settings {
         } else {
             admin = AdminSettings {
                 enabled: false,
-                address: "::1:3001".parse::<SocketAddr>().unwrap(),
+                address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 encrypted: false,
                 key: "".to_string(),

@@ -104,6 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cache_admin = Arc::clone(&cache);
         let config_admin = Arc::clone(&config);
         tokio::task::spawn(async move {
+        println!("\x1b[35mInfo:\x1b[0m Admin namespace enabled, accepting admin methods at admin port");
             let _ = listen_for_admin_requests(
                 rpc_list_admin,
                 cache_admin,
