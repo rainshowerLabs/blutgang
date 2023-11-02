@@ -3,10 +3,10 @@ use crate::{
     Rpc,
 };
 
-use std::sync::{
+use std::{sync::{
     Arc,
     RwLock,
-};
+}, time::Instant};
 
 use serde_json::{
     json,
@@ -25,6 +25,7 @@ pub async fn execute_method(
     match method {
         Some("blutgang_quit") => admin_blutgang_quit(cache).await,
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
+        Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         // Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
@@ -43,6 +44,20 @@ async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
     let _ = cache.flush_async().await;
     std::process::exit(0);
     Ok(Value::Null)
+}
+
+async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
+    let time = Instant::now();
+    let _ = cache.flush_async().await;
+    let time = time.elapsed();
+
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": format!("Cache flushed in {:?}", time),
+    });
+
+    Ok(rx)
 }
 
 // List generic Fn to list RPCs from a Arc<RwLock<Vec<Rpc>>>
