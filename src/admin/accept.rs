@@ -40,15 +40,15 @@ macro_rules! get_response {
         $tx:expr,
         $id:expr,
         $rpc_list_rwlock:expr,
+        $config:expr,
         $cache:expr,
-        //$config:expr
     ) => {{
         // Execute the request and store it into rx
         let mut rx = match execute_method(
             $tx,
             $rpc_list_rwlock,
+            Arc::clone(&$config),
             Arc::clone(&$cache),
-            // Arc::clone(&config),
         ).await {
             Ok(rx) => rx,
             Err(_) => json!({
@@ -89,8 +89,8 @@ async fn forward_body(
         tx,
         id,
         rpc_list_rwlock,
+        config,
         cache,
-        //config,
     );
 
     // Convert rx to bytes and but it in a Buf

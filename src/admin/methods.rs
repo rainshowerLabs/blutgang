@@ -1,6 +1,7 @@
 use crate::{
     admin::error::AdminError,
     Rpc,
+    Settings,
 };
 
 use std::{sync::{
@@ -19,6 +20,7 @@ use sled::Db;
 pub async fn execute_method(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    config: Arc<RwLock<Settings>>,
     cache: Arc<Db>,
 ) -> Result<Value, AdminError> {
     let method = tx["method"].as_str();
@@ -26,6 +28,7 @@ pub async fn execute_method(
         Some("blutgang_quit") => admin_blutgang_quit(cache).await,
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
+        Some("blutgang_config") => admin_config(config),
         // Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
@@ -55,6 +58,17 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
         "id": Null,
         "jsonrpc": "2.0",
         "result": format!("Cache flushed in {:?}", time),
+    });
+
+    Ok(rx)
+}
+
+fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
+    let guard = config.read().unwrap();
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": format!("{:?}", guard),
     });
 
     Ok(rx)
