@@ -14,6 +14,7 @@ use std::sync::{
 use sled::Db;
 
 use crate::{
+    admin::methods::execute_method,
     balancer::format::incoming_to_value,
     Rpc,
     Settings,
@@ -35,6 +36,7 @@ macro_rules! get_response {
         $tx:expr,
         $id:expr,
         $rpc_list_rwlock:expr,
+        $cache:expr,
         //$config:expr
     ) => {{
         // Kinda jank but set the id back to what it was before
@@ -42,7 +44,12 @@ macro_rules! get_response {
 
         let tx_string = $tx.to_string();
         // Admin rpc response serde::Value
-        let rx;
+        let rx = execute_method(
+            $tx,
+            Arc::clone(&$cache),
+            // Arc::clone(&rpc_list_rwlock),
+            // Arc::clone(&config),
+        );
 
         let mut rx_str = "sdas";
 
@@ -72,6 +79,7 @@ async fn forward_body(
         tx,
         id,
         rpc_list_rwlock,
+        cache,
         //config,
     );
 
