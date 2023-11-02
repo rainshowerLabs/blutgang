@@ -39,19 +39,18 @@ macro_rules! get_response {
         $cache:expr,
         //$config:expr
     ) => {{
-        // Kinda jank but set the id back to what it was before
-        $tx["id"] = $id.into();
-
-        let tx_string = $tx.to_string();
-        // Admin rpc response serde::Value
-        let rx = execute_method(
+        // Execute the request and store it into rx
+        let mut rx = execute_method(
             $tx,
+            $rpc_list_rwlock,
             Arc::clone(&$cache),
-            // Arc::clone(&rpc_list_rwlock),
             // Arc::clone(&config),
-        );
+        ).await.unwrap();
 
-        let mut rx_str = "sdas";
+        // Set the id to whatever it was
+        rx["id"] = $id.into();
+
+        let rx_str = rx.to_string();
 
         rx_str
     }};
