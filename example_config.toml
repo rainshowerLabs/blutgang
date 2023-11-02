@@ -5,7 +5,7 @@
 # Clear the cache DB on startup
 do_clear = false
 # Where to bind blutgang to
-address = "localhost:3000"
+address = "127.0.0.1:3000"
 # Moving average length for the latency
 ma_length = 10
 # Sort RPCs by latency on startup. Recommended to leave on.
@@ -23,7 +23,7 @@ health_check_ttl = 12000
 # Enable the admin namespace
 enabled = true
 # Address for the admin RPC
-address = "localhost:5715"
+address = "127.0.0.1:5715"
 # Only allow read-only methods
 # Recommended `true` unless you 100% need write methods
 readonly = true
