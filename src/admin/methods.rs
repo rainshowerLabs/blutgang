@@ -1,4 +1,3 @@
-
 use crate::{
     admin::error::AdminError,
     Rpc,
@@ -10,9 +9,9 @@ use std::sync::{
 };
 
 use serde_json::{
-    Value::Null,
-    Value,
     json,
+    Value,
+    Value::Null,
 };
 
 use sled::Db;

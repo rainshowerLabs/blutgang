@@ -3,6 +3,10 @@ use hyper::{
     body::Bytes,
     Request,
 };
+use serde_json::{
+    json,
+    Value::Null,
+};
 use std::convert::Infallible;
 use std::time::Instant;
 
@@ -40,12 +44,19 @@ macro_rules! get_response {
         //$config:expr
     ) => {{
         // Execute the request and store it into rx
-        let mut rx = execute_method(
+        let mut rx = match execute_method(
             $tx,
             $rpc_list_rwlock,
             Arc::clone(&$cache),
             // Arc::clone(&config),
-        ).await.unwrap();
+        ).await {
+            Ok(rx) => rx,
+            Err(_) => json!({
+                "id": Null,
+                "jsonrpc": "2.0",
+                "result": "Invalid method!",
+            }),
+        };
 
         // Set the id to whatever it was
         rx["id"] = $id.into();
