@@ -33,9 +33,9 @@ macro_rules! accept_admin {
                 service_fn(|req| {
                     let response = accept_admin_request(
                         req,
-                        $rpc_list_rwlock,
-                        $cache,
-                        $config,
+                        Arc::clone($rpc_list_rwlock),
+                        Arc::clone($cache),
+                        Arc::clone($config),
                     );
                     response
                 }),
@@ -67,14 +67,16 @@ pub async fn listen_for_admin_requests(
         let io = TokioIo::new(stream);
 
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
+        let cache_clone = Arc::clone(&cache);
+        let config_clone = Arc::clone(&config);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept_admin!(
                 io,
-                rpc_list_rwlock_clone,
-                cache,
-                config,
+                &rpc_list_rwlock_clone,
+                &cache_clone,
+                &config_clone,
             );
         });
     }
