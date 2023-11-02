@@ -52,11 +52,14 @@ pub async fn listen_for_admin_requests(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<(), Box<dyn std::error::Error>>{
-    let config_guard = config.read().unwrap();
+    let address;
+    {
+        let config_guard = config.read().unwrap();
+        address = config_guard.admin.address.clone();
+    }
 
     // Create a listener and bind to it
-    let listener = TcpListener::bind(config_guard.admin.address).await?;
-    drop(config_guard);
+    let listener = TcpListener::bind(address).await?;
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;

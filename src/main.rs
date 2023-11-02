@@ -5,6 +5,7 @@ mod rpc;
 mod admin;
 
 use crate::{
+    admin::listener::listen_for_admin_requests,
     balancer::balancer::accept_request,
     config::{
         cache_setup::setup_data,
@@ -92,6 +93,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 finalized_tx,
                 &named_blocknumbers_health,
                 &config_health,
+            )
+            .await;
+        });
+    }
+
+    // Spawn a thread for the admin namespace if enabled
+    if config_guard.admin.enabled {
+        let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
+        let cache_admin = Arc::clone(&cache);
+        let config_admin = Arc::clone(&config);
+        tokio::task::spawn(async move {
+            let _ = listen_for_admin_requests(
+                rpc_list_admin,
+                cache_admin,
+                config_admin,
             )
             .await;
         });
