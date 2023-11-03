@@ -66,9 +66,9 @@ async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
     // Drop cache so we get the print profile on drop thing before we quit
     // We have to get the raw pointer
     // TODO: This still doesnt work!
-    unsafe {
-        ptr::drop_in_place(Arc::into_raw(cache) as *mut Db);
-    }
+    // unsafe {
+    //     ptr::drop_in_place(Arc::into_raw(cache) as *mut Db);
+    // }
     std::process::exit(0);
     Ok(Value::Null)
 }
