@@ -36,6 +36,8 @@ pub async fn execute_method(
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         Some("blutgang_config") => admin_config(config),
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
+        Some("blutgang_ttl") => admin_blutgang_ttl(config),
+        Some("blutgang_health_check_ttl") => admin_blutgang_health_check_ttl(config),
         Some("blutgang_add_to_rpc_list") => {
             admin_add_rpc(rpc_list, tx["params"].as_array())
         },
@@ -204,6 +206,34 @@ fn admin_remove_rpc(
     Ok(rx)
 }
 
+// Responds with health_check_ttl
+fn admin_blutgang_health_check_ttl(
+    config: Arc<RwLock<Settings>>,
+) -> Result<Value, AdminError> {
+    let guard = config.read().unwrap();
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": guard.health_check_ttl,
+    });
+
+    Ok(rx)
+}
+
+// Responds with ttl
+fn admin_blutgang_ttl(
+    config: Arc<RwLock<Settings>>,
+) -> Result<Value, AdminError> {
+    let guard = config.read().unwrap();
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": guard.ttl,
+    });
+
+    Ok(rx)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,6 +357,46 @@ mod tests {
         // Arrange
         let cache = create_test_cache();
         let tx = json!({ "id":1,"method": "blutgang_poverty_list" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_ttl() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_ttl" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_health_check_ttl() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_health_check_ttl" });
 
         // Act
         let result = execute_method(
