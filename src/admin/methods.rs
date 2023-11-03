@@ -241,7 +241,10 @@ mod tests {
 
     // Helper function to create a test cache
     fn create_test_cache() -> Arc<Db> {
-        Arc::new(sled::open("test").unwrap())
+        let db = sled::Config::new().temporary(true);
+        let db = db.open().unwrap();
+
+        Arc::new(db)
     }
 
     #[tokio::test]
