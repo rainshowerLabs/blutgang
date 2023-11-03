@@ -29,6 +29,8 @@ pub async fn execute_method(
     cache: Arc<Db>,
 ) -> Result<Value, AdminError> {
     let method = tx["method"].as_str();
+    println!("Method: {:?}", method.unwrap());
+
     match method {
         Some("blutgang_quit") => admin_blutgang_quit(cache).await,
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
@@ -137,12 +139,12 @@ fn admin_add_rpc(
     };
 
     if params.len() != 3 {
-        return Err(AdminError::InvalidParams);
+        return Err(AdminError::InvalidLen);
     }
 
     let rpc = match params[0].as_str() {
         Some(rpc) => rpc,
-        None => return Err(AdminError::InvalidParams),
+        None => return Err(AdminError::ParseError),
     };
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
@@ -167,19 +169,19 @@ fn admin_add_rpc(
 fn admin_remove_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
-) -> Result<Value, AdminError> {
+) -> Result<Value, AdminError> {    
     let params = match params {
         Some(params) => params,
         None => return Err(AdminError::InvalidParams),
     };
 
     if params.len() != 1 {
-        return Err(AdminError::InvalidParams);
+        return Err(AdminError::InvalidLen);
     }
 
-    let index = match params[0].as_u64() {
-        Some(index) => index,
-        None => return Err(AdminError::InvalidParams),
+    let index = match params[0].to_string().replace("\"", "").parse::<u64>() {
+        Ok(index) => index,
+        Err(_) => return Err(AdminError::ParseError),
     };
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
