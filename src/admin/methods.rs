@@ -582,6 +582,7 @@ mod tests {
         // Assert
         assert!(result.is_ok());
         assert!(config.read().unwrap().ttl != ttl);
+        assert!(config.read().unwrap().ttl == 9001)
     }
 
     #[tokio::test]
@@ -599,5 +600,6 @@ mod tests {
         // Assert
         assert!(result.is_ok());
         assert!(config.read().unwrap().health_check_ttl != health_check_ttl);
+        assert!(config.read().unwrap().health_check_ttl == 9001)
     }
 }
