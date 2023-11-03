@@ -35,10 +35,18 @@ pub async fn execute_method(
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         Some("blutgang_config") => admin_config(config),
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
-        Some("blutgang_add_to_rpc_list") => admin_add_rpc(rpc_list, tx["params"].as_array()),
-        Some("blutgang_add_to_poverty_list") => admin_add_rpc(poverty_list, tx["params"].as_array()),
-        Some("blutgang_remove_from_rpc_list") => admin_remove_rpc(rpc_list, tx["params"].as_array()),
-        Some("blutgang_remove_from_poverty_list") => admin_remove_rpc(poverty_list, tx["params"].as_array()),
+        Some("blutgang_add_to_rpc_list") => {
+            admin_add_rpc(rpc_list, tx["params"].as_array())
+        },
+        Some("blutgang_add_to_poverty_list") => {
+            admin_add_rpc(poverty_list, tx["params"].as_array())
+        },
+        Some("blutgang_remove_from_rpc_list") => {
+            admin_remove_rpc(rpc_list, tx["params"].as_array())
+        },
+        Some("blutgang_remove_from_poverty_list") => {
+            admin_remove_rpc(poverty_list, tx["params"].as_array())
+        },
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
         // "blutgang_cache" => _,
@@ -97,7 +105,7 @@ fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
 fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError> {
     let rpc_list = rpc_list.read().map_err(|_| AdminError::Innacessible)?;
     let mut rpc_list_str = String::new();
-    
+
     rpc_list_str.push_str("[");
     for (i, rpc) in rpc_list.iter().enumerate() {
         println!("RPC {}:\n{:#?}", i, rpc);
@@ -116,7 +124,9 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
 
 // Pushes an RPC to the end of the list
 //
-// param[0] - JSON serialized RPC
+// param[0] - RPC url
+// param[1] - max_consecutive
+// param[2] - ma_len
 fn admin_add_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
@@ -126,14 +136,21 @@ fn admin_add_rpc(
         None => return Err(AdminError::InvalidParams),
     };
 
+    if params.len() != 3 {
+        return Err(AdminError::InvalidParams);
+    }
+
     let rpc = match params[0].as_str() {
         Some(rpc) => rpc,
         None => return Err(AdminError::InvalidParams),
     };
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
-    let rpc: Rpc = serde_json::from_str(rpc).map_err(|_| AdminError::InvalidParams)?;
-    rpc_list.push(rpc);
+    rpc_list.push(Rpc::new(
+        rpc.to_string(),
+        params[1].as_u64().unwrap_or(0) as u32,
+        params[2].as_f64().unwrap_or(0.0),
+    ));
 
     let rx = json!({
         "id": Null,
@@ -144,9 +161,35 @@ fn admin_add_rpc(
     Ok(rx)
 }
 
+// Remove RPC at a specified index
+//
+// param[0] - RPC index
 fn admin_remove_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
 ) -> Result<Value, AdminError> {
-    Ok(Value::Null)
+    let params = match params {
+        Some(params) => params,
+        None => return Err(AdminError::InvalidParams),
+    };
+
+    if params.len() != 1 {
+        return Err(AdminError::InvalidParams);
+    }
+
+    let index = match params[0].as_u64() {
+        Some(index) => index,
+        None => return Err(AdminError::InvalidParams),
+    };
+
+    let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
+    rpc_list.remove(index as usize);
+
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": "Success",
+    });
+
+    Ok(rx)
 }
