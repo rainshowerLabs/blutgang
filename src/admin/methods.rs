@@ -38,18 +38,20 @@ pub async fn execute_method(
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         Some("blutgang_ttl") => admin_blutgang_ttl(config),
         Some("blutgang_health_check_ttl") => admin_blutgang_health_check_ttl(config),
-        Some("blutgang_add_to_rpc_list") => {
-            admin_add_rpc(rpc_list, tx["params"].as_array())
-        },
+        Some("blutgang_set_ttl") => admin_blutgang_set_ttl(config, tx["params"].as_array()),
+        Some("blutgang_set_health_check_ttl") => {
+            admin_blutgang_set_health_check_ttl(config, tx["params"].as_array())
+        }
+        Some("blutgang_add_to_rpc_list") => admin_add_rpc(rpc_list, tx["params"].as_array()),
         Some("blutgang_add_to_poverty_list") => {
             admin_add_rpc(poverty_list, tx["params"].as_array())
-        },
+        }
         Some("blutgang_remove_from_rpc_list") => {
             admin_remove_rpc(rpc_list, tx["params"].as_array())
-        },
+        }
         Some("blutgang_remove_from_poverty_list") => {
             admin_remove_rpc(poverty_list, tx["params"].as_array())
-        },
+        }
         _ => Err(AdminError::InvalidMethod),
     }
 }
@@ -207,9 +209,7 @@ fn admin_remove_rpc(
 }
 
 // Responds with health_check_ttl
-fn admin_blutgang_health_check_ttl(
-    config: Arc<RwLock<Settings>>,
-) -> Result<Value, AdminError> {
+fn admin_blutgang_health_check_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let rx = json!({
         "id": Null,
@@ -221,10 +221,74 @@ fn admin_blutgang_health_check_ttl(
 }
 
 // Responds with ttl
-fn admin_blutgang_ttl(
-    config: Arc<RwLock<Settings>>,
-) -> Result<Value, AdminError> {
+fn admin_blutgang_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": guard.ttl,
+    });
+
+    Ok(rx)
+}
+
+// Sets health_check_ttl
+//
+// param[0] - health_check_ttl
+fn admin_blutgang_set_health_check_ttl(
+    config: Arc<RwLock<Settings>>,
+    params: Option<&Vec<Value>>,
+) -> Result<Value, AdminError> {
+    let params = match params {
+        Some(params) => params,
+        None => return Err(AdminError::InvalidParams),
+    };
+
+    if params.len() != 1 {
+        return Err(AdminError::InvalidLen);
+    }
+
+    let health_check_ttl = match params[0].to_string().replace("\"", "").parse::<u64>() {
+        Ok(health_check_ttl) => health_check_ttl,
+        Err(_) => return Err(AdminError::ParseError),
+    };
+
+    let mut guard = config.write().unwrap();
+    guard.health_check_ttl = health_check_ttl;
+
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": guard.health_check_ttl,
+    });
+
+    Ok(rx)
+}
+
+// Sets ttl
+//
+// param[0] - ttl
+fn admin_blutgang_set_ttl(
+    config: Arc<RwLock<Settings>>,
+    params: Option<&Vec<Value>>,
+) -> Result<Value, AdminError> {
+    let params = match params {
+        Some(params) => params,
+        None => return Err(AdminError::InvalidParams),
+    };
+
+    if params.len() != 1 {
+        return Err(AdminError::InvalidLen);
+    }
+
+    let ttl = match params[0].to_string().replace("\"", "").parse::<u64>() {
+        Ok(ttl) => ttl,
+        Err(_) => return Err(AdminError::ParseError),
+    };
+
+    let mut guard = config.write().unwrap();
+    guard.ttl = ttl as u128;
+
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
@@ -465,11 +529,10 @@ mod tests {
 
         let rpc_list = create_test_rpc_list();
         // rpc_list has only 1 so add another one to keep the 1st one some company
-        rpc_list.write().unwrap().push(Rpc::new(
-            "http://example.com".to_string(),
-            5,
-            0.5,
-        ));
+        rpc_list
+            .write()
+            .unwrap()
+            .push(Rpc::new("http://example.com".to_string(), 5, 0.5));
         let len = rpc_list.read().unwrap().len();
 
         // Act
@@ -496,10 +559,45 @@ mod tests {
             &binding,
             create_test_settings_config(),
             cache,
-        ).await;
+        )
+        .await;
 
         // Assert
         assert!(result.is_ok());
         assert!(rpc_list.read().unwrap().len() == len - 1);
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_set_ttl() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_set_ttl", "params": [9001] });
+
+        let config = create_test_settings_config();
+        let ttl = config.read().unwrap().ttl;
+
+        // Act
+        let result = execute_method(tx, &create_test_rpc_list(), &create_test_poverty_list(), Arc::clone(&config), cache).await;
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(config.read().unwrap().ttl != ttl);
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_set_health_check_ttl() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_set_health_check_ttl", "params": [9001] });
+
+        let config = create_test_settings_config();
+        let ttl = config.read().unwrap().ttl;
+
+        // Act
+        let result = execute_method(tx, &create_test_rpc_list(), &create_test_poverty_list(), Arc::clone(&config), cache).await;
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(config.read().unwrap().ttl != ttl);
     }
 }
