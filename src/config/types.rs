@@ -14,8 +14,8 @@ pub struct AdminSettings {
     pub enabled: bool,
     pub address: SocketAddr,
     pub readonly: bool,
-    pub encrypted: bool,
-    pub key: String,
+    pub jwt: bool,
+    pub token: String,
 }
 
 #[derive(Debug, Clone)]
@@ -160,9 +160,9 @@ impl Settings {
             let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
             let address = admin_table.get("address").unwrap().as_str().unwrap();
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
-            let encrypted = admin_table.get("encrypted").unwrap().as_bool().unwrap();
-            let key = admin_table
-                .get("key")
+            let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
+            let token = admin_table
+                .get("token")
                 .unwrap()
                 .as_str()
                 .unwrap()
@@ -172,16 +172,16 @@ impl Settings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
-                encrypted,
-                key,
+                jwt,
+                token,
             };
         } else {
             admin = AdminSettings {
                 enabled: false,
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
-                encrypted: false,
-                key: "".to_string(),
+                jwt: false,
+                token: "".to_string(),
             };
         }
 
@@ -290,23 +290,23 @@ impl Settings {
                 .get_one::<String>("admin_address")
                 .expect("Invalid admin_address");
             let readonly = matches.get_occurrences::<String>("readonly").is_some();
-            let encrypted = matches.get_occurrences::<String>("encrypted").is_some();
-            let key = matches.get_one::<String>("key").expect("Invalid key");
+            let jwt = matches.get_occurrences::<String>("jwt").is_some();
+            let token = matches.get_one::<String>("token").expect("Invalid token");
 
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
-                encrypted,
-                key: key.to_string(),
+                jwt,
+                token: token.to_string(),
             };
         } else {
             admin = AdminSettings {
                 enabled: false,
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
-                encrypted: false,
-                key: "".to_string(),
+                jwt: false,
+                token: "".to_string(),
             };
         }
 
