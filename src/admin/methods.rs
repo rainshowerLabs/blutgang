@@ -591,13 +591,13 @@ mod tests {
         let tx = json!({ "id":1,"method": "blutgang_set_health_check_ttl", "params": [9001] });
 
         let config = create_test_settings_config();
-        let ttl = config.read().unwrap().ttl;
+        let health_check_ttl = config.read().unwrap().health_check_ttl;
 
         // Act
         let result = execute_method(tx, &create_test_rpc_list(), &create_test_poverty_list(), Arc::clone(&config), cache).await;
 
         // Assert
         assert!(result.is_ok());
-        assert!(config.read().unwrap().ttl != ttl);
+        assert!(config.read().unwrap().health_check_ttl != health_check_ttl);
     }
 }
