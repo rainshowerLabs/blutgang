@@ -22,6 +22,7 @@ macro_rules! accept_admin {
     (
         $io:expr,
         $rpc_list_rwlock:expr,
+        $poverty_list_rwlock:expr,
         $cache:expr,
         $config:expr,
     ) => {
@@ -34,6 +35,7 @@ macro_rules! accept_admin {
                     let response = accept_admin_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
+                        Arc::clone($poverty_list_rwlock),
                         Arc::clone($cache),
                         Arc::clone($config),
                     );
@@ -49,6 +51,7 @@ macro_rules! accept_admin {
 
 pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -71,12 +74,19 @@ pub async fn listen_for_admin_requests(
         let io = TokioIo::new(stream);
 
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_rwlock_clone = Arc::clone(&poverty_list_rwlock);
         let cache_clone = Arc::clone(&cache);
         let config_clone = Arc::clone(&config);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            accept_admin!(io, &rpc_list_rwlock_clone, &cache_clone, &config_clone,);
+            accept_admin!(
+                io,
+                &rpc_list_rwlock_clone,
+                &poverty_list_rwlock_clone,
+                &cache_clone,
+                &config_clone,
+            );
         });
     }
 }

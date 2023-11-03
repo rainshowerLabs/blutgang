@@ -40,6 +40,7 @@ macro_rules! get_response {
         $tx:expr,
         $id:expr,
         $rpc_list_rwlock:expr,
+        $poverty_list_rwlock:expr,
         $config:expr,
         $cache:expr,
     ) => {{
@@ -47,6 +48,7 @@ macro_rules! get_response {
         let mut rx = match execute_method(
             $tx,
             $rpc_list_rwlock,
+            $poverty_list_rwlock,
             Arc::clone(&$config),
             Arc::clone(&$cache),
         ).await {
@@ -71,6 +73,7 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -85,13 +88,7 @@ async fn forward_body(
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
-    let rax = get_response!(
-        tx,
-        id,
-        rpc_list_rwlock,
-        config,
-        cache,
-    );
+    let rax = get_response!(tx, id, rpc_list_rwlock, poverty_list_rwlock, config, cache,);
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -109,13 +106,14 @@ async fn forward_body(
 pub async fn accept_admin_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
 
     let time = Instant::now();
-    response = forward_body(tx, &rpc_list_rwlock, cache, config).await;
+    response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 

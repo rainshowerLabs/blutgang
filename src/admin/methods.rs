@@ -10,7 +10,7 @@ use std::{
         Arc,
         RwLock,
     },
-    time::Instant
+    time::Instant,
 };
 
 use serde_json::{
@@ -24,6 +24,7 @@ use sled::Db;
 pub async fn execute_method(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     config: Arc<RwLock<Settings>>,
     cache: Arc<Db>,
 ) -> Result<Value, AdminError> {
@@ -33,7 +34,7 @@ pub async fn execute_method(
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         Some("blutgang_config") => admin_config(config),
-        // Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
+        Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
         // "blutgang_cache" => _,
@@ -45,7 +46,7 @@ pub async fn execute_method(
 }
 
 // Quit Blutgang upon receiving this method
-// We're returning a string and allowing unreachable code so rustc doesnt cry
+// We're returning a Null and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
 async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
     // We're doing something not-good so flush everything to disk

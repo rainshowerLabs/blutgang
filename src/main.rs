@@ -77,6 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let poverty_list_health = Arc::clone(&rpc_poverty_list);
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
     let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
@@ -88,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
-                rpc_poverty_list,
+                poverty_list_health,
                 &blocknum_tx,
                 finalized_tx,
                 &named_blocknumbers_health,
@@ -101,11 +102,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the admin namespace if enabled
     if config_guard.admin.enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_admin = Arc::clone(&rpc_poverty_list);
         let cache_admin = Arc::clone(&cache);
         let config_admin = Arc::clone(&config);
         tokio::task::spawn(async move {
             println!("\x1b[35mInfo:\x1b[0m Admin namespace enabled, accepting admin methods at admin port");
-            let _ = listen_for_admin_requests(rpc_list_admin, cache_admin, config_admin).await;
+            let _ = listen_for_admin_requests(
+                rpc_list_admin,
+                poverty_list_admin,
+                cache_admin,
+                config_admin,
+            )
+            .await;
         });
     }
 
