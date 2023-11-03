@@ -163,7 +163,7 @@ fn admin_add_rpc(
     Ok(rx)
 }
 
-// Remove RPC at a specified index
+// Remove RPC at a specified index, return the url of the removed RPC
 //
 // param[0] - RPC index
 fn admin_remove_rpc(
@@ -185,12 +185,19 @@ fn admin_remove_rpc(
     };
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
-    rpc_list.remove(index as usize);
+    
+    // Check if index exists before removing
+    if index as usize >= rpc_list.len() {
+        return Err(AdminError::OutOfBounds);
+    }
+
+    // Finally, remove the index
+    let removed: Rpc = rpc_list.remove(index as usize);
 
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
-        "result": "Success",
+        "result": removed.url,
     });
 
     Ok(rx)
