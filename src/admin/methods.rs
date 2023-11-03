@@ -147,17 +147,21 @@ fn admin_add_rpc(
         None => return Err(AdminError::ParseError),
     };
 
+    let max_consecutive = params[1].to_string().replace("\"", "").parse::<u32>().unwrap_or(0);
+    let ma_len = params[2].to_string().replace("\"", "").parse::<f64>().unwrap_or(0.0);
+
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
+
     rpc_list.push(Rpc::new(
         rpc.to_string(),
-        params[1].as_u64().unwrap_or(0) as u32,
-        params[2].as_f64().unwrap_or(0.0),
+        max_consecutive,
+        ma_len,
     ));
 
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
-        "result": "Success",
+        "result": format!("RPC: {}, max_consecutive: {}, ma: {}", rpc, max_consecutive, ma_len),
     });
 
     Ok(rx)
