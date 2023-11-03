@@ -65,10 +65,12 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
+    let mut clone = guard.clone();
+    clone.admin.token = "HIDDEN".to_string(); // Hide the token
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
-        "result": format!("{:?}", guard),
+        "result": format!("{:?}", clone),
     });
 
     Ok(rx)
