@@ -37,18 +37,16 @@ pub async fn execute_method(
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         Some("blutgang_config") => admin_config(config),
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
-        Some("blutgang_add_to_rpc_list") => {
-            admin_add_rpc(rpc_list, tx["params"].as_array())
-        },
+        Some("blutgang_add_to_rpc_list") => admin_add_rpc(rpc_list, tx["params"].as_array()),
         Some("blutgang_add_to_poverty_list") => {
             admin_add_rpc(poverty_list, tx["params"].as_array())
-        },
+        }
         Some("blutgang_remove_from_rpc_list") => {
             admin_remove_rpc(rpc_list, tx["params"].as_array())
-        },
+        }
         Some("blutgang_remove_from_poverty_list") => {
             admin_remove_rpc(poverty_list, tx["params"].as_array())
-        },
+        }
         // "blutgang_db_stats" => _,
         // "blutgang_print_db_profile_and_drop" => _,
         // "blutgang_cache" => _,
@@ -147,16 +145,20 @@ fn admin_add_rpc(
         None => return Err(AdminError::ParseError),
     };
 
-    let max_consecutive = params[1].to_string().replace("\"", "").parse::<u32>().unwrap_or(0);
-    let ma_len = params[2].to_string().replace("\"", "").parse::<f64>().unwrap_or(0.0);
+    let max_consecutive = params[1]
+        .to_string()
+        .replace("\"", "")
+        .parse::<u32>()
+        .unwrap_or(0);
+    let ma_len = params[2]
+        .to_string()
+        .replace("\"", "")
+        .parse::<f64>()
+        .unwrap_or(0.0);
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
 
-    rpc_list.push(Rpc::new(
-        rpc.to_string(),
-        max_consecutive,
-        ma_len,
-    ));
+    rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, ma_len));
 
     let rx = json!({
         "id": Null,
@@ -173,7 +175,7 @@ fn admin_add_rpc(
 fn admin_remove_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
-) -> Result<Value, AdminError> {    
+) -> Result<Value, AdminError> {
     let params = match params {
         Some(params) => params,
         None => return Err(AdminError::InvalidParams),
@@ -189,7 +191,7 @@ fn admin_remove_rpc(
     };
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
-    
+
     // Check if index exists before removing
     if index as usize >= rpc_list.len() {
         return Err(AdminError::OutOfBounds);
@@ -205,4 +207,160 @@ fn admin_remove_rpc(
     });
 
     Ok(rx)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper function to create a test RPC list
+    fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
+        Arc::new(RwLock::new(vec![Rpc::new(
+            "http://example.com".to_string(),
+            5,
+            0.5,
+        )]))
+    }
+
+    // Helper function to create a test poverty list
+    fn create_test_poverty_list() -> Arc<RwLock<Vec<Rpc>>> {
+        Arc::new(RwLock::new(vec![Rpc::new(
+            "http://poverty.com".to_string(),
+            2,
+            0.1,
+        )]))
+    }
+
+    // Helper function to create a test Settings config
+    fn create_test_settings_config() -> Arc<RwLock<Settings>> {
+        let mut config = Settings::default();
+        config.do_clear = true;
+        config.admin.token = "admin_token".to_string();
+        Arc::new(RwLock::new(config))
+    }
+
+    // Helper function to create a test cache
+    fn create_test_cache() -> Arc<Db> {
+        Arc::new(sled::open("test").unwrap())
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_quit() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_quit" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_rpc_list() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_rpc_list" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_flush_cache() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_flush_cache" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok()); // Verify that flushing the cache doesn't produce an error
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_config() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_config" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_blutgang_poverty_list() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_poverty_list" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_invalid_method() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "invalid_method" });
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_err());
+    }
 }

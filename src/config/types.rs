@@ -1,10 +1,19 @@
-use crate::config::setup::sort_by_latency;
-use crate::Rpc;
-use clap::ArgMatches;
-use clap::Command;
+use crate::{
+    config::setup::sort_by_latency,
+    Rpc,
+};
+use clap::{
+    ArgMatches,
+    Command,
+};
+
 use sled::Config;
-use std::fs::{self,};
-use std::net::SocketAddr;
+
+use std::{
+    fs::{self,},
+    net::SocketAddr,
+};
+
 use toml::Value;
 
 #[derive(Debug, Clone)]
@@ -14,6 +23,18 @@ pub struct AdminSettings {
     pub readonly: bool,
     pub jwt: bool,
     pub token: String,
+}
+
+impl Default for AdminSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+            readonly: false,
+            jwt: false,
+            token: "".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +47,21 @@ pub struct Settings {
     pub health_check_ttl: u64,
     pub sled_config: Config,
     pub admin: AdminSettings,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            rpc_list: Vec::new(),
+            do_clear: false,
+            address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
+            health_check: false,
+            ttl: 1000,
+            health_check_ttl: 1000,
+            sled_config: sled::Config::default(),
+            admin: AdminSettings::default(),
+        }
+    }
 }
 
 impl Settings {
