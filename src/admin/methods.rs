@@ -391,4 +391,50 @@ mod tests {
         assert!(rpc_list.read().unwrap().len() == len + 1);
     }
 
+    #[tokio::test]
+    async fn test_execute_method_remove_from_rpc_list() {
+        // Arrange
+        let cache = create_test_cache();
+        // purpusefully OOB
+        let tx = json!({ "id":1,"method": "blutgang_remove_from_rpc_list", "params": [10] });
+
+        let rpc_list = create_test_rpc_list();
+        // rpc_list has only 1 so add another one to keep the 1st one some company
+        rpc_list.write().unwrap().push(Rpc::new(
+            "http://example.com".to_string(),
+            5,
+            0.5,
+        ));
+        let len = rpc_list.read().unwrap().len();
+
+        // Act
+        let result = execute_method(
+            tx,
+            &rpc_list,
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache.clone(),
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_err());
+
+        // Arrange
+        let tx = json!({ "id":1,"method": "blutgang_remove_from_rpc_list", "params": [0] });
+
+        // Act
+        let binding = create_test_poverty_list();
+        let result = execute_method(
+            tx,
+            &rpc_list,
+            &binding,
+            create_test_settings_config(),
+            cache,
+        ).await;
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(rpc_list.read().unwrap().len() == len - 1);
+    }
 }
