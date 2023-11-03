@@ -53,10 +53,10 @@ macro_rules! get_response {
             Arc::clone(&$cache),
         ).await {
             Ok(rx) => rx,
-            Err(_) => json!({
+            Err(err) => json!({
                 "id": Null,
                 "jsonrpc": "2.0",
-                "result": "Invalid method!",
+                "result": err.to_string(),
             }),
         };
 
