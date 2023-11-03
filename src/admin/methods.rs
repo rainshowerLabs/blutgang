@@ -47,12 +47,6 @@ pub async fn execute_method(
         Some("blutgang_remove_from_poverty_list") => {
             admin_remove_rpc(poverty_list, tx["params"].as_array())
         }
-        // "blutgang_db_stats" => _,
-        // "blutgang_print_db_profile_and_drop" => _,
-        // "blutgang_cache" => _,
-        // "blutgang_force_reorg" => _,
-        // "blutgang_force_health" => _,
-        // _ => println!("\x1b[31mErr:\x1b[0m Invalid admin namespace method"),
         _ => Err(AdminError::InvalidMethod),
     }
 }
