@@ -5,7 +5,6 @@ use crate::{
 };
 
 use std::{
-    ptr,
     sync::{
         Arc,
         RwLock,
@@ -37,16 +36,18 @@ pub async fn execute_method(
         Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
         Some("blutgang_config") => admin_config(config),
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
-        Some("blutgang_add_to_rpc_list") => admin_add_rpc(rpc_list, tx["params"].as_array()),
+        Some("blutgang_add_to_rpc_list") => {
+            admin_add_rpc(rpc_list, tx["params"].as_array())
+        },
         Some("blutgang_add_to_poverty_list") => {
             admin_add_rpc(poverty_list, tx["params"].as_array())
-        }
+        },
         Some("blutgang_remove_from_rpc_list") => {
             admin_remove_rpc(rpc_list, tx["params"].as_array())
-        }
+        },
         Some("blutgang_remove_from_poverty_list") => {
             admin_remove_rpc(poverty_list, tx["params"].as_array())
-        }
+        },
         _ => Err(AdminError::InvalidMethod),
     }
 }
