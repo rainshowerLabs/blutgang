@@ -4,10 +4,14 @@ use crate::{
     Settings,
 };
 
-use std::{sync::{
-    Arc,
-    RwLock,
-}, time::Instant};
+use std::{
+    ptr,
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Instant
+};
 
 use serde_json::{
     json,
@@ -44,7 +48,14 @@ pub async fn execute_method(
 // We're returning a string and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
 async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
+    // We're doing something not-good so flush everything to disk
     let _ = cache.flush_async().await;
+    // Drop cache so we get the print profile on drop thing before we quit
+    // We have to get the raw pointer
+    // TODO: This still doesnt work!
+    unsafe {
+        ptr::drop_in_place(Arc::into_raw(cache) as *mut Db);
+    }
     std::process::exit(0);
     Ok(Value::Null)
 }
