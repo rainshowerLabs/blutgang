@@ -5,6 +5,7 @@ use std::error::Error;
 #[allow(dead_code)]
 pub enum AdminError {
     InvalidMethod,
+    InvalidParams,
     InvalidSecret,
     RwError,
     Innacessible,
@@ -16,6 +17,7 @@ impl std::fmt::Display for AdminError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             AdminError::InvalidMethod => write!(f, "Requested method does not exist."),
+            AdminError::InvalidParams => write!(f, "Invalid params provided"),
             AdminError::InvalidSecret => write!(f, "Invalid secret for protected method."),
             AdminError::RwError => write!(f, "Error while trying to read or write fromt/to disk."),
             AdminError::Innacessible => write!(f, "Could not access shared resource."),

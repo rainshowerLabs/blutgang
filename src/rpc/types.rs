@@ -1,3 +1,4 @@
+use serde::Deserialize;
 use crate::rpc::error::RpcError;
 use reqwest::Client;
 use serde_json::{
@@ -7,7 +8,7 @@ use serde_json::{
 use simd_json;
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct Status {
     // Set this to true in case the RPC becomes unavailable
     // Also set the last time it was called, so we can check again later
@@ -24,7 +25,7 @@ pub struct Status {
 
 unsafe impl Sync for Status {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Rpc {
     pub url: String,    // url of the rpc we're forwarding requests to.
     client: Client,     // Reqwest client
@@ -32,6 +33,8 @@ pub struct Rpc {
     pub max_consecutive: u32,
     pub consecutive: u32,
 }
+
+impl Deserialize for Client {}
 
 unsafe impl Sync for Rpc {}
 
