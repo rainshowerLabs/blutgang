@@ -208,6 +208,8 @@ fn admin_remove_rpc(
     Ok(rx)
 }
 
+// TODO: change the following 4 fn so theyre generic
+
 // Responds with health_check_ttl
 fn admin_blutgang_health_check_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
@@ -577,7 +579,14 @@ mod tests {
         let ttl = config.read().unwrap().ttl;
 
         // Act
-        let result = execute_method(tx, &create_test_rpc_list(), &create_test_poverty_list(), Arc::clone(&config), cache).await;
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            Arc::clone(&config),
+            cache,
+        )
+        .await;
 
         // Assert
         assert!(result.is_ok());
@@ -595,7 +604,14 @@ mod tests {
         let health_check_ttl = config.read().unwrap().health_check_ttl;
 
         // Act
-        let result = execute_method(tx, &create_test_rpc_list(), &create_test_poverty_list(), Arc::clone(&config), cache).await;
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            Arc::clone(&config),
+            cache,
+        )
+        .await;
 
         // Assert
         assert!(result.is_ok());
