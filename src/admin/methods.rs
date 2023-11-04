@@ -30,27 +30,70 @@ pub async fn execute_method(
     let method = tx["method"].as_str();
     println!("Method: {:?}", method.unwrap());
 
+    // Check if write protection is enabled
+    let write_protection_enabled = config.read().unwrap().admin.readonly;
+
     match method {
-        Some("blutgang_quit") => admin_blutgang_quit(cache).await,
+        Some("blutgang_quit") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_blutgang_quit(cache).await
+            }
+        }
         Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
-        Some("blutgang_flush_cache") => admin_flush_cache(cache).await,
+        Some("blutgang_flush_cache") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_flush_cache(cache).await
+            }
+        }
         Some("blutgang_config") => admin_config(config),
         Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
         Some("blutgang_ttl") => admin_blutgang_ttl(config),
         Some("blutgang_health_check_ttl") => admin_blutgang_health_check_ttl(config),
-        Some("blutgang_set_ttl") => admin_blutgang_set_ttl(config, tx["params"].as_array()),
-        Some("blutgang_set_health_check_ttl") => {
-            admin_blutgang_set_health_check_ttl(config, tx["params"].as_array())
+        Some("blutgang_set_ttl") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_blutgang_set_ttl(config, tx["params"].as_array())
+            }
         }
-        Some("blutgang_add_to_rpc_list") => admin_add_rpc(rpc_list, tx["params"].as_array()),
+        Some("blutgang_set_health_check_ttl") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_blutgang_set_health_check_ttl(config, tx["params"].as_array())
+            }
+        }
+        Some("blutgang_add_to_rpc_list") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_add_rpc(rpc_list, tx["params"].as_array())
+            }
+        }
         Some("blutgang_add_to_poverty_list") => {
-            admin_add_rpc(poverty_list, tx["params"].as_array())
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_add_rpc(poverty_list, tx["params"].as_array())
+            }
         }
         Some("blutgang_remove_from_rpc_list") => {
-            admin_remove_rpc(rpc_list, tx["params"].as_array())
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_remove_rpc(rpc_list, tx["params"].as_array())
+            }
         }
         Some("blutgang_remove_from_poverty_list") => {
-            admin_remove_rpc(poverty_list, tx["params"].as_array())
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                admin_remove_rpc(poverty_list, tx["params"].as_array())
+            }
         }
         _ => Err(AdminError::InvalidMethod),
     }
