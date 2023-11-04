@@ -40,7 +40,7 @@ token = "FILL THIS IN"
 db_path = "./blutgang-cache"
 # sled mode. Can be HighThroughput/LowSpace
 mode = "HighThroughput"
- # Cache size in bytes. Doesn't matter too much as you OS should also be caching.
+# Cache size in bytes. Doesn't matter too much as you OS should also be caching.
 cache_capacity = 1000000000
 # Use zstd compression. Reduces size 60-70%,
 # and increases CPU and latency by around 10% for db writes and 2% for reads
