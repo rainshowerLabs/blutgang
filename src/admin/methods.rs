@@ -661,4 +661,41 @@ mod tests {
         assert!(config.read().unwrap().health_check_ttl != health_check_ttl);
         assert!(config.read().unwrap().health_check_ttl == 9001)
     }
+
+    #[tokio::test]
+    async fn test_rw_protection() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_set_health_check_ttl", "params": [9001] });
+
+        let config = create_test_settings_config();
+        config.write().unwrap().admin.readonly = true;
+
+        // Act
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            Arc::clone(&config),
+            cache.clone(),
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_err());
+
+        // Also check that we can read
+        let tx = json!({ "id":1,"method": "blutgang_health_check_ttl" });
+        let result = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            Arc::clone(&config),
+            cache,
+        ).await;
+
+        // Assert
+        assert!(result.is_ok());
+
+    }
 }
