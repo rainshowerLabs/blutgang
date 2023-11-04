@@ -1,9 +1,11 @@
+mod admin;
 mod balancer;
 mod config;
 mod health;
 mod rpc;
 
 use crate::{
+    admin::listener::listen_for_admin_requests,
     balancer::balancer::accept_request,
     config::{
         cache_setup::setup_data,
@@ -43,19 +45,21 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
-    let config = Settings::new(create_match()).await;
+    let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+    let binding = Arc::clone(&config);
+    let config_guard = binding.read().unwrap();
 
     // Make the list a rwlock
-    let rpc_list_rwlock = Arc::new(RwLock::new(config.rpc_list.clone()));
+    let rpc_list_rwlock = Arc::new(RwLock::new(config_guard.rpc_list.clone()));
 
     // Create/Open sled DB
-    let cache: Arc<sled::Db> = Arc::new(config.sled_config.open().unwrap());
+    let cache: Arc<sled::Db> = Arc::new(config_guard.sled_config.open().unwrap());
 
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
     // Clear database if specified
-    if config.do_clear {
+    if config_guard.do_clear {
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
@@ -65,34 +69,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_data(Arc::clone(&cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
-    let listener = TcpListener::bind(config.address).await?;
-    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", config.address);
+    let listener = TcpListener::bind(config_guard.address).await?;
+    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", config_guard.address);
 
     // Spawn a thread for the health check
     //
     // Also handle the finalized block tracking in this thread
     let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let poverty_list_health = Arc::clone(&rpc_poverty_list);
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
     let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
     let finalized_rx_arc = Arc::new(finalized_rx);
+    let config_health = Arc::clone(&config);
 
-    if config.health_check {
+    if config_guard.health_check {
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
-                rpc_poverty_list,
+                poverty_list_health,
                 &blocknum_tx,
                 finalized_tx,
                 &named_blocknumbers_health,
-                config.ttl,
-                config.health_check_ttl,
+                &config_health,
             )
             .await;
         });
     }
+
+    // Spawn a thread for the admin namespace if enabled
+    if config_guard.admin.enabled {
+        let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_admin = Arc::clone(&rpc_poverty_list);
+        let cache_admin = Arc::clone(&cache);
+        let config_admin = Arc::clone(&config);
+        tokio::task::spawn(async move {
+            println!("\x1b[35mInfo:\x1b[0m Admin namespace enabled, accepting admin methods at admin port");
+            let _ = listen_for_admin_requests(
+                rpc_list_admin,
+                poverty_list_admin,
+                cache_admin,
+                config_admin,
+            )
+            .await;
+        });
+    }
+
+    // Drop the config guard used to get the settings
+    // Prevents deadlocks when writing
+    drop(config_guard);
+    drop(binding);
 
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
@@ -123,17 +151,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let head_cache_clone = Arc::clone(&head_cache);
         let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
+        let config_clone = Arc::clone(&config);
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
-                config.ma_length,
                 &cache_clone,
                 &finalized_rx_clone,
                 &named_blocknumbers_clone,
                 &head_cache_clone,
-                config.ttl
+                &config_clone
             );
         });
     }

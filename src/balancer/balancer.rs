@@ -14,6 +14,7 @@ use crate::{
     rpc::types::Rpc,
     timed_out,
     NamedBlocknumbers,
+    Settings,
 };
 
 use serde_json::{
@@ -62,12 +63,11 @@ macro_rules! accept {
     (
         $io:expr,
         $rpc_list_rwlock:expr,
-        $ma_length:expr,
         $cache:expr,
         $finalized_rx:expr,
         $named_numbers:expr,
         $head_cache:expr,
-        $ttl:expr
+        $config:expr
     ) => {
         // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
@@ -82,7 +82,7 @@ macro_rules! accept {
                         $named_numbers,
                         $head_cache,
                         Arc::clone($cache),
-                        $ttl,
+                        $config,
                     );
                     response
                 }),
@@ -184,7 +184,6 @@ macro_rules! get_response {
                             let num = num.unwrap();
 
                             if num > *$finalized_rx.borrow() {
-                                // TODO: test this
                                 let mut head_cache = $head_cache.write().unwrap();
                                 head_cache
                                     .entry(num)
@@ -294,11 +293,13 @@ pub async fn accept_request(
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
-    ttl: u128,
+    config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
+    // TTL from config
+    let ttl = config.read().unwrap().ttl;
 
     let time = Instant::now();
     (response, rpc_position) = forward_body(

@@ -5,7 +5,7 @@
 # Clear the cache DB on startup
 do_clear = false
 # Where to bind blutgang to
-address = "localhost:3000"
+address = "127.0.0.1:3000"
 # Moving average length for the latency
 ma_length = 10
 # Sort RPCs by latency on startup. Recommended to leave on.
@@ -17,6 +17,22 @@ ttl = 300
 # Time between health checks in ms
 health_check_ttl = 12000
 
+# Note: the admin namespace contains volatile functions and
+# should not be exposed publicly.
+[admin]
+# Enable the admin namespace
+enabled = false
+# Address for the admin RPC
+address = "127.0.0.1:5715"
+# Only allow read-only methods
+# Recommended `true` unless you 100% need write methods
+readonly = true
+# Enable the use of JWT for auth
+# Should be on if exposing to the internet
+jwt = false
+# jwt token
+token = ""
+
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
 [sled]
@@ -24,7 +40,7 @@ health_check_ttl = 12000
 db_path = "./blutgang-cache"
 # sled mode. Can be HighThroughput/LowSpace
 mode = "HighThroughput"
- # Cache size in bytes. Doesn't matter too much as you OS should also be caching.
+# Cache size in bytes. Doesn't matter too much as you OS should also be caching.
 cache_capacity = 1000000000
 # Use zstd compression. Reduces size 60-70%,
 # and increases CPU and latency by around 10% for db writes and 2% for reads
@@ -35,7 +51,7 @@ print_profile = false
 flush_every_ms = 24000
 
 # Add seperate RPCs as TOML tables
-# DO NOT name an rpc `blutgang` or `sled`
+# DO NOT name an rpc `blutgang`, `admin`, or `sled`
 [llama]
 # RPC url
 url = "https://eth.llamarpc.com"

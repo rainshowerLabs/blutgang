@@ -1,11 +1,41 @@
-use crate::config::setup::sort_by_latency;
-use crate::Rpc;
-use clap::ArgMatches;
-use clap::Command;
+use crate::{
+    config::setup::sort_by_latency,
+    Rpc,
+};
+use clap::{
+    ArgMatches,
+    Command,
+};
+
 use sled::Config;
-use std::fs::{self,};
-use std::net::SocketAddr;
+
+use std::{
+    fs::{self,},
+    net::SocketAddr,
+};
+
 use toml::Value;
+
+#[derive(Debug, Clone)]
+pub struct AdminSettings {
+    pub enabled: bool,
+    pub address: SocketAddr,
+    pub readonly: bool,
+    pub jwt: bool,
+    pub token: String,
+}
+
+impl Default for AdminSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+            readonly: false,
+            jwt: false,
+            token: "".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Settings {
@@ -16,6 +46,22 @@ pub struct Settings {
     pub ttl: u128,
     pub health_check_ttl: u64,
     pub sled_config: Config,
+    pub admin: AdminSettings,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            rpc_list: Vec::new(),
+            do_clear: false,
+            address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
+            health_check: false,
+            ttl: 1000,
+            health_check_ttl: 1000,
+            sled_config: sled::Config::default(),
+            admin: AdminSettings::default(),
+        }
+    }
 }
 
 impl Settings {
@@ -125,7 +171,7 @@ impl Settings {
         // Sort RPCs by latency if enabled
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
-            if table_name != "blutgang" && table_name != "sled" {
+            if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
 
                 let max_consecutive = rpc_table
@@ -138,6 +184,39 @@ impl Settings {
                 let rpc = Rpc::new(url, max_consecutive, ma_length);
                 rpc_list.push(rpc);
             }
+        }
+
+        // Admin namespace things
+        let admin;
+        let admin_table = parsed_toml.get("admin").unwrap().as_table().unwrap();
+        let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
+        if enabled {
+            let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
+            let address = admin_table.get("address").unwrap().as_str().unwrap();
+            let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
+            let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
+            let token = admin_table
+                .get("token")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                .to_string();
+
+            admin = AdminSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+                readonly,
+                jwt,
+                token,
+            };
+        } else {
+            admin = AdminSettings {
+                enabled: false,
+                address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+                readonly: false,
+                jwt: false,
+                token: "".to_string(),
+            };
         }
 
         if sort_on_startup {
@@ -153,6 +232,7 @@ impl Settings {
             ttl,
             health_check_ttl,
             sled_config,
+            admin,
         }
     }
 
@@ -236,6 +316,34 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid health_check_ttl");
 
+        // Admin thing setup
+        let admin;
+        let enabled = matches.get_occurrences::<String>("admin").is_some();
+        if enabled {
+            let address = matches
+                .get_one::<String>("admin_address")
+                .expect("Invalid admin_address");
+            let readonly = matches.get_occurrences::<String>("readonly").is_some();
+            let jwt = matches.get_occurrences::<String>("jwt").is_some();
+            let token = matches.get_one::<String>("token").expect("Invalid token");
+
+            admin = AdminSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+                readonly,
+                jwt,
+                token: token.to_string(),
+            };
+        } else {
+            admin = AdminSettings {
+                enabled: false,
+                address: "::1:3001".parse::<SocketAddr>().unwrap(),
+                readonly: false,
+                jwt: false,
+                token: "".to_string(),
+            };
+        }
+
         Settings {
             rpc_list,
             do_clear: clear,
@@ -244,6 +352,7 @@ impl Settings {
             ttl,
             health_check_ttl,
             sled_config,
+            admin,
         }
     }
 }
