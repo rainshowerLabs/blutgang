@@ -21,7 +21,7 @@ health_check_ttl = 12000
 # should not be exposed publicly.
 [admin]
 # Enable the admin namespace
-enabled = true
+enabled = false
 # Address for the admin RPC
 address = "127.0.0.1:5715"
 # Only allow read-only methods
