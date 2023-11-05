@@ -1,11 +1,11 @@
-use hmac::{
-    Hmac,
-    Mac,
-};
 use crate::{
     admin::error::AdminError,
     Rpc,
     Settings,
+};
+use hmac::{
+    Hmac,
+    Mac,
 };
 
 use std::{
