@@ -139,6 +139,7 @@ pub async fn accept_admin_request(
                         .unwrap());
                 }
             };
+
         // Reconstruct the TX as a normal json rpc request
         let claims = token.claims();
         tx = json!({
