@@ -5,14 +5,24 @@ use hyper::{
 };
 use serde_json::{
     json,
+    Value,
     Value::Null,
 };
-use std::convert::Infallible;
-use std::time::Instant;
 
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Instant,
+};
+
+use jwt::{
+    Header,
+    Token,
+    VerifyWithKey,
 };
 
 use sled::Db;
@@ -71,15 +81,12 @@ macro_rules! get_response {
 
 // Execute requesst and construct a HTTP response
 async fn forward_body(
-    tx: Request<hyper::body::Incoming>,
+    mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Convert incoming body to serde value
-    let mut tx = incoming_to_value(tx).await.unwrap();
-
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -111,6 +118,33 @@ pub async fn accept_admin_request(
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
+
+    let mut tx = incoming_to_value(tx).await.unwrap();
+
+    // If we have JWT enabled check that tx is valid
+    if config.read().unwrap().admin.jwt {
+        let token_str = tx["token"].to_string();
+
+        let token: Token<Header, HashMap<String, String>, _> =
+            match token_str.verify_with_key(&config.read().unwrap().admin.key) {
+                Ok(token) => token,
+                Err(err) => {
+                    println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
+                    return Ok(hyper::Response::builder()
+                        .status(401)
+                        .body(Full::new(Bytes::from("Unauthorized")))
+                        .unwrap());
+                }
+            };
+        // Reconstruct the TX as a normal json rpc request
+        let claims = token.claims();
+        tx = json!({
+            "id": claims["id"],
+            "jsonrpc": "2.0",
+            "method": claims["method"],
+            "params": claims["params"],
+        });
+    }
 
     let time = Instant::now();
     response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
