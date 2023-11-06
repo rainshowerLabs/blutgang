@@ -19,12 +19,6 @@ use std::{
     time::Instant,
 };
 
-use jwt::{
-    Header,
-    Token,
-    VerifyWithKey,
-};
-
 use sled::Db;
 
 use crate::{
@@ -163,9 +157,7 @@ pub async fn accept_admin_request(
 
 #[cfg(test)]
 mod tests {
-    use hmac::Mac;
-    use hmac::Hmac;
-
+    use jsonwebtoken::EncodingKey;
     use super::*;
     
 
@@ -173,7 +165,7 @@ mod tests {
     fn create_test_settings() -> Arc<RwLock<Settings>> {
         let mut config = Settings::default();
         config.do_clear = true;
-        config.admin.key = Hmac::new_from_slice(b"some-secret").unwrap();
+        config.admin.key = EncodingKey::from_base64_secret("some-key").unwrap();
         Arc::new(RwLock::new(config))
     }
 

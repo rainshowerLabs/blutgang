@@ -1,3 +1,4 @@
+use jsonwebtoken::EncodingKey;
 use crate::{
     config::setup::sort_by_latency,
     Rpc,
@@ -22,7 +23,7 @@ pub struct AdminSettings {
     pub address: SocketAddr,
     pub readonly: bool,
     pub jwt: bool,
-    pub token: String,
+    pub key: EncodingKey,
 }
 
 impl Default for AdminSettings {
@@ -32,7 +33,7 @@ impl Default for AdminSettings {
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
             readonly: false,
             jwt: false,
-            token: "".to_string(),
+            key: EncodingKey::from_base64_secret("").unwrap(),
         }
     }
 }
@@ -195,8 +196,8 @@ impl Settings {
             let address = admin_table.get("address").unwrap().as_str().unwrap();
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
             let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
-            let token = admin_table
-                .get("token")
+            let key = admin_table
+                .get("key")
                 .unwrap()
                 .as_str()
                 .unwrap()
@@ -207,7 +208,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                token,
+                key: EncodingKey::from_base64_secret(&key).unwrap(),
             };
         } else {
             admin = AdminSettings {
@@ -215,7 +216,7 @@ impl Settings {
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                token: "".to_string(),
+                key: EncodingKey::from_base64_secret("").unwrap(),
             };
         }
 
@@ -325,14 +326,14 @@ impl Settings {
                 .expect("Invalid admin_address");
             let readonly = matches.get_occurrences::<String>("readonly").is_some();
             let jwt = matches.get_occurrences::<String>("jwt").is_some();
-            let token = matches.get_one::<String>("token").expect("Invalid token");
+            let key = matches.get_one::<String>("key").expect("Invalid key");
 
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                token: token.to_string(),
+                key: EncodingKey::from_base64_secret(&key).unwrap(),
             };
         } else {
             admin = AdminSettings {
@@ -340,7 +341,7 @@ impl Settings {
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                token: "".to_string(),
+                key: EncodingKey::from_base64_secret("").unwrap(),
             };
         }
 

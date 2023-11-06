@@ -36,6 +36,7 @@ hyper-util-blutgang = "0.1.3"
 simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_impl"] }
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
 zerocopy = { version = "0.7.20", optional =  true }
+jsonwebtoken = "9.1.0"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
