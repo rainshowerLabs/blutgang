@@ -1,4 +1,3 @@
-use jsonwebtoken::DecodingKey;
 use crate::{
     config::setup::sort_by_latency,
     Rpc,
@@ -7,17 +6,22 @@ use clap::{
     ArgMatches,
     Command,
 };
+use jsonwebtoken::DecodingKey;
 
 use sled::Config;
 
 use std::{
-    fs::{self,},
+    fmt,
+    fmt::Debug,
+    fs::{
+        self,
+    },
     net::SocketAddr,
 };
 
 use toml::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AdminSettings {
     pub enabled: bool,
     pub address: SocketAddr,
@@ -33,8 +37,19 @@ impl Default for AdminSettings {
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
             readonly: false,
             jwt: false,
-            key: DecodingKey::from_base64_secret("").unwrap(),
+            key: DecodingKey::from_secret(b""),
         }
+    }
+}
+
+impl Debug for AdminSettings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AdminSettings {{")?;
+        write!(f, " enabled: {:?}", self.enabled)?;
+        write!(f, ", address: {:?}", self.address)?;
+        write!(f, ", readonly: {:?}", self.readonly)?;
+        write!(f, ", jwt: HIDDEN",)?;
+        write!(f, " }}")
     }
 }
 
@@ -208,7 +223,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key: DecodingKey::from_base64_secret(&key).unwrap(),
+                key: DecodingKey::from_secret(key.as_bytes()),
             };
         } else {
             admin = AdminSettings {
@@ -216,7 +231,7 @@ impl Settings {
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: DecodingKey::from_base64_secret("").unwrap(),
+                key: DecodingKey::from_secret(b""),
             };
         }
 
@@ -333,7 +348,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key: DecodingKey::from_base64_secret(&key).unwrap(),
+                key: DecodingKey::from_secret(key.as_bytes()),
             };
         } else {
             admin = AdminSettings {
@@ -341,7 +356,7 @@ impl Settings {
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: DecodingKey::from_base64_secret("").unwrap(),
+                key: DecodingKey::from_secret(b""),
             };
         }
 

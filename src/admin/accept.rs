@@ -1,13 +1,20 @@
-use jsonwebtoken::Validation;
-use serde::Serialize;
-use serde::Deserialize;
-use jsonwebtoken::decode;
-use jsonwebtoken::Algorithm;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
     Request,
 };
+
+use jsonwebtoken::{
+    decode,
+    Algorithm,
+    Validation,
+};
+
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use serde_json::{
     json,
     Value,
@@ -42,9 +49,9 @@ use crate::{
 // For decoding JWT
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
-   id: Value,
-   method: Value,
-   params: Value,
+    id: Value,
+    method: Value,
+    params: Value,
 }
 
 // Macro for getting responses from either the cache or RPC nodes.
@@ -134,17 +141,20 @@ pub async fn accept_admin_request(
     if config.read().unwrap().admin.jwt {
         let token_str = tx["token"].to_string();
 
-        let token = match decode::<Claims>(&token_str, &config.read().unwrap().admin.key, &Validation::new(Algorithm::HS256)) {
-                Ok(token) => token,
-                Err(err) => {
-                    println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
-                    return Ok(hyper::Response::builder()
-                        .status(401)
-                        .body(Full::new(Bytes::from("Unauthorized or invalid token")))
-                        .unwrap());
-                }
-            };
-
+        let token = match decode::<Claims>(
+            &token_str,
+            &config.read().unwrap().admin.key,
+            &Validation::new(Algorithm::HS256),
+        ) {
+            Ok(token) => token,
+            Err(err) => {
+                println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
+                return Ok(hyper::Response::builder()
+                    .status(401)
+                    .body(Full::new(Bytes::from("Unauthorized or invalid token")))
+                    .unwrap());
+            }
+        };
 
         // Reconstruct the TX as a normal json rpc request
         println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", token);
@@ -167,8 +177,8 @@ pub async fn accept_admin_request(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use jsonwebtoken::DecodingKey;
-    use super::*;    
 
     // Helper function to create a test Settings config
     fn create_test_settings() -> Arc<RwLock<Settings>> {
@@ -202,7 +212,14 @@ mod tests {
         });
 
         // Call forward_body with the test data
-        let result = forward_body(tx.clone(), &rpc_list, &poverty_list, cache.clone(), settings).await;
+        let result = forward_body(
+            tx.clone(),
+            &rpc_list,
+            &poverty_list,
+            cache.clone(),
+            settings,
+        )
+        .await;
 
         // You can assert that the result matches the expected outcome
         assert!(result.is_ok());

@@ -1,9 +1,9 @@
-use jsonwebtoken::EncodingKey;
 use crate::{
     admin::error::AdminError,
     Rpc,
     Settings,
 };
+use jsonwebtoken::DecodingKey;
 
 use std::{
     sync::{
@@ -133,7 +133,7 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let mut clone = guard.clone();
-    clone.admin.key = EncodingKey::from_base64_secret("some-key").unwrap(); // Hide the token
+    clone.admin.key = DecodingKey::from_base64_secret("some-key").unwrap(); // Hide the token
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",

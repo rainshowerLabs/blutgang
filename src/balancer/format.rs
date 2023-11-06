@@ -7,9 +7,9 @@ use hyper::{
 use memchr::memmem;
 use regex::Regex;
 use serde_json::{
+    json,
     Value,
     Value::Null,
-    json,
 };
 use simd_json::serde::from_str;
 use std::{
@@ -160,7 +160,7 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
     let tx = tx.collect().await?.to_bytes().clone();
     let mut tx = from_utf8(&tx).unwrap().to_owned();
     let ret;
-    
+
     ret = match unsafe { from_str(&mut tx) } {
         Ok(ret) => ret,
         Err(_) => {
