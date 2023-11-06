@@ -135,13 +135,16 @@ pub async fn accept_admin_request(
                     println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
                     return Ok(hyper::Response::builder()
                         .status(401)
-                        .body(Full::new(Bytes::from("Unauthorized")))
+                        .body(Full::new(Bytes::from("Unauthorized or invalid token")))
                         .unwrap());
                 }
             };
 
+
         // Reconstruct the TX as a normal json rpc request
         let claims = token.claims();
+        println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", claims);
+
         tx = json!({
             "id": claims["id"],
             "jsonrpc": "2.0",
