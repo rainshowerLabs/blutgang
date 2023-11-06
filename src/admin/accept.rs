@@ -160,3 +160,52 @@ pub async fn accept_admin_request(
 
     response
 }
+
+#[cfg(test)]
+mod tests {
+    use hmac::Mac;
+    use hmac::Hmac;
+
+    use super::*;
+    
+
+    // Helper function to create a test Settings config
+    fn create_test_settings() -> Arc<RwLock<Settings>> {
+        let mut config = Settings::default();
+        config.do_clear = true;
+        config.admin.key = Hmac::new_from_slice(b"some-secret").unwrap();
+        Arc::new(RwLock::new(config))
+    }
+
+    // Helper function to create a test cache
+    fn create_test_cache() -> Arc<Db> {
+        let db = sled::Config::new().temporary(true);
+        let db = db.open().unwrap();
+
+        Arc::new(db)
+    }
+
+    #[tokio::test]
+    async fn test_forward_body() {
+        let settings = create_test_settings();
+        let cache = create_test_cache();
+        let rpc_list = Arc::new(RwLock::new(vec![]));
+        let poverty_list = Arc::new(RwLock::new(vec![]));
+
+        // Create a test request (use the actual request format here)
+        let tx = json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": "blutgang_quit",
+            "params": [],
+        });
+
+        // Call forward_body with the test data
+        let result = forward_body(tx.clone(), &rpc_list, &poverty_list, cache.clone(), settings).await;
+
+        // You can assert that the result matches the expected outcome
+        assert!(result.is_ok());
+
+        // Additional assertions can be added based on expected behavior
+    }
+}
