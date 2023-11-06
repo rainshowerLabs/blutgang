@@ -6,7 +6,11 @@ use hyper::{
 };
 use memchr::memmem;
 use regex::Regex;
-use serde_json::Value;
+use serde_json::{
+    Value,
+    Value::Null,
+    json,
+};
 use simd_json::serde::from_str;
 use std::{
     str::from_utf8,
@@ -155,10 +159,22 @@ pub fn get_block_number_from_request(
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
     let tx = tx.collect().await?.to_bytes().clone();
     let mut tx = from_utf8(&tx).unwrap().to_owned();
-    let ret: Value;
-    unsafe {
-        ret = from_str(&mut tx).unwrap();
-    }
+    let ret;
+    
+    ret = match unsafe { from_str(&mut tx) } {
+        Ok(ret) => ret,
+        Err(_) => {
+            // Insane error handling
+            let ret = json!({
+                "id": Null,
+                "jsonrpc": "2.0",
+                "result": "Invalid JSON",
+            });
+
+            return Ok(ret);
+        }
+    };
+
     Ok(ret)
 }
 
