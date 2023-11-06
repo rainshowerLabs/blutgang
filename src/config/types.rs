@@ -1,4 +1,4 @@
-use jsonwebtoken::EncodingKey;
+use jsonwebtoken::DecodingKey;
 use crate::{
     config::setup::sort_by_latency,
     Rpc,
@@ -23,7 +23,7 @@ pub struct AdminSettings {
     pub address: SocketAddr,
     pub readonly: bool,
     pub jwt: bool,
-    pub key: EncodingKey,
+    pub key: DecodingKey,
 }
 
 impl Default for AdminSettings {
@@ -33,7 +33,7 @@ impl Default for AdminSettings {
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
             readonly: false,
             jwt: false,
-            key: EncodingKey::from_base64_secret("").unwrap(),
+            key: DecodingKey::from_base64_secret("").unwrap(),
         }
     }
 }
@@ -208,7 +208,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key: EncodingKey::from_base64_secret(&key).unwrap(),
+                key: DecodingKey::from_base64_secret(&key).unwrap(),
             };
         } else {
             admin = AdminSettings {
@@ -216,7 +216,7 @@ impl Settings {
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: EncodingKey::from_base64_secret("").unwrap(),
+                key: DecodingKey::from_base64_secret("").unwrap(),
             };
         }
 
@@ -333,7 +333,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key: EncodingKey::from_base64_secret(&key).unwrap(),
+                key: DecodingKey::from_base64_secret(&key).unwrap(),
             };
         } else {
             admin = AdminSettings {
@@ -341,7 +341,7 @@ impl Settings {
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: EncodingKey::from_base64_secret("").unwrap(),
+                key: DecodingKey::from_base64_secret("").unwrap(),
             };
         }
 

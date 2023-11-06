@@ -1,3 +1,8 @@
+use jsonwebtoken::Validation;
+use serde::Serialize;
+use serde::Deserialize;
+use jsonwebtoken::decode;
+use jsonwebtoken::Algorithm;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -10,7 +15,6 @@ use serde_json::{
 };
 
 use std::{
-    collections::HashMap,
     convert::Infallible,
     sync::{
         Arc,
@@ -34,6 +38,14 @@ use crate::{
 //     service::service_fn,
 // };
 // use hyper_util_blutgang::rt::TokioIo;
+
+// For decoding JWT
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+   id: Value,
+   method: Value,
+   params: Value,
+}
 
 // Macro for getting responses from either the cache or RPC nodes.
 //
@@ -122,8 +134,7 @@ pub async fn accept_admin_request(
     if config.read().unwrap().admin.jwt {
         let token_str = tx["token"].to_string();
 
-        let token: Token<Header, HashMap<String, String>, _> =
-            match token_str.verify_with_key(&config.read().unwrap().admin.key) {
+        let token = match decode::<Claims>(&token_str, &config.read().unwrap().admin.key, &Validation::new(Algorithm::HS256)) {
                 Ok(token) => token,
                 Err(err) => {
                     println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
@@ -136,14 +147,13 @@ pub async fn accept_admin_request(
 
 
         // Reconstruct the TX as a normal json rpc request
-        let claims = token.claims();
-        println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", claims);
+        println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", token);
 
         tx = json!({
-            "id": claims["id"],
+            "id": token.claims.id,
             "jsonrpc": "2.0",
-            "method": claims["method"],
-            "params": claims["params"],
+            "method": token.claims.method,
+            "params": token.claims.params,
         });
     }
 
@@ -157,15 +167,14 @@ pub async fn accept_admin_request(
 
 #[cfg(test)]
 mod tests {
-    use jsonwebtoken::EncodingKey;
-    use super::*;
-    
+    use jsonwebtoken::DecodingKey;
+    use super::*;    
 
     // Helper function to create a test Settings config
     fn create_test_settings() -> Arc<RwLock<Settings>> {
         let mut config = Settings::default();
         config.do_clear = true;
-        config.admin.key = EncodingKey::from_base64_secret("some-key").unwrap();
+        config.admin.key = DecodingKey::from_base64_secret("some-key").unwrap();
         Arc::new(RwLock::new(config))
     }
 
