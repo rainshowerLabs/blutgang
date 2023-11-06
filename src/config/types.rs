@@ -10,17 +10,9 @@ use clap::{
 use sled::Config;
 
 use std::{
-    fs::{
-        self,
-    },
+    fs::{self,},
     net::SocketAddr,
 };
-
-use hmac::{
-    Hmac,
-    Mac,
-};
-use sha2::Sha384;
 
 use toml::Value;
 
@@ -30,7 +22,7 @@ pub struct AdminSettings {
     pub address: SocketAddr,
     pub readonly: bool,
     pub jwt: bool,
-    pub key: Hmac<Sha384>,
+    pub token: String,
 }
 
 impl Default for AdminSettings {
@@ -40,7 +32,7 @@ impl Default for AdminSettings {
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
             readonly: false,
             jwt: false,
-            key: Hmac::new_from_slice(b"some-secret").unwrap(),
+            token: "".to_string(),
         }
     }
 }
@@ -203,21 +195,19 @@ impl Settings {
             let address = admin_table.get("address").unwrap().as_str().unwrap();
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
             let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
-            let key = admin_table
-                .get("key")
+            let token = admin_table
+                .get("token")
                 .unwrap()
                 .as_str()
                 .unwrap()
                 .to_string();
-
-            let key = Hmac::new_from_slice(key.as_bytes()).unwrap();
 
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key,
+                token,
             };
         } else {
             admin = AdminSettings {
@@ -225,7 +215,7 @@ impl Settings {
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: Hmac::new_from_slice(b"some-secret").unwrap(),
+                token: "".to_string(),
             };
         }
 
@@ -335,15 +325,14 @@ impl Settings {
                 .expect("Invalid admin_address");
             let readonly = matches.get_occurrences::<String>("readonly").is_some();
             let jwt = matches.get_occurrences::<String>("jwt").is_some();
-            let key = matches.get_one::<String>("key").expect("Invalid key");
-            let key = Hmac::new_from_slice(key.as_bytes()).unwrap();
+            let token = matches.get_one::<String>("token").expect("Invalid token");
 
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                key: key,
+                token: token.to_string(),
             };
         } else {
             admin = AdminSettings {
@@ -351,7 +340,7 @@ impl Settings {
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                key: Hmac::new_from_slice(b"some-key").unwrap(),
+                token: "".to_string(),
             };
         }
 
