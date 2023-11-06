@@ -50,6 +50,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     id: Value,
+    jsonrpc: Value,
     method: Value,
     params: Value,
 }
