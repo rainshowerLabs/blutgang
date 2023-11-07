@@ -315,29 +315,25 @@ pub async fn accept_request(
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
-    // Get lock for the rpc list and add it to the moving average if we picked an rpc
-    if rpc_position.is_some() {
-        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
+    if let Some(rpc_position) = rpc_position {
+        let mut rpc_list_guard = rpc_list_rwlock.write().unwrap_or_else(|e| {
+            // Handle the case where the RwLock is poisoned
+            e.into_inner()
+        });
 
-        if rpc_list_rwlock_guard.len() == 0 {
+        if rpc_list_guard.is_empty() {
             println!(
                 "LA {}",
-                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
+                rpc_list_guard[rpc_position].status.latency
             );
-        } else if rpc_list_rwlock_guard.len() <= rpc_position.unwrap() {
-            // Something fucky wucky is happening so get the delta between
-            // len and rpc_position.unwrap() so we can get a proper index
-            let delta =  rpc_position.unwrap() - rpc_list_rwlock_guard.len();
-            let index = rpc_position.unwrap() - delta;
-
-            rpc_list_rwlock_guard[index].update_latency(time.as_nanos() as f64);
-            println!("LA {}", rpc_list_rwlock_guard[index].status.latency);
         } else {
-            rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
-            println!(
-                "LA {}",
-                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
-            );
+            let index = if rpc_position >= rpc_list_guard.len() {
+                rpc_list_guard.len() - 1
+            } else {
+                rpc_position
+            };
+            rpc_list_guard[index].update_latency(time.as_nanos() as f64);
+            println!("LA {}", rpc_list_guard[index].status.latency);
         }
     }
 
