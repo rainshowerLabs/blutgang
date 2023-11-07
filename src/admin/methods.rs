@@ -149,12 +149,12 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
     let rpc_list = rpc_list.read().map_err(|_| AdminError::Innacessible)?;
     let mut rpc_list_str = String::new();
 
-    rpc_list_str.push_str("[");
+    rpc_list_str.push('[');
     for (i, rpc) in rpc_list.iter().enumerate() {
         println!("RPC {}:\n{:#?}", i, rpc);
         rpc_list_str.push_str(&format!("\"{:?}\", ", rpc));
     }
-    rpc_list_str.push_str("]");
+    rpc_list_str.push(']');
 
     let rx = json!({
         "id": Null,
@@ -190,12 +190,12 @@ fn admin_add_rpc(
 
     let max_consecutive = params[1]
         .to_string()
-        .replace("\"", "")
+        .replace('\"', "")
         .parse::<u32>()
         .unwrap_or(0);
     let ma_len = params[2]
         .to_string()
-        .replace("\"", "")
+        .replace('\"', "")
         .parse::<f64>()
         .unwrap_or(0.0);
 
@@ -228,7 +228,7 @@ fn admin_remove_rpc(
         return Err(AdminError::InvalidLen);
     }
 
-    let index = match params[0].to_string().replace("\"", "").parse::<u64>() {
+    let index = match params[0].to_string().replace('\"', "").parse::<u64>() {
         Ok(index) => index,
         Err(_) => return Err(AdminError::ParseError),
     };

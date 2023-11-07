@@ -131,7 +131,6 @@ pub async fn accept_admin_request(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
 
     let mut tx = incoming_to_value(tx).await.unwrap();
 
@@ -170,7 +169,7 @@ pub async fn accept_admin_request(
     }
 
     let time = Instant::now();
-    response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
+    let response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 

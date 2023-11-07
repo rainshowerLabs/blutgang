@@ -58,7 +58,7 @@ pub async fn listen_for_admin_requests(
     let address;
     {
         let config_guard = config.read().unwrap();
-        address = config_guard.admin.address.clone();
+        address = config_guard.admin.address;
     }
 
     // Create a listener and bind to it
