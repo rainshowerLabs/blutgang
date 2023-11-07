@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let binding = Arc::clone(&config);
     let config_guard = binding.read().unwrap();
 
-    // Clone all the things we need so we dont send across await
+    // Copy all the things we need so we dont send config_guard across await
     let addr_clone = config_guard.address;
     let do_clear_clone = config_guard.do_clear;
     let health_check_clone = config_guard.health_check;
@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let poverty_list_health = Arc::clone(&rpc_poverty_list);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
         let config_health = Arc::clone(&config);
-        
+
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,

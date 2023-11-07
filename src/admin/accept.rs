@@ -131,7 +131,6 @@ pub async fn accept_admin_request(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // If we have JWT enabled check that tx is valid
