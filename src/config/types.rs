@@ -6,23 +6,28 @@ use clap::{
     ArgMatches,
     Command,
 };
+use jsonwebtoken::DecodingKey;
 
 use sled::Config;
 
 use std::{
-    fs::{self,},
+    fmt,
+    fmt::Debug,
+    fs::{
+        self,
+    },
     net::SocketAddr,
 };
 
 use toml::Value;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AdminSettings {
     pub enabled: bool,
     pub address: SocketAddr,
     pub readonly: bool,
     pub jwt: bool,
-    pub token: String,
+    pub key: DecodingKey,
 }
 
 impl Default for AdminSettings {
@@ -32,8 +37,19 @@ impl Default for AdminSettings {
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
             readonly: false,
             jwt: false,
-            token: "".to_string(),
+            key: DecodingKey::from_secret(b""),
         }
+    }
+}
+
+impl Debug for AdminSettings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "AdminSettings {{")?;
+        write!(f, " enabled: {:?}", self.enabled)?;
+        write!(f, ", address: {:?}", self.address)?;
+        write!(f, ", readonly: {:?}", self.readonly)?;
+        write!(f, ", jwt: HIDDEN",)?;
+        write!(f, " }}")
     }
 }
 
@@ -195,8 +211,8 @@ impl Settings {
             let address = admin_table.get("address").unwrap().as_str().unwrap();
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
             let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
-            let token = admin_table
-                .get("token")
+            let key = admin_table
+                .get("key")
                 .unwrap()
                 .as_str()
                 .unwrap()
@@ -207,7 +223,7 @@ impl Settings {
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                token,
+                key: DecodingKey::from_secret(key.as_bytes()),
             };
         } else {
             admin = AdminSettings {
@@ -215,7 +231,7 @@ impl Settings {
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                token: "".to_string(),
+                key: DecodingKey::from_secret(b""),
             };
         }
 
@@ -325,14 +341,14 @@ impl Settings {
                 .expect("Invalid admin_address");
             let readonly = matches.get_occurrences::<String>("readonly").is_some();
             let jwt = matches.get_occurrences::<String>("jwt").is_some();
-            let token = matches.get_one::<String>("token").expect("Invalid token");
+            let key = matches.get_one::<String>("key").expect("Invalid key");
 
             admin = AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
-                token: token.to_string(),
+                key: DecodingKey::from_secret(key.as_bytes()),
             };
         } else {
             admin = AdminSettings {
@@ -340,7 +356,7 @@ impl Settings {
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
-                token: "".to_string(),
+                key: DecodingKey::from_secret(b""),
             };
         }
 

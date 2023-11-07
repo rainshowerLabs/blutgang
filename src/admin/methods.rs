@@ -3,6 +3,7 @@ use crate::{
     Rpc,
     Settings,
 };
+use jsonwebtoken::DecodingKey;
 
 use std::{
     sync::{
@@ -132,7 +133,7 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let mut clone = guard.clone();
-    clone.admin.token = "HIDDEN".to_string(); // Hide the token
+    clone.admin.key = DecodingKey::from_base64_secret("some-key").unwrap(); // Hide the token
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
@@ -369,7 +370,7 @@ mod tests {
     fn create_test_settings_config() -> Arc<RwLock<Settings>> {
         let mut config = Settings::default();
         config.do_clear = true;
-        config.admin.token = "admin_token".to_string();
+        config.admin.key = Hmac::new_from_slice(b"some-secret").unwrap();
         Arc::new(RwLock::new(config))
     }
 
@@ -692,10 +693,10 @@ mod tests {
             &create_test_poverty_list(),
             Arc::clone(&config),
             cache,
-        ).await;
+        )
+        .await;
 
         // Assert
         assert!(result.is_ok());
-
     }
 }

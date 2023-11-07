@@ -3,16 +3,30 @@ use hyper::{
     body::Bytes,
     Request,
 };
+
+use jsonwebtoken::{
+    decode,
+    Validation,
+};
+
+use serde::{
+    Deserialize,
+    Serialize,
+};
+
 use serde_json::{
     json,
+    Value,
     Value::Null,
 };
-use std::convert::Infallible;
-use std::time::Instant;
 
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    convert::Infallible,
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Instant,
 };
 
 use sled::Db;
@@ -30,6 +44,16 @@ use crate::{
 //     service::service_fn,
 // };
 // use hyper_util_blutgang::rt::TokioIo;
+
+// For decoding JWT
+#[derive(Debug, Serialize, Deserialize)]
+struct Claims {
+    id: Value,
+    jsonrpc: Value,
+    method: Value,
+    params: Value,
+    exp: usize,
+}
 
 // Macro for getting responses from either the cache or RPC nodes.
 //
@@ -71,15 +95,12 @@ macro_rules! get_response {
 
 // Execute requesst and construct a HTTP response
 async fn forward_body(
-    tx: Request<hyper::body::Incoming>,
+    mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Convert incoming body to serde value
-    let mut tx = incoming_to_value(tx).await.unwrap();
-
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -112,10 +133,99 @@ pub async fn accept_admin_request(
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
 
+    let mut tx = incoming_to_value(tx).await.unwrap();
+
+    // If we have JWT enabled check that tx is valid
+    //
+    // TODO: We are importing 2 random crates and doing this awfulness
+    // for JWT support. This makes my eyes bleed and brain hurt. Don't.
+    if config.read().unwrap().admin.jwt {
+        let mut token_str = tx["token"].to_string();
+        token_str = token_str.trim_matches('"').to_string();
+
+        let token = match decode::<Claims>(
+            &token_str,
+            &config.read().unwrap().admin.key,
+            &Validation::default(),
+        ) {
+            Ok(token) => token,
+            Err(err) => {
+                println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
+                return Ok(hyper::Response::builder()
+                    .status(401)
+                    .body(Full::new(Bytes::from("Unauthorized or invalid token")))
+                    .unwrap());
+            }
+        };
+
+        // Reconstruct the TX as a normal json rpc request
+        println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", token);
+
+        tx = json!({
+            "id": token.claims.id,
+            "jsonrpc": "2.0",
+            "method": token.claims.method,
+            "params": token.claims.params,
+        });
+    }
+
     let time = Instant::now();
     response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use jsonwebtoken::DecodingKey;
+
+    // Helper function to create a test Settings config
+    fn create_test_settings() -> Arc<RwLock<Settings>> {
+        let mut config = Settings::default();
+        config.do_clear = true;
+        config.admin.key = DecodingKey::from_base64_secret("some-key").unwrap();
+        Arc::new(RwLock::new(config))
+    }
+
+    // Helper function to create a test cache
+    fn create_test_cache() -> Arc<Db> {
+        let db = sled::Config::new().temporary(true);
+        let db = db.open().unwrap();
+
+        Arc::new(db)
+    }
+
+    #[tokio::test]
+    async fn test_forward_body() {
+        let settings = create_test_settings();
+        let cache = create_test_cache();
+        let rpc_list = Arc::new(RwLock::new(vec![]));
+        let poverty_list = Arc::new(RwLock::new(vec![]));
+
+        // Create a test request (use the actual request format here)
+        let tx = json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": "blutgang_quit",
+            "params": [],
+        });
+
+        // Call forward_body with the test data
+        let result = forward_body(
+            tx.clone(),
+            &rpc_list,
+            &poverty_list,
+            cache.clone(),
+            settings,
+        )
+        .await;
+
+        // You can assert that the result matches the expected outcome
+        assert!(result.is_ok());
+
+        // Additional assertions can be added based on expected behavior
+    }
 }
