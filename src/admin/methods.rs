@@ -370,7 +370,7 @@ mod tests {
     fn create_test_settings_config() -> Arc<RwLock<Settings>> {
         let mut config = Settings::default();
         config.do_clear = true;
-        config.admin.key = Hmac::new_from_slice(b"some-secret").unwrap();
+        config.admin.key = DecodingKey::from_secret(b"some-key");
         Arc::new(RwLock::new(config))
     }
 
