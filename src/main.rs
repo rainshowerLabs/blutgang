@@ -49,17 +49,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let binding = Arc::clone(&config);
     let config_guard = binding.read().unwrap();
 
+    // Clone all the things we need so we dont send across await
+    let addr_clone = config_guard.address;
+    let do_clear_clone = config_guard.do_clear;
+    let health_check_clone = config_guard.health_check;
+    let admin_enabled_clone = config_guard.admin.enabled;
+
     // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config_guard.rpc_list.clone()));
 
     // Create/Open sled DB
     let cache: Arc<sled::Db> = Arc::new(config_guard.sled_config.open().unwrap());
 
+    // Drop the config guard used to get the settings
+    // Prevents deadlocks when writing
+    drop(config_guard);
+    drop(binding);
+
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
     // Clear database if specified
-    if config_guard.do_clear {
+    if do_clear_clone {
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
@@ -69,23 +80,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_data(Arc::clone(&cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
-    let listener = TcpListener::bind(config_guard.address).await?;
-    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", config_guard.address);
+    let listener = TcpListener::bind(addr_clone).await?;
+    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr_clone);
 
     // Spawn a thread for the health check
     //
     // Also handle the finalized block tracking in this thread
-    let rpc_list_health = Arc::clone(&rpc_list_rwlock);
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let poverty_list_health = Arc::clone(&rpc_poverty_list);
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
-    let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
     let finalized_rx_arc = Arc::new(finalized_rx);
-    let config_health = Arc::clone(&config);
 
-    if config_guard.health_check {
+    if health_check_clone {
+        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_health = Arc::clone(&rpc_poverty_list);
+        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let config_health = Arc::clone(&config);
+        
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
@@ -100,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Spawn a thread for the admin namespace if enabled
-    if config_guard.admin.enabled {
+    if admin_enabled_clone {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
         let poverty_list_admin = Arc::clone(&rpc_poverty_list);
         let cache_admin = Arc::clone(&cache);
@@ -116,11 +128,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await;
         });
     }
-
-    // Drop the config guard used to get the settings
-    // Prevents deadlocks when writing
-    drop(config_guard);
-    drop(binding);
 
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
