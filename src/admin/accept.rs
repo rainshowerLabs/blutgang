@@ -6,7 +6,6 @@ use hyper::{
 
 use jsonwebtoken::{
     decode,
-    Algorithm,
     Validation,
 };
 
@@ -53,6 +52,7 @@ struct Claims {
     jsonrpc: Value,
     method: Value,
     params: Value,
+    exp: usize,
 }
 
 // Macro for getting responses from either the cache or RPC nodes.
@@ -140,12 +140,13 @@ pub async fn accept_admin_request(
     // TODO: We are importing 2 random crates and doing this awfulness
     // for JWT support. This makes my eyes bleed and brain hurt. Don't.
     if config.read().unwrap().admin.jwt {
-        let token_str = tx["token"].to_string();
+        let mut token_str = tx["token"].to_string();
+        token_str = token_str.trim_matches('"').to_string();
 
         let token = match decode::<Claims>(
             &token_str,
             &config.read().unwrap().admin.key,
-            &Validation::new(Algorithm::HS256),
+            &Validation::default(),
         ) {
             Ok(token) => token,
             Err(err) => {
