@@ -324,12 +324,14 @@ pub async fn accept_request(
                 "LA {}",
                 rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
             );
-            return response;
-        }
+        } else if rpc_list_rwlock_guard.len() <= rpc_position.unwrap() {
+            // Something fucky wucky is happening so get the delta between
+            // len and rpc_position.unwrap() so we can get a proper index
+            let delta =  rpc_position.unwrap() - rpc_list_rwlock_guard.len();
+            let index = rpc_position.unwrap() - delta;
 
-        if rpc_list_rwlock_guard.len() == 1 {
-            rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
-            println!("LA {}", rpc_list_rwlock_guard[0].status.latency);
+            rpc_list_rwlock_guard[index].update_latency(time.as_nanos() as f64);
+            println!("LA {}", rpc_list_rwlock_guard[index].status.latency);
         } else {
             rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
             println!(
