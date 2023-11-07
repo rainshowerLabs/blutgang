@@ -186,7 +186,7 @@ mod tests {
     fn create_test_settings() -> Arc<RwLock<Settings>> {
         let mut config = Settings::default();
         config.do_clear = true;
-        config.admin.key = DecodingKey::from_base64_secret("some-key").unwrap();
+        config.admin.key = DecodingKey::from_secret(b"some-key");
         Arc::new(RwLock::new(config))
     }
 
@@ -209,7 +209,7 @@ mod tests {
         let tx = json!({
             "id": 1,
             "jsonrpc": "2.0",
-            "method": "blutgang_quit",
+            "method": "blutgang_ttl",
             "params": [],
         });
 
