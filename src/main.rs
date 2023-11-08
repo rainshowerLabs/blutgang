@@ -6,7 +6,7 @@ mod rpc;
 
 use crate::{
     admin::listener::listen_for_admin_requests,
-    balancer::balancer::accept_request,
+    balancer::accept_http::accept_request,
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
