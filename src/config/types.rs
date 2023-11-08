@@ -278,12 +278,18 @@ impl Settings {
                 .expect("\x1b[31mErr:\x1b[0m Missing JWT token toggle!")
                 .as_bool()
                 .expect("\x1b[31mErr:\x1b[0m Could not parse JWT as bool!");
-            let key = admin_table
-                .get("key")
-                .expect("\x1b[31mErr:\x1b[0m Missing key key!")
-                .as_str()
-                .expect("\x1b[31mErr:\x1b[0m Could not parse key as str!")
-                .to_string();
+
+            let key;
+            if jwt {
+                key = admin_table
+                    .get("key")
+                    .expect("\x1b[31mErr:\x1b[0m Missing key key!")
+                    .as_str()
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse key as str!")
+                    .to_string();
+            } else {
+                key = String::new();
+            }
 
             admin = AdminSettings {
                 enabled,
