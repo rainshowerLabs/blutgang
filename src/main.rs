@@ -46,25 +46,22 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args amd set them
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
-    let binding = Arc::clone(&config);
-    let config_guard = binding.read().unwrap();
 
-    // Copy all the things we need so we dont send config_guard across await
-    let addr_clone = config_guard.address;
-    let do_clear_clone = config_guard.do_clear;
-    let health_check_clone = config_guard.health_check;
-    let admin_enabled_clone = config_guard.admin.enabled;
-
+    // Copy the configuration values we need
+    let (addr_clone, do_clear_clone, health_check_clone, admin_enabled_clone) = {
+        let config_guard = config.read().unwrap();
+        (
+            config_guard.address,
+            config_guard.do_clear,
+            config_guard.health_check,
+            config_guard.admin.enabled,
+        )
+    };
     // Make the list a rwlock
-    let rpc_list_rwlock = Arc::new(RwLock::new(config_guard.rpc_list.clone()));
+    let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
 
     // Create/Open sled DB
-    let cache: Arc<sled::Db> = Arc::new(config_guard.sled_config.open().unwrap());
-
-    // Drop the config guard used to get the settings
-    // Prevents deadlocks when writing
-    drop(config_guard);
-    drop(binding);
+    let cache: Arc<sled::Db> = Arc::new(config.read().unwrap().sled_config.open().unwrap());
 
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
