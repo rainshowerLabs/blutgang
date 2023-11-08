@@ -192,10 +192,15 @@ impl Settings {
 
                 let max_consecutive = rpc_table
                     .get("max_consecutive")
-                    .unwrap()
+                    .expect("\x1b[31mErr:\x1b[0m Missing max_consecutive from an RPC!")
                     .as_integer()
                     .unwrap() as u32;
-                let url = rpc_table.get("url").unwrap().as_str().unwrap().to_string();
+                let url = rpc_table
+                    .get("url")
+                    .expect("\x1b[31mErr:\x1b[0m Missing URL from RPC!")
+                    .as_str()
+                    .unwrap()
+                    .to_string();
 
                 let rpc = Rpc::new(url, max_consecutive, ma_length);
                 rpc_list.push(rpc);
@@ -204,17 +209,36 @@ impl Settings {
 
         // Admin namespace things
         let admin;
-        let admin_table = parsed_toml.get("admin").unwrap().as_table().unwrap();
-        let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
+        let admin_table = parsed_toml
+            .get("admin")
+            .expect("\x1b[31mErr:\x1b[0m Missing admin table!")
+            .as_table()
+            .unwrap();
+        let enabled = admin_table
+            .get("enabled")
+            .expect("\x1b[31mErr:\x1b[0m Missing admin enabled toggle!")
+            .as_bool()
+            .unwrap();
         if enabled {
-            let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
-            let address = admin_table.get("address").unwrap().as_str().unwrap();
+            let address = admin_table
+                .get("address")
+                .expect("\x1b[31mErr:\x1b[0m Missing/invalid address!")
+                .as_str()
+                .unwrap();
             let address = address.replace("localhost", "127.0.0.1");
-            let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
-            let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
+            let readonly = admin_table
+                .get("readonly")
+                .expect("\x1b[31mErr:\x1b[0m Missing readonly toggle!")
+                .as_bool()
+                .unwrap();
+            let jwt = admin_table
+                .get("jwt")
+                .expect("\x1b[31mErr:\x1b[0m Missing JWT token toggle!")
+                .as_bool()
+                .unwrap();
             let key = admin_table
                 .get("key")
-                .unwrap()
+                .expect("\x1b[31mErr:\x1b[0m Invalid/no key!")
                 .as_str()
                 .unwrap()
                 .to_string();

@@ -322,10 +322,7 @@ pub async fn accept_request(
         });
 
         if rpc_list_guard.is_empty() {
-            println!(
-                "LA {}",
-                rpc_list_guard[rpc_position].status.latency
-            );
+            println!("LA {}", rpc_list_guard[rpc_position].status.latency);
         } else {
             let index = if rpc_position >= rpc_list_guard.len() {
                 rpc_list_guard.len() - 1
