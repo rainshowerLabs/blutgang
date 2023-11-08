@@ -109,22 +109,22 @@ impl Settings {
             .get("blutgang")
             .expect("\x1b[31mErr:\x1b[0m Missing blutgang table!")
             .as_table()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse blutgang table!");
         let do_clear = blutgang_table
             .get("do_clear")
             .expect("\x1b[31mErr:\x1b[0m Missing do_clear toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse do_clear as bool!");
         let address = blutgang_table
             .get("address")
             .expect("\x1b[31mErr:\x1b[0m Missing address!")
             .as_str()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse address as str!");
         let sort_on_startup = blutgang_table
             .get("sort_on_startup")
-            .unwrap()
+            .expect("\x1b[31mErr:\x1b[0m Missing sort_on_startup toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse sort_on_startup as bool!");
 
         // Build the SocketAddr
         let port = 3000;
@@ -136,31 +136,35 @@ impl Settings {
         } else {
             format!("{}:{}", address, port)
         };
-        let address = address.parse::<SocketAddr>().unwrap();
+        let address = address
+            .parse::<SocketAddr>()
+            .expect("\x1b[31mErr:\x1b[0m Could not address to SocketAddr!");
 
         let ma_length = blutgang_table
             .get("ma_length")
             .expect("\x1b[31mErr:\x1b[0m Missing ma_length!")
             .as_integer()
-            .unwrap() as f64;
+            .expect("\x1b[31mErr:\x1b[0m Could not parse ma_length as int!")
+            as f64;
 
         let health_check = blutgang_table
             .get("health_check")
             .expect("\x1b[31mErr:\x1b[0m Missing health_check toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse health_check as bool!");
         let ttl = blutgang_table
             .get("ttl")
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
             .as_integer()
-            .unwrap() as u128;
+            .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
 
         let health_check_ttl = if health_check {
             blutgang_table
                 .get("health_check_ttl")
                 .expect("\x1b[31mErr:\x1b[0m Missing health_check_ttl!")
                 .as_integer()
-                .unwrap() as u64
+                .expect("\x1b[31mErr:\x1b[0m Could not parse health_check_ttl as int!")
+                as u64
         } else {
             u64::MAX
         };
@@ -170,35 +174,40 @@ impl Settings {
             .get("sled")
             .expect("\x1b[31mErr:\x1b[0m Missing sled table!")
             .as_table()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse sled_table as table!");
         let db_path = sled_table
             .get("db_path")
             .expect("\x1b[31mErr:\x1b[0m Missing db_path!")
             .as_str()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse db_path as str!");
         let cache_capacity = sled_table
             .get("cache_capacity")
             .expect("\x1b[31mErr:\x1b[0m Missing cache_capacity!")
             .as_integer()
-            .unwrap() as usize;
+            .expect("\x1b[31mErr:\x1b[0m Could not parse cache_capacity as int!")
+            as usize;
         let compression = sled_table
             .get("compression")
             .expect("\x1b[31mErr:\x1b[0m Missing compression toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse compression as bool!");
         let print_profile = sled_table
             .get("print_profile")
             .expect("\x1b[31mErr:\x1b[0m Missing print profile toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse print_profile as bool!");
         let flush_every_ms = sled_table
             .get("flush_every_ms")
             .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
             .as_integer()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse flush_every_ms as int!");
 
         // Parse sled mode
-        let sled_mode_str = sled_table.get("mode").unwrap().as_str().unwrap();
+        let sled_mode_str = sled_table
+            .get("mode")
+            .expect("\x1b[31mErr:\x1b[0m Missing sled_mode!")
+            .as_str()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse sled_mode as str!");
         let mut sled_mode = sled::Mode::HighThroughput;
 
         if sled_mode_str == "LowSpace" {
@@ -226,12 +235,13 @@ impl Settings {
                     .get("max_consecutive")
                     .expect("\x1b[31mErr:\x1b[0m Missing max_consecutive from an RPC!")
                     .as_integer()
-                    .unwrap() as u32;
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse max_consecutive as int!")
+                    as u32;
                 let url = rpc_table
                     .get("url")
                     .expect("\x1b[31mErr:\x1b[0m Missing URL from RPC!")
                     .as_str()
-                    .unwrap()
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse URL from a RPC as str!")
                     .to_string();
 
                 let rpc = Rpc::new(url, max_consecutive, ma_length);
@@ -245,34 +255,34 @@ impl Settings {
             .get("admin")
             .expect("\x1b[31mErr:\x1b[0m Missing admin table!")
             .as_table()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse admin table!");
         let enabled = admin_table
             .get("enabled")
             .expect("\x1b[31mErr:\x1b[0m Missing admin enabled toggle!")
             .as_bool()
-            .unwrap();
+            .expect("\x1b[31mErr:\x1b[0m Could not parse admin enabled as bool!");
         if enabled {
             let address = admin_table
                 .get("address")
-                .expect("\x1b[31mErr:\x1b[0m Missing/invalid address!")
+                .expect("\x1b[31mErr:\x1b[0m Missing address!")
                 .as_str()
-                .unwrap();
+                .expect("\x1b[31mErr:\x1b[0m Could not parse admin address!");
             let address = address.replace("localhost", "127.0.0.1");
             let readonly = admin_table
                 .get("readonly")
                 .expect("\x1b[31mErr:\x1b[0m Missing readonly toggle!")
                 .as_bool()
-                .unwrap();
+                .expect("\x1b[31mErr:\x1b[0m Could not parse readonly as bool!");
             let jwt = admin_table
                 .get("jwt")
                 .expect("\x1b[31mErr:\x1b[0m Missing JWT token toggle!")
                 .as_bool()
-                .unwrap();
+                .expect("\x1b[31mErr:\x1b[0m Could not parse JWT as bool!");
             let key = admin_table
                 .get("key")
-                .expect("\x1b[31mErr:\x1b[0m Invalid/no key!")
+                .expect("\x1b[31mErr:\x1b[0m Missing key key!")
                 .as_str()
-                .unwrap()
+                .expect("\x1b[31mErr:\x1b[0m Could not parse key as str!")
                 .to_string();
 
             admin = AdminSettings {
