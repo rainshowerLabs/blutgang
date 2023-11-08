@@ -180,9 +180,8 @@ macro_rules! get_response {
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
                         let num = get_block_number_from_request($tx, $named_numbers);
-                        if num.is_some() {
-                            let num = num.unwrap();
-
+                        
+                        if let Some(num) = num {
                             if num > *$finalized_rx.borrow() {
                                 let mut head_cache = $head_cache.write().unwrap();
                                 head_cache

@@ -91,10 +91,11 @@ impl Settings {
             Err(_) => panic!("\x1b[31mErr:\x1b[0m Error opening config file at {}", path),
         };
 
-        if file.is_some() {
+        if let Some(file) = file {
             println!("\x1b[35mInfo:\x1b[0m Using config file at {}", path);
-            return Settings::create_from_file(file.unwrap()).await;
+            return Settings::create_from_file(file).await;
         }
+        
         println!("\x1b[35mInfo:\x1b[0m Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
@@ -250,7 +251,6 @@ impl Settings {
         }
 
         // Admin namespace things
-        let admin;
         let admin_table = parsed_toml
             .get("admin")
             .expect("\x1b[31mErr:\x1b[0m Missing admin table!")
@@ -261,7 +261,7 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing admin enabled toggle!")
             .as_bool()
             .expect("\x1b[31mErr:\x1b[0m Could not parse admin enabled as bool!");
-        if enabled {
+        let admin = if enabled {
             let address = admin_table
                 .get("address")
                 .expect("\x1b[31mErr:\x1b[0m Missing address!")
@@ -279,34 +279,33 @@ impl Settings {
                 .as_bool()
                 .expect("\x1b[31mErr:\x1b[0m Could not parse JWT as bool!");
 
-            let key;
-            if jwt {
-                key = admin_table
+            let key = if jwt {
+                admin_table
                     .get("key")
                     .expect("\x1b[31mErr:\x1b[0m Missing key key!")
                     .as_str()
                     .expect("\x1b[31mErr:\x1b[0m Could not parse key as str!")
-                    .to_string();
+                    .to_string()
             } else {
-                key = String::new();
-            }
+                String::new()
+            };
 
-            admin = AdminSettings {
+            AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
                 key: DecodingKey::from_secret(key.as_bytes()),
-            };
+            }
         } else {
-            admin = AdminSettings {
+            AdminSettings {
                 enabled: false,
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
                 key: DecodingKey::from_secret(b""),
-            };
-        }
+            }
+        };
 
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
@@ -406,9 +405,8 @@ impl Settings {
             .expect("Invalid health_check_ttl");
 
         // Admin thing setup
-        let admin;
         let enabled = matches.get_occurrences::<String>("admin").is_some();
-        if enabled {
+        let admin = if enabled {
             let address = matches
                 .get_one::<String>("admin_address")
                 .expect("Invalid admin_address");
@@ -416,22 +414,22 @@ impl Settings {
             let jwt = matches.get_occurrences::<String>("jwt").is_some();
             let key = matches.get_one::<String>("key").expect("Invalid key");
 
-            admin = AdminSettings {
+            AdminSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 readonly,
                 jwt,
                 key: DecodingKey::from_secret(key.as_bytes()),
-            };
+            }
         } else {
-            admin = AdminSettings {
+            AdminSettings {
                 enabled: false,
                 address: "::1:3001".parse::<SocketAddr>().unwrap(),
                 readonly: false,
                 jwt: false,
                 key: DecodingKey::from_secret(b""),
-            };
-        }
+            }
+        };
 
         Settings {
             rpc_list,
