@@ -294,7 +294,7 @@ fn admin_blutgang_set_health_check_ttl(
         return Err(AdminError::InvalidLen);
     }
 
-    let health_check_ttl = match params[0].to_string().replace("\"", "").parse::<u64>() {
+    let health_check_ttl = match params[0].to_string().replace('\"', "").parse::<u64>() {
         Ok(health_check_ttl) => health_check_ttl,
         Err(_) => return Err(AdminError::ParseError),
     };
@@ -327,7 +327,7 @@ fn admin_blutgang_set_ttl(
         return Err(AdminError::InvalidLen);
     }
 
-    let ttl = match params[0].to_string().replace("\"", "").parse::<u64>() {
+    let ttl = match params[0].to_string().replace('\"', "").parse::<u64>() {
         Ok(ttl) => ttl,
         Err(_) => return Err(AdminError::ParseError),
     };
