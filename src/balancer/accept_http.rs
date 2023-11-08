@@ -94,7 +94,7 @@ macro_rules! accept {
             )
             .await
         {
-            println!("error serving connection: {:?}", err);
+            println!("\x1b[31mErr:\x1b[0m Error serving connection: {:?}", err);
         }
     };
 }
