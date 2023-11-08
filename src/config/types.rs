@@ -105,9 +105,21 @@ impl Settings {
         let table_names: Vec<&String> = parsed_toml.as_table().unwrap().keys().collect::<Vec<_>>();
 
         // Parse the `blutgang` table
-        let blutgang_table = parsed_toml.get("blutgang").unwrap().as_table().unwrap();
-        let do_clear = blutgang_table.get("do_clear").unwrap().as_bool().unwrap();
-        let address = blutgang_table.get("address").unwrap().as_str().unwrap();
+        let blutgang_table = parsed_toml
+            .get("blutgang")
+            .expect("\x1b[31mErr:\x1b[0m Missing blutgang table!")
+            .as_table()
+            .unwrap();
+        let do_clear = blutgang_table
+            .get("do_clear")
+            .expect("\x1b[31mErr:\x1b[0m Missing do_clear toggle!")
+            .as_bool()
+            .unwrap();
+        let address = blutgang_table
+            .get("address")
+            .expect("\x1b[31mErr:\x1b[0m Missing address!")
+            .as_str()
+            .unwrap();
         let sort_on_startup = blutgang_table
             .get("sort_on_startup")
             .unwrap()
@@ -128,21 +140,25 @@ impl Settings {
 
         let ma_length = blutgang_table
             .get("ma_length")
-            .unwrap()
+            .expect("\x1b[31mErr:\x1b[0m Missing ma_length!")
             .as_integer()
             .unwrap() as f64;
 
         let health_check = blutgang_table
             .get("health_check")
-            .unwrap()
+            .expect("\x1b[31mErr:\x1b[0m Missing health_check toggle!")
             .as_bool()
             .unwrap();
-        let ttl = blutgang_table.get("ttl").unwrap().as_integer().unwrap() as u128;
+        let ttl = blutgang_table
+            .get("ttl")
+            .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
+            .as_integer()
+            .unwrap() as u128;
 
         let health_check_ttl = if health_check {
             blutgang_table
                 .get("health_check_ttl")
-                .unwrap()
+                .expect("\x1b[31mErr:\x1b[0m Missing health_check_ttl!")
                 .as_integer()
                 .unwrap() as u64
         } else {
@@ -150,18 +166,34 @@ impl Settings {
         };
 
         // Parse `sled` table
-        let sled_table = parsed_toml.get("sled").unwrap().as_table().unwrap();
-        let db_path = sled_table.get("db_path").unwrap().as_str().unwrap();
+        let sled_table = parsed_toml
+            .get("sled")
+            .expect("\x1b[31mErr:\x1b[0m Missing sled table!")
+            .as_table()
+            .unwrap();
+        let db_path = sled_table
+            .get("db_path")
+            .expect("\x1b[31mErr:\x1b[0m Missing db_path!")
+            .as_str()
+            .unwrap();
         let cache_capacity = sled_table
             .get("cache_capacity")
-            .unwrap()
+            .expect("\x1b[31mErr:\x1b[0m Missing cache_capacity!")
             .as_integer()
             .unwrap() as usize;
-        let compression = sled_table.get("compression").unwrap().as_bool().unwrap();
-        let print_profile = sled_table.get("print_profile").unwrap().as_bool().unwrap();
+        let compression = sled_table
+            .get("compression")
+            .expect("\x1b[31mErr:\x1b[0m Missing compression toggle!")
+            .as_bool()
+            .unwrap();
+        let print_profile = sled_table
+            .get("print_profile")
+            .expect("\x1b[31mErr:\x1b[0m Missing print profile toggle!")
+            .as_bool()
+            .unwrap();
         let flush_every_ms = sled_table
             .get("flush_every_ms")
-            .unwrap()
+            .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
             .as_integer()
             .unwrap();
 
