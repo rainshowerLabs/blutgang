@@ -165,6 +165,6 @@ pub fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> 
 
     // Remove `0x` prefix if it exists
     let hex_string = hex_string.trim_start_matches("0x");
-    
+
     u64::from_str_radix(hex_string, 16)
 }

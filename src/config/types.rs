@@ -95,7 +95,7 @@ impl Settings {
             println!("\x1b[35mInfo:\x1b[0m Using config file at {}", path);
             return Settings::create_from_file(file).await;
         }
-        
+
         println!("\x1b[35mInfo:\x1b[0m Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
