@@ -13,9 +13,7 @@ use sled::Config;
 use std::{
     fmt,
     fmt::Debug,
-    fs::{
-        self,
-    },
+    fs::{self,},
     net::SocketAddr,
 };
 
@@ -164,7 +162,8 @@ impl Settings {
             .get("max_retries")
             .expect("\x1b[31mErr:\x1b[0m Missing max_retries!")
             .as_integer()
-            .expect("\x1b[31mErr:\x1b[0m Could not parse max_retries as int!") as u32;
+            .expect("\x1b[31mErr:\x1b[0m Could not parse max_retries as int!")
+            as u32;
 
         let health_check_ttl = if health_check {
             blutgang_table

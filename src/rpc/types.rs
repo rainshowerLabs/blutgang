@@ -116,8 +116,20 @@ impl Rpc {
         let number: Value =
             unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?).unwrap() };
         let number = &number["result"]["number"];
+        
+        let number = match number.as_str() {
+            Some(number) => number,
+            None => {
+                return Err(RpcError::InvalidResponse(
+                    "error: Invalid response".to_string(),
+                ))
+            }
+        };
 
-        let return_number = hex_to_decimal(number.as_str().unwrap()).unwrap();
+        let return_number = match hex_to_decimal(number) {
+            Ok(return_number) => return_number,
+            Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
+        };
 
         Ok(return_number)
     }

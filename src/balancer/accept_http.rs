@@ -301,7 +301,7 @@ pub async fn accept_request(
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
-    
+
     // RequestParams from config
     let params = {
         let config_guard = config.read().unwrap();
