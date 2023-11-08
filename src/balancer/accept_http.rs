@@ -7,7 +7,7 @@ use crate::{
         cache_method,
         cache_result,
     },
-    balancer::selection::selection::pick,
+    balancer::selection::select::pick,
     cache_error,
     no_rpc_available,
     print_cache_error,
@@ -180,7 +180,7 @@ macro_rules! get_response {
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
                         let num = get_block_number_from_request($tx, $named_numbers);
-                        
+
                         if let Some(num) = num {
                             if num > *$finalized_rx.borrow() {
                                 let mut head_cache = $head_cache.write().unwrap();
