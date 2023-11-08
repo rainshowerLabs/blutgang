@@ -14,6 +14,8 @@ sort_on_startup = true
 health_check = true
 # Acceptable time to wait for a response in ms
 ttl = 300
+# How many times to retry a request before giving up
+max_retries = 32
 # Time between health checks in ms
 health_check_ttl = 12000
 

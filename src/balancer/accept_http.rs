@@ -106,7 +106,8 @@ macro_rules! get_response {
         $finalized_rx:expr,
         $named_numbers:expr,
         $head_cache:expr,
-        $ttl:expr
+        $ttl:expr,
+        $max_retries:expr
     ) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
@@ -168,8 +169,7 @@ macro_rules! get_response {
                             },
                         };
 
-                        // TODO: dont hardcode this
-                        if retries == 32 {
+                        if retries == $max_retries {
                             return (timed_out!(), $rpc_position,);
                         }
                     }
@@ -225,6 +225,7 @@ async fn forward_body(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     ttl: u128,
+    max_retries: u32,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
@@ -253,8 +254,6 @@ async fn forward_body(
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
 
-    // TODO: admin namespace here?
-
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
@@ -266,7 +265,8 @@ async fn forward_body(
         finalized_rx,
         named_numbers,
         head_cache,
-        ttl
+        ttl,
+        max_retries
     );
 
     // Convert rx to bytes and but it in a Buf
@@ -299,6 +299,7 @@ pub async fn accept_request(
     let rpc_position: Option<usize>;
     // TTL from config
     let ttl = config.read().unwrap().ttl;
+    let max_retries = config.read().unwrap().max_retries;
 
     let time = Instant::now();
     (response, rpc_position) = forward_body(
@@ -309,6 +310,7 @@ pub async fn accept_request(
         head_cache,
         cache,
         ttl,
+        max_retries,
     )
     .await;
     let time = time.elapsed();

@@ -134,9 +134,6 @@ pub async fn accept_admin_request(
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // If we have JWT enabled check that tx is valid
-    //
-    // TODO: We are importing 2 random crates and doing this awfulness
-    // for JWT support. This makes my eyes bleed and brain hurt. Don't.
     if config.read().unwrap().admin.jwt {
         let mut token_str = tx["token"].to_string();
         token_str = token_str.trim_matches('"').to_string();

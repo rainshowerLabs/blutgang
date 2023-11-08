@@ -60,6 +60,7 @@ pub struct Settings {
     pub address: SocketAddr,
     pub health_check: bool,
     pub ttl: u128,
+    pub max_retries: u32,
     pub health_check_ttl: u64,
     pub sled_config: Config,
     pub admin: AdminSettings,
@@ -73,6 +74,7 @@ impl Default for Settings {
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
             ttl: 1000,
+            max_retries: 32,
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
             admin: AdminSettings::default(),
@@ -158,6 +160,11 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
+        let max_retries = blutgang_table
+            .get("max_retries")
+            .expect("\x1b[31mErr:\x1b[0m Missing max_retries!")
+            .as_integer()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse max_retries as int!") as u32;
 
         let health_check_ttl = if health_check {
             blutgang_table
@@ -318,6 +325,7 @@ impl Settings {
             address,
             health_check,
             ttl,
+            max_retries,
             health_check_ttl,
             sled_config,
             admin,
@@ -393,11 +401,19 @@ impl Settings {
             .flush_every_ms(Some(flush_every_ms));
 
         let health_check = matches.get_occurrences::<String>("health_check").is_some();
+
         let ttl = matches
             .get_one::<String>("ttl")
             .expect("Invalid ttl")
             .parse::<u128>()
             .expect("Invalid ttl");
+
+        let max_retries = matches
+            .get_one::<String>("max_retries")
+            .expect("Invalid max_retries")
+            .parse::<u32>()
+            .expect("Invalid max_retries");
+
         let health_check_ttl = matches
             .get_one::<String>("health_check_ttl")
             .expect("Invalid health_check_ttl")
@@ -437,6 +453,7 @@ impl Settings {
             address,
             health_check,
             ttl,
+            max_retries,
             health_check_ttl,
             sled_config,
             admin,

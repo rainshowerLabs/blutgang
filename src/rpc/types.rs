@@ -105,7 +105,6 @@ impl Rpc {
     }
 
     // Get the latest finalized block
-    // TODO: make this work
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
