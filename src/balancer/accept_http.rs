@@ -57,6 +57,11 @@ use std::{
     },
 };
 
+struct RequestParams {
+    ttl: u128,
+    max_retries: u32,
+}
+
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
@@ -224,8 +229,7 @@ async fn forward_body(
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
-    ttl: u128,
-    max_retries: u32,
+    params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
@@ -265,8 +269,8 @@ async fn forward_body(
         finalized_rx,
         named_numbers,
         head_cache,
-        ttl,
-        max_retries
+        params.ttl,
+        params.max_retries
     );
 
     // Convert rx to bytes and but it in a Buf
@@ -297,9 +301,15 @@ pub async fn accept_request(
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
-    // TTL from config
-    let ttl = config.read().unwrap().ttl;
-    let max_retries = config.read().unwrap().max_retries;
+    
+    // RequestParams from config
+    let params = {
+        let config_guard = config.read().unwrap();
+        RequestParams {
+            ttl: config_guard.ttl,
+            max_retries: config_guard.max_retries,
+        }
+    };
 
     let time = Instant::now();
     (response, rpc_position) = forward_body(
@@ -309,8 +319,7 @@ pub async fn accept_request(
         named_numbers,
         head_cache,
         cache,
-        ttl,
-        max_retries,
+        params,
     )
     .await;
     let time = time.elapsed();
