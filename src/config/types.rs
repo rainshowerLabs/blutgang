@@ -209,6 +209,7 @@ impl Settings {
         if enabled {
             let enabled = admin_table.get("enabled").unwrap().as_bool().unwrap();
             let address = admin_table.get("address").unwrap().as_str().unwrap();
+            let address = address.replace("localhost", "127.0.0.1");
             let readonly = admin_table.get("readonly").unwrap().as_bool().unwrap();
             let jwt = admin_table.get("jwt").unwrap().as_bool().unwrap();
             let key = admin_table
