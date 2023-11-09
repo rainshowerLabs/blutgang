@@ -116,7 +116,7 @@ impl Rpc {
         let number: Value =
             unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?).unwrap() };
         let number = &number["result"]["number"];
-        
+
         let number = match number.as_str() {
             Some(number) => number,
             None => {

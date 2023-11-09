@@ -130,13 +130,6 @@ macro_rules! get_response {
 
                     let tx_string = $tx.to_string();
 
-                    // Quit blutgang if `tx_string` contains the word `blutgang_quit`
-                    // Only for debugging, remove this for production builds *manually*.
-                    if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
-                        let _ = $cache.flush_async().await;
-                        std::process::exit(0);
-                    }
-
                     // Loop until we get a response
                     let rx;
                     let mut retries = 0;

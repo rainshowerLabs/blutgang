@@ -63,7 +63,6 @@ pub fn get_block_number_from_request(
     tx: Value,
     named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
 ) -> Option<u64> {
-
     // Return none if `params` is not a thing
     let params = tx["params"].as_array();
     if let Some(params) = params {
@@ -488,5 +487,4 @@ mod tests {
         let tx = _extract_id(tx);
         assert_eq!(tx, None);
     }
-    
 }
