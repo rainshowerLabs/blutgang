@@ -1,16 +1,18 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
+
 use serde_json::{
     json,
     Value,
 };
+use simd_json;
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
 pub struct Status {
     // Set this to true in case the RPC becomes unavailable
     // Also set the last time it was called, so we can check again later
-    pub is_erroring: bool, // TODO: maybe remove this???
+    pub is_erroring: bool,
     pub last_error: u64,
 
     // The latency is a moving average of the last n calls
@@ -103,7 +105,6 @@ impl Rpc {
     }
 
     // Get the latest finalized block
-    // TODO: make this work
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
@@ -112,10 +113,23 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let number: Value = serde_json::from_str(&self.send_request(request).await?).unwrap();
+        let number: Value =
+            unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?).unwrap() };
         let number = &number["result"]["number"];
 
-        let return_number = hex_to_decimal(number.as_str().unwrap()).unwrap();
+        let number = match number.as_str() {
+            Some(number) => number,
+            None => {
+                return Err(RpcError::InvalidResponse(
+                    "error: Invalid response".to_string(),
+                ))
+            }
+        };
+
+        let return_number = match hex_to_decimal(number) {
+            Ok(return_number) => return_number,
+            Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
+        };
 
         Ok(return_number)
     }
@@ -137,7 +151,10 @@ impl Rpc {
 
 // Take in the result of eth_getBlockByNumber, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
-    let json: Value = serde_json::from_str(rx).unwrap();
+    // TODO: maybe this is too slow?
+    let mut rx = rx.to_string();
+
+    let json: Value = unsafe { simd_json::serde::from_str(&mut rx).unwrap() };
 
     let number = match json["result"].as_str() {
         Some(number) => number,
@@ -157,12 +174,8 @@ pub fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> 
     // previou step so check for that here and remove it if necessary
     let hex_string: &str = &hex_string.replace('\"', "");
 
-    // remove 0x prefix if it exists
-    let hex_string = if hex_string.starts_with("0x") {
-        &hex_string[2..]
-    } else {
-        hex_string
-    };
+    // Remove `0x` prefix if it exists
+    let hex_string = hex_string.trim_start_matches("0x");
 
     u64::from_str_radix(hex_string, 16)
 }

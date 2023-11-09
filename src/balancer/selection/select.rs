@@ -82,45 +82,40 @@ mod tests {
         assert_eq!(v[0].url, vx[0].url);
     }
 
-    // #[test]
-    // fn test_pick() {
-    //     let mut rpc1 = Rpc::default();
-    //     let mut rpc2 = Rpc::default();
-    //     let mut rpc3 = Rpc::default();
+    // Test picking the fastest RPC
+    // Change the latencies of the other ones to simulate
+    // real network fluctuations.
+    #[test]
+    fn test_pick() {
+        let mut rpc1 = Rpc::default();
+        let mut rpc2 = Rpc::default();
+        let mut rpc3 = Rpc::default();
 
-    //     rpc1.status.latency = 1.0;
-    //     rpc1.max_consecutive = 10;
-    //     rpc2.status.latency = 6.0;
-    //     rpc2.max_consecutive = 10;
-    //     rpc3.status.latency = 3.0;
-    //     rpc3.max_consecutive = 10;
+        rpc1.status.latency = 1.0;
+        rpc1.max_consecutive = 10;
+        rpc2.status.latency = 6.0;
+        rpc2.max_consecutive = 10;
+        rpc3.status.latency = 3.0;
+        rpc3.max_consecutive = 10;
 
+        let mut rpc_list = vec![rpc1, rpc2, rpc3];
 
-    //     let mut rpc_list = vec![rpc1, rpc2, rpc3];
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc: {:?}", rpc);
+        assert_eq!(rpc.status.latency, 1.0);
+        assert_eq!(index, Some(0));
 
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     println!("rpc: {:?}", rpc);
-    //     assert_eq!(rpc.status.latency, 1.0);
-    //     assert_eq!(index, Some(0));
+        rpc_list[0].status.latency = 10000.0;
 
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     assert_eq!(rpc.status.latency, 2.0);
-    //     assert_eq!(index, Some(1));
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc index: {:?}", index);
+        assert_eq!(rpc.status.latency, 3.0);
+        assert_eq!(index, Some(2));
 
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     assert_eq!(rpc.status.latency, 3.0);
-    //     assert_eq!(index, Some(2));
+        rpc_list[2].status.latency = 100000.0;
 
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     assert_eq!(rpc.status.latency, 1.0);
-    //     assert_eq!(index, Some(0));
-
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     assert_eq!(rpc.status.latency, 2.0);
-    //     assert_eq!(index, Some(1));
-
-    //     let (rpc, index) = pick(&mut rpc_list);
-    //     assert_eq!(rpc.status.latency, 3.0);
-    //     assert_eq!(index, Some(2));
-    // }
+        let (rpc, index) = pick(&mut rpc_list);
+        assert_eq!(rpc.status.latency, 6.0);
+        assert_eq!(index, Some(1));
+    }
 }

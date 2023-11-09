@@ -7,17 +7,31 @@ use crate::{
         cache_method,
         cache_result,
     },
-    balancer::selection::selection::pick,
+    balancer::selection::select::pick,
     cache_error,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
     timed_out,
+    NamedBlocknumbers,
+    Settings,
 };
 
-use serde_json::to_vec;
+use serde_json::{
+    to_vec,
+    Value,
+};
+use simd_json;
 
+// Select either blake3 or xxhash based on the features
+#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
+
+#[cfg(feature = "xxhash")]
+use xxhash_rust::xxh3::xxh3_64;
+#[cfg(feature = "xxhash")]
+use zerocopy::AsBytes; // Impls AsBytes trait for u64
+
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -26,8 +40,6 @@ use hyper::{
 use sled::Db;
 
 use tokio::time::timeout;
-
-use memchr::memmem;
 
 use std::{
     collections::BTreeMap,
@@ -43,19 +55,24 @@ use std::{
     },
 };
 
+struct RequestParams {
+    ttl: u128,
+    max_retries: u32,
+}
+
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
     (
         $io:expr,
         $rpc_list_rwlock:expr,
-        $ma_length:expr,
         $cache:expr,
         $finalized_rx:expr,
+        $named_numbers:expr,
         $head_cache:expr,
-        $ttl:expr
+        $config:expr
     ) => {
-        // Finally, we bind the incoming connection to our service
+        // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
             // `service_fn` converts our function in a `Service`
             .serve_connection(
@@ -65,16 +82,17 @@ macro_rules! accept {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         $finalized_rx,
+                        $named_numbers,
                         $head_cache,
                         Arc::clone($cache),
-                        $ttl,
+                        $config,
                     );
                     response
                 }),
             )
             .await
         {
-            println!("error serving connection: {:?}", err);
+            println!("\x1b[31mErr:\x1b[0m Error serving connection: {:?}", err);
         }
     };
 }
@@ -89,16 +107,19 @@ macro_rules! get_response {
         $id:expr,
         $rpc_list_rwlock:expr,
         $finalized_rx:expr,
+        $named_numbers:expr,
         $head_cache:expr,
-        $ttl:expr
+        $ttl:expr,
+        $max_retries:expr
     ) => {
         match $cache.get($tx_hash.as_bytes()) {
             Ok(rax) => {
-                if let Some(rax) = rax {
+                if let Some(mut rax) = rax {
                     $rpc_position = None;
 
                     // Reconstruct ID
-                    let mut cached: serde_json::Value = serde_json::from_slice(&rax).unwrap();
+                    let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+
                     cached["id"] = $id.into();
                     cached.to_string()
                 } else {
@@ -106,13 +127,6 @@ macro_rules! get_response {
                     $tx["id"] = $id.into();
 
                     let tx_string = $tx.to_string();
-
-                    // Quit blutgang if `tx_string` contains the word `blutgang_quit`
-                    // Only for debugging, remove this for production builds *manually*.
-                    if memmem::find(&tx_string.as_bytes(), "blutgang_quit".as_bytes()).is_some() {
-                        let _ = $cache.flush_async().await;
-                        std::process::exit(0);
-                    }
 
                     // Loop until we get a response
                     let rx;
@@ -145,26 +159,27 @@ macro_rules! get_response {
                                 break;
                             },
                             Err(_) => {
+                                println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
                                 rpc.update_latency($ttl as f64);
                                 retries += 1;
                             },
                         };
 
-                        if retries == 32 {
+                        if retries == $max_retries {
                             return (timed_out!(), $rpc_position,);
                         }
-
                     }
 
-                    let rx_str = rx.as_str().to_string();
+                    let mut rx_str = rx.as_str().to_string();
 
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
-                        let num = get_block_number_from_request($tx);
-                        if num.is_some() {
-                            let num = num.unwrap();
+                        let num = get_block_number_from_request($tx, $named_numbers);
 
+                        // Insert the key of the request we made into our `head_cache`
+                        // so we can invalidate it and remove it from the DB if it reorgs.
+                        if let Some(num) = num {
                             if num > *$finalized_rx.borrow() {
                                 let mut head_cache = $head_cache.write().unwrap();
                                 head_cache
@@ -174,14 +189,14 @@ macro_rules! get_response {
 
                             }
 
-                            // Replace the id with 0 and insert that
-                            let mut rx_value: serde_json::Value =
-                                serde_json::from_str(&rx_str).unwrap();
-                            rx_value["id"] = serde_json::Value::Null;
+                            // Replace the id with Value::Null and insert the request
+                            let mut rx_value: Value = unsafe {
+                                simd_json::serde::from_str(&mut rx_str).unwrap()
+                            };
+                            rx_value["id"] = Value::Null;
 
                             $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                         }
-
                     }
 
                     rx_str
@@ -203,9 +218,10 @@ async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
-    ttl: u128,
+    params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
@@ -214,12 +230,24 @@ async fn forward_body(
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // Get the id of the request and set it to 0 for caching
+    //
+    // We're doing this ID gymnastics because we're hashing the
+    // whole request and we don't want the ID as it's arbitrary
+    // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
-    // read tx as bytes
-    let tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    // Hash the request with either blake3 or xxhash depending on the enabled feature
+    let tx_hash;
+    #[cfg(not(feature = "xxhash"))]
+    {
+        tx_hash = hash(to_vec(&tx).unwrap().as_slice());
+    }
+    #[cfg(feature = "xxhash")]
+    {
+        tx_hash = xxh3_64(to_vec(&tx).unwrap().as_slice());
+    }
 
-    // TODO: Current RPC position. idk of a better way for now so this will do
+    // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
@@ -231,8 +259,10 @@ async fn forward_body(
         id,
         rpc_list_rwlock,
         finalized_rx,
+        named_numbers,
         head_cache,
-        ttl
+        params.ttl,
+        params.max_retries
     );
 
     // Convert rx to bytes and but it in a Buf
@@ -255,41 +285,64 @@ pub async fn accept_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
-    ttl: u128,
+    config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
 
+    // RequestParams from config
+    let params = {
+        let config_guard = config.read().unwrap();
+        RequestParams {
+            ttl: config_guard.ttl,
+            max_retries: config_guard.max_retries,
+        }
+    };
+
+    // Check if we have the response hashed, and if not forward it
+    // to the best available RPC.
+    //
+    // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) =
-        forward_body(tx, &rpc_list_rwlock, finalized_rx, head_cache, cache, ttl).await;
+    (response, rpc_position) = forward_body(
+        tx,
+        &rpc_list_rwlock,
+        finalized_rx,
+        named_numbers,
+        head_cache,
+        cache,
+        params,
+    )
+    .await;
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
-    // Get lock for the rpc list and add it to the moving average if we picked an rpc
-    if rpc_position.is_some() {
-        let mut rpc_list_rwlock_guard = rpc_list_rwlock.write().unwrap();
+    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // we forwarded our request to, or is None if the result was cached.
+    //
+    // Here, we update the latency of the RPC that was used to process the request
+    // if `rpc_position` is Some.
+    if let Some(rpc_position) = rpc_position {
+        let mut rpc_list_guard = rpc_list_rwlock.write().unwrap_or_else(|e| {
+            // Handle the case where the RwLock is poisoned
+            e.into_inner()
+        });
 
-        if rpc_list_rwlock_guard.len() == 0 {
-            println!(
-                "LA {}",
-                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
-            );
-            return response;
-        }
-
-        if rpc_list_rwlock_guard.len() == 1 {
-            rpc_list_rwlock_guard[0].update_latency(time.as_nanos() as f64);
-            println!("LA {}", rpc_list_rwlock_guard[0].status.latency);
+        // Handle weird edge cases ¯\_(ツ)_/¯
+        if rpc_list_guard.is_empty() {
+            println!("LA {}", rpc_list_guard[rpc_position].status.latency);
         } else {
-            rpc_list_rwlock_guard[rpc_position.unwrap()].update_latency(time.as_nanos() as f64);
-            println!(
-                "LA {}",
-                rpc_list_rwlock_guard[rpc_position.unwrap()].status.latency
-            );
+            let index = if rpc_position >= rpc_list_guard.len() {
+                rpc_list_guard.len() - 1
+            } else {
+                rpc_position
+            };
+            rpc_list_guard[index].update_latency(time.as_nanos() as f64);
+            println!("LA {}", rpc_list_guard[index].status.latency);
         }
     }
 

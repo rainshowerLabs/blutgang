@@ -1,20 +1,5 @@
 use memchr::memmem;
 
-// Macro for building the blacklist
-//
-// For custom blacklist rules, please read the docs and code comments
-#[allow(unused_macros)]
-macro_rules! blacklist {
-    () => {
-        // The blacklist contains keywords that are included in responses we dont want to cache.
-        // These responses are either to get the current state of the chain at the head or errors.
-        //
-        // For max performance, blacklist keywords should be sorted in the order of how common they are.
-
-        ["latest", "blockNumber", "error", "missing"]
-    };
-}
-
 // Return true if we are supposed to be caching the input.
 //
 // The default rust string contains does not use SIMD extensions

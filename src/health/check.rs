@@ -1,5 +1,14 @@
-use crate::health::safe_block::get_safe_block;
-use crate::Rpc;
+use crate::{
+    health::{
+        error::HealthError,
+        safe_block::{
+            get_safe_block,
+            NamedBlocknumbers,
+        },
+    },
+    Rpc,
+    Settings,
+};
 
 use std::println;
 use std::sync::{
@@ -22,28 +31,38 @@ struct HeadResult {
     reported_head: u64,
 }
 
-//Call check and safe_block in a loop
+// Call check and safe_block in a loop
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
-    ttl: u128,
-    health_check_ttl: u64,
-) -> Result<(), Box<dyn std::error::Error>> {
+    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
+    config: &Arc<RwLock<Settings>>,
+) -> Result<(), HealthError> {
     loop {
+        let health_check_ttl = config.read().unwrap().health_check_ttl;
+        let ttl = config.read().unwrap().ttl;
+
         sleep(Duration::from_millis(health_check_ttl)).await;
         check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
-        get_safe_block(&rpc_list, &finalized_tx, health_check_ttl).await?;
+        get_safe_block(
+            &rpc_list,
+            &finalized_tx,
+            named_numbers_rwlock,
+            health_check_ttl,
+        )
+        .await?;
     }
 }
 
+// Track the head of each RPC and process them accordingly
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), HealthError> {
     print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
@@ -80,7 +99,7 @@ async fn check(
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
-) -> Result<Vec<HeadResult>, Box<dyn std::error::Error>> {
+) -> Result<Vec<HeadResult>, HealthError> {
     let len = rpc_list.read().unwrap().len();
     let mut heads = Vec::<HeadResult>::new();
 
@@ -144,7 +163,7 @@ fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     heads: Vec<HeadResult>,
-) -> Result<u64, Box<dyn std::error::Error>> {
+) -> Result<u64, HealthError> {
     // Get the highest head reported by the RPCs
     let mut highest_head = 0;
     for head in &heads {
@@ -183,7 +202,7 @@ fn escape_poverty(
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_heads: Vec<HeadResult>,
     agreed_head: u64,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), HealthError> {
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
