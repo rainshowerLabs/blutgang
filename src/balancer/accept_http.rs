@@ -204,7 +204,6 @@ macro_rules! get_response {
 
                             $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
                         }
-
                     }
 
                     rx_str

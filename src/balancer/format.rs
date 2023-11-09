@@ -63,13 +63,14 @@ pub fn get_block_number_from_request(
     tx: Value,
     named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
 ) -> Option<u64> {
-    // If the `params` field does not exist return None
-    if !tx["params"].is_array() {
-        return None;
-    }
 
-    // Return None immediately if params == 0
-    if tx["params"].as_array().unwrap().is_empty() {
+    // Return none if `params` is not a thing
+    let params = tx["params"].as_array();
+    if let Some(params) = params {
+        if params.is_empty() {
+            return None;
+        }
+    } else {
         return None;
     }
 
@@ -203,64 +204,6 @@ pub fn _replace_id(tx: &str, id: &str) -> Result<String, RpcError> {
     let replaced = re.replace(tx, |caps: &regex::Captures| format!("{}{}", &caps[1], id));
 
     Ok(replaced.to_string())
-}
-
-#[test]
-fn replace_id_test() {
-    let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _replace_id(tx, "2").unwrap();
-    assert_eq!(
-        tx,
-        r#"{"id":2,"jsonrpc":"2.0","method":"eth_call","params":...}"#
-    );
-
-    let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id":1, "params":...}"#;
-    let tx = _replace_id(tx, "2").unwrap();
-    assert_eq!(
-        tx,
-        r#"{"jsonrpc":"2.0","method":"eth_call", "id":2, "params":...}"#
-    );
-
-    let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": "1", "params":...}"#;
-    let tx = _replace_id(tx, "2").unwrap();
-    assert_eq!(
-        tx,
-        r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
-    );
-
-    let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": 1, "params":...}"#;
-    let tx = _replace_id(tx, "2").unwrap();
-    assert_eq!(
-        tx,
-        r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
-    );
-}
-
-#[test]
-fn extract_id_test() {
-    let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx).unwrap();
-    assert_eq!(tx, r#"1"#);
-
-    let tx = r#"{"id": 1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx).unwrap();
-    assert_eq!(tx, r#"1"#);
-
-    let tx = r#"{"id":1 ,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx).unwrap();
-    assert_eq!(tx, r#"1"#);
-
-    let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx).unwrap();
-    assert_eq!(tx, r#"1"#);
-
-    let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx).unwrap();
-    assert_eq!(tx, r#"1"#);
-
-    let tx = r#"{,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-    let tx = _extract_id(tx);
-    assert_eq!(tx, None);
 }
 
 #[cfg(test)]
@@ -487,4 +430,63 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn replace_id_test() {
+        let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _replace_id(tx, "2").unwrap();
+        assert_eq!(
+            tx,
+            r#"{"id":2,"jsonrpc":"2.0","method":"eth_call","params":...}"#
+        );
+
+        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id":1, "params":...}"#;
+        let tx = _replace_id(tx, "2").unwrap();
+        assert_eq!(
+            tx,
+            r#"{"jsonrpc":"2.0","method":"eth_call", "id":2, "params":...}"#
+        );
+
+        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": "1", "params":...}"#;
+        let tx = _replace_id(tx, "2").unwrap();
+        assert_eq!(
+            tx,
+            r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
+        );
+
+        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": 1, "params":...}"#;
+        let tx = _replace_id(tx, "2").unwrap();
+        assert_eq!(
+            tx,
+            r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
+        );
+    }
+
+    #[test]
+    fn extract_id_test() {
+        let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx).unwrap();
+        assert_eq!(tx, r#"1"#);
+
+        let tx = r#"{"id": 1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx).unwrap();
+        assert_eq!(tx, r#"1"#);
+
+        let tx = r#"{"id":1 ,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx).unwrap();
+        assert_eq!(tx, r#"1"#);
+
+        let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx).unwrap();
+        assert_eq!(tx, r#"1"#);
+
+        let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx).unwrap();
+        assert_eq!(tx, r#"1"#);
+
+        let tx = r#"{,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
+        let tx = _extract_id(tx);
+        assert_eq!(tx, None);
+    }
+    
 }
