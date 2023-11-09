@@ -49,6 +49,9 @@ macro_rules! accept_admin {
     };
 }
 
+// Used for listening to admin requests as its own tokio task.
+//
+// Similar to what you'd find in main/balancer
 pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,

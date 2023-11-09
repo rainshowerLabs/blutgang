@@ -3,7 +3,6 @@ use crate::{
     Rpc,
     Settings,
 };
-use jsonwebtoken::DecodingKey;
 
 use std::{
     sync::{
@@ -21,6 +20,7 @@ use serde_json::{
 
 use sled::Db;
 
+// Extract the method, call the appropriate function and return the response
 pub async fn execute_method(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -29,7 +29,7 @@ pub async fn execute_method(
     cache: Arc<Db>,
 ) -> Result<Value, AdminError> {
     let method = tx["method"].as_str();
-    println!("Method: {:?}", method.unwrap());
+    println!("Method: {:?}", method.unwrap_or("None"));
 
     // Check if write protection is enabled
     let write_protection_enabled = config.read().unwrap().admin.readonly;
@@ -116,6 +116,7 @@ async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
     Ok(Value::Null)
 }
 
+// Flushes sled cache to disk
 async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
     let time = Instant::now();
     let _ = cache.flush_async().await;
@@ -130,10 +131,10 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
     Ok(rx)
 }
 
+// Respond with the config we started blutgang with
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
-    let mut clone = guard.clone();
-    clone.admin.key = DecodingKey::from_base64_secret("some-key").unwrap(); // Hide the token
+    let clone = guard.clone();
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",

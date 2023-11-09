@@ -58,7 +58,7 @@ struct Claims {
 // Macro for getting responses from either the cache or RPC nodes.
 //
 // Since we don't cache the admin request responses, this functions
-// quite differently from the one you'll find in `blutgang/balancer/balancer.rs`
+// quite differently from the one you'll find in `blutgang/balancer/accept_http.rs`
 macro_rules! get_response {
     (
         $tx:expr,
@@ -93,7 +93,7 @@ macro_rules! get_response {
     }};
 }
 
-// Execute requesst and construct a HTTP response
+// Execute request and construct a HTTP response
 async fn forward_body(
     mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
@@ -164,6 +164,7 @@ pub async fn accept_admin_request(
         });
     }
 
+    // Send the request off to be processed
     let time = Instant::now();
     let response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();

@@ -41,8 +41,6 @@ use sled::Db;
 
 use tokio::time::timeout;
 
-use memchr::memmem;
-
 use std::{
     collections::BTreeMap,
     convert::Infallible,
@@ -179,6 +177,8 @@ macro_rules! get_response {
                         // Insert the response hash into the head_cache
                         let num = get_block_number_from_request($tx, $named_numbers);
 
+                        // Insert the key of the request we made into our `head_cache`
+                        // so we can invalidate it and remove it from the DB if it reorgs.
                         if let Some(num) = num {
                             if num > *$finalized_rx.borrow() {
                                 let mut head_cache = $head_cache.write().unwrap();
@@ -189,7 +189,7 @@ macro_rules! get_response {
 
                             }
 
-                            // Replace the id with 0 and insert that
+                            // Replace the id with Value::Null and insert the request
                             let mut rx_value: Value = unsafe {
                                 simd_json::serde::from_str(&mut rx_str).unwrap()
                             };
@@ -303,6 +303,10 @@ pub async fn accept_request(
         }
     };
 
+    // Check if we have the response hashed, and if not forward it
+    // to the best available RPC.
+    //
+    // Also handle cache insertions.
     let time = Instant::now();
     (response, rpc_position) = forward_body(
         tx,
@@ -317,12 +321,18 @@ pub async fn accept_request(
     let time = time.elapsed();
     println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
 
+    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // we forwarded our request to, or is None if the result was cached.
+    //
+    // Here, we update the latency of the RPC that was used to process the request
+    // if `rpc_position` is Some.
     if let Some(rpc_position) = rpc_position {
         let mut rpc_list_guard = rpc_list_rwlock.write().unwrap_or_else(|e| {
             // Handle the case where the RwLock is poisoned
             e.into_inner()
         });
 
+        // Handle weird edge cases ¯\_(ツ)_/¯
         if rpc_list_guard.is_empty() {
             println!("LA {}", rpc_list_guard[rpc_position].status.latency);
         } else {

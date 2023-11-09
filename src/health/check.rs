@@ -31,7 +31,7 @@ struct HeadResult {
     reported_head: u64,
 }
 
-//Call check and safe_block in a loop
+// Call check and safe_block in a loop
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
@@ -56,6 +56,7 @@ pub async fn health_check(
     }
 }
 
+// Track the head of each RPC and process them accordingly
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
