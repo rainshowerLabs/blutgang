@@ -157,6 +157,9 @@ pub fn get_block_number_from_request(
 }
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
+    #[cfg(feature = "debug-verbose")]
+    println!("Incoming request: {:?}", tx);
+
     let tx = tx.collect().await?.to_bytes().clone();
     let mut tx = from_utf8(&tx).unwrap().to_owned();
 
