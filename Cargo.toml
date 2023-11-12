@@ -49,6 +49,7 @@ incremental = false
 default = ["selection-weighed-round-robin"]
 xxhash = ["xxhash-rust", "zerocopy"] # 4x faster caching but potentially less secure
 no-cache = [] # enable this to disable caching
+debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
 selection-random = ["rand"] # optional random algo
 # add your own below
