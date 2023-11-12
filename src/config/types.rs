@@ -13,7 +13,9 @@ use sled::Config;
 use std::{
     fmt,
     fmt::Debug,
-    fs::{self,},
+    fs::{
+        self,
+    },
     net::SocketAddr,
 };
 

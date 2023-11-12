@@ -66,9 +66,7 @@ impl Rpc {
     // Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
         #[cfg(feature = "debug-verbose")]
-        {
-            println!("Sending request: {}", tx.clone());
-        }
+        println!("Sending request: {}", tx.clone());
 
         let response = match self.client.post(&self.url).json(&tx).send().await {
             Ok(response) => response,

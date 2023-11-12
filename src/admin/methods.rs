@@ -347,8 +347,8 @@ fn admin_blutgang_set_ttl(
 
 #[cfg(test)]
 mod tests {
-    use jsonwebtoken::DecodingKey;
     use super::*;
+    use jsonwebtoken::DecodingKey;
 
     // Helper function to create a test RPC list
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
