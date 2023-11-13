@@ -228,9 +228,13 @@ async fn forward_body(
 ) {
     // Check if body has application/json
     if !tx.headers().contains_key("content-type") {
-        return (Ok(hyper::Response::builder().status(400).body(Full::new(Bytes::from(
-            "Improper content-type header",
-        ))).unwrap()), None);
+        return (
+            Ok(hyper::Response::builder()
+                .status(400)
+                .body(Full::new(Bytes::from("Improper content-type header")))
+                .unwrap()),
+            None,
+        );
     }
 
     // Convert incoming body to serde value
