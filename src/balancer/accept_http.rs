@@ -227,7 +227,9 @@ async fn forward_body(
     Option<usize>,
 ) {
     // Check if body has application/json
-    if !tx.headers().contains_key("content-type") {
+    if tx.headers()["content-type"] != "application/json"
+        || !tx.headers().contains_key("content-type")
+    {
         return (
             Ok(hyper::Response::builder()
                 .status(400)
