@@ -157,7 +157,7 @@ fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
 // Used for `blutgang_rpc_list` and `blutgang_poverty_list`
 fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError> {
     // Read the RPC list, handling errors
-    let rpc_list = rpc_list.read().map_err(|_| AdminError::Innacessible)?;
+    let rpc_list = rpc_list.read().map_err(|_| AdminError::Inaccessible)?;
 
     // Prepare a formatted string for the RPC list
     let mut rpc_list_str = String::new();
@@ -219,7 +219,7 @@ fn admin_add_rpc(
         .parse::<f64>()
         .unwrap_or(0.0);
 
-    let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
+    let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
     rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, ma_len));
 
@@ -253,7 +253,7 @@ fn admin_remove_rpc(
         Err(_) => return Err(AdminError::ParseError),
     };
 
-    let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Innacessible)?;
+    let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
     // Check if index exists before removing
     if index as usize >= rpc_list.len() {

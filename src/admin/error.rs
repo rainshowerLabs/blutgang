@@ -11,7 +11,7 @@ pub enum AdminError {
     WriteProtectionEnabled,
     InvalidSecret,
     RwError,
-    Innacessible,
+    Inaccessible,
     OutOfBounds,
     InvalidResponse(String),
 }
@@ -26,7 +26,7 @@ impl std::fmt::Display for AdminError {
             AdminError::WriteProtectionEnabled => write!(f, "Admin namespace is set to read-only"),
             AdminError::InvalidSecret => write!(f, "Invalid secret for protected method"),
             AdminError::RwError => write!(f, "Error while trying to read or write fromt/to disk"),
-            AdminError::Innacessible => write!(f, "Could not access shared resource."),
+            AdminError::Inaccessible => write!(f, "Could not access shared resource."),
             AdminError::OutOfBounds => {
                 write!(f, "Request out of bounds.")
             }
