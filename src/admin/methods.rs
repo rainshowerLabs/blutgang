@@ -153,19 +153,28 @@ fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     Ok(rx)
 }
 
-// List generic Fn to list RPCs from a Arc<RwLock<Vec<Rpc>>>
+// List generic Fn to retrieve RPCs from an Arc<RwLock<Vec<Rpc>>>
 // Used for `blutgang_rpc_list` and `blutgang_poverty_list`
 fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError> {
+    // Read the RPC list, handling errors
     let rpc_list = rpc_list.read().map_err(|_| AdminError::Innacessible)?;
-    let mut rpc_list_str = String::new();
 
+    // Prepare a formatted string for the RPC list
+    let mut rpc_list_str = String::new();
     rpc_list_str.push('[');
-    for (i, rpc) in rpc_list.iter().enumerate() {
-        println!("RPC {}:\n{:#?}", i, rpc);
-        rpc_list_str.push_str(&format!("\"{:?}\", ", rpc));
+
+    // Iterate over the RPC list and format each RPC
+    for rpc in rpc_list.iter() {
+        rpc_list_str.push_str(&format!(
+            "{{\"url\": \"{}\", \"max_consecutive\": {}, \"last_error\": {}}}",
+            rpc.url, rpc.max_consecutive, rpc.status.last_error
+        ));
     }
+
+    // Complete the formatted RPC list string
     rpc_list_str.push(']');
 
+    // Create a JSON response
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
@@ -174,6 +183,7 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
 
     Ok(rx)
 }
+
 
 // Pushes an RPC to the end of the list
 //
