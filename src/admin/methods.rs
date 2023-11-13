@@ -134,11 +134,20 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 // Respond with the config we started blutgang with
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
-    let clone = guard.clone();
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
-        "result": format!("{:?}", clone),
+        "result": {
+            "address": guard.address,
+            "do_clear": guard.do_clear,
+            "health_check": guard.health_check,
+            "admin": {
+                "enabled": guard.admin.enabled,
+                "readonly": guard.admin.readonly,
+            },
+            "ttl": guard.ttl,
+            "health_check_ttl": guard.health_check_ttl,
+        },
     });
 
     Ok(rx)
