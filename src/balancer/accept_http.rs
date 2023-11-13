@@ -226,6 +226,13 @@ async fn forward_body(
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
 ) {
+    // Check if body has application/json
+    if !tx.headers().contains_key("content-type") {
+        return (Ok(hyper::Response::builder().status(400).body(Full::new(Bytes::from(
+            "Improper content-type header",
+        ))).unwrap()), None);
+    }
+
     // Convert incoming body to serde value
     let mut tx = incoming_to_value(tx).await.unwrap();
 
