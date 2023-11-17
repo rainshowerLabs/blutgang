@@ -184,7 +184,6 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
     Ok(rx)
 }
 
-
 // Pushes an RPC to the end of the list
 //
 // param[0] - RPC url

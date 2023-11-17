@@ -283,7 +283,11 @@ async fn forward_body(
     let body = Full::new(body);
 
     //Build the response
-    let res = hyper::Response::builder().status(200).body(body).unwrap();
+    let res = hyper::Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .body(body)
+        .unwrap();
 
     (Ok(res), rpc_position)
 }
