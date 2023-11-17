@@ -282,7 +282,7 @@ async fn forward_body(
     // Put it in a http_body_util::Full
     let body = Full::new(body);
 
-    //Build the response
+    // Build the response
     let res = hyper::Response::builder()
         .status(200)
         .header("Content-Type", "application/json")
