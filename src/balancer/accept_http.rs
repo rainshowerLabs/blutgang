@@ -35,6 +35,7 @@ use zerocopy::AsBytes; // Impls AsBytes trait for u64
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
+    header::HeaderValue,
     Request,
 };
 use sled::Db;
@@ -227,7 +228,7 @@ async fn forward_body(
     Option<usize>,
 ) {
     // Check if body has application/json
-    if tx.headers()["content-type"] != "application/json" {
+    if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
         return (
             Ok(hyper::Response::builder()
                 .status(400)
