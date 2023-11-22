@@ -20,5 +20,8 @@ RUN pwd
 
 RUN ls -la
 
+# Install libssl-dev
+RUN apt-get update && apt-get install -y libssl-dev
+
 # Build and run the Rust project
 CMD ["cargo", "run", "--profile", "maxperf", "--", "-c", "config.toml"]
