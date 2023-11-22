@@ -22,11 +22,6 @@ use std::{
 
 use crate::rpc::error::RpcError;
 
-struct BlocknumIndex<'a> {
-    pub method: &'a [u8],
-    pub position: usize,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedNumber {
     Latest,
@@ -75,85 +70,51 @@ pub fn get_block_number_from_request(
 
     // The JSON-RPC standard is all over the place so depending on the method, we need to look at
     // different param indexes. Why? Has i ever???
-    let methods = [
-        BlocknumIndex {
-            method: b"eth_getBalance",
-            position: 1,
-        },
-        BlocknumIndex {
-            method: b"eth_getStorageAt",
-            position: 2,
-        },
-        BlocknumIndex {
-            method: b"eth_getTransactionCount",
-            position: 1,
-        },
-        BlocknumIndex {
-            method: b"eth_getBlockTransactionCountByNumber",
-            position: 0,
-        },
-        BlocknumIndex {
-            method: b"eth_getUncleCountByBlockNumber",
-            position: 0,
-        },
-        BlocknumIndex {
-            method: b"eth_getCode",
-            position: 1,
-        },
-        BlocknumIndex {
-            method: b"eth_call",
-            position: 1,
-        },
-        BlocknumIndex {
-            method: b"eth_getBlockByNumber",
-            position: 0,
-        },
-        BlocknumIndex {
-            method: b"eth_getTransactionByBlockNumberAndIndex",
-            position: 0,
-        },
-        BlocknumIndex {
-            method: b"eth_getUncleByBlockNumberAndIndex",
-            position: 0,
-        },
-    ];
+    let position = match tx["method"].as_str() {
+        Some("eth_getBalance") => 1,
+        Some("eth_getStorageAt") => 2,
+        Some("eth_getTransactionCount") => 1,
+        Some("eth_getBlockTransactionCountByNumber") => 0,
+        Some("eth_getUncleCountByBlockNumber") => 0,
+        Some("eth_getCode") => 1,
+        Some("eth_call") => 1,
+        Some("eth_getBlockByNumber") => 0,
+        Some("eth_getTransactionByBlockNumberAndIndex") => 0,
+        Some("eth_getUncleByBlockNumberAndIndex") => 0,
+        _ => return None,
+    };
+
 
     // Iterate through the array and return the position, return None if not present
-    for item in methods.iter() {
-        if memmem::find(tx["method"].to_string().as_bytes(), item.method).is_some() {
-            let block_number = tx["params"][item.position].to_string().replace('\"', "");
+    let block_number = tx["params"][position].to_string().replace('\"', "");
 
-            // If `null` return None
-            if block_number == "null" {
-                return None;
-            }
+    // If `null` return None
+    if block_number == "null" {
+        return None;
+    }
 
-            // Return the corresponding named parameter from the RwLock is present
-            let nn = has_named_number(&block_number);
-            if nn != NamedNumber::Null {
-                let rwlock_guard = named_blocknumbers.read().unwrap();
+    // Return the corresponding named parameter from the RwLock is present
+    let nn = has_named_number(&block_number);
+    if nn != NamedNumber::Null {
+        let rwlock_guard = named_blocknumbers.read().unwrap();
 
-                match nn {
-                    NamedNumber::Latest => return Some(rwlock_guard.latest),
-                    NamedNumber::Earliest => return Some(rwlock_guard.earliest),
-                    NamedNumber::Safe => return Some(rwlock_guard.safe),
-                    NamedNumber::Finalized => return Some(rwlock_guard.finalized),
-                    NamedNumber::Pending => return Some(rwlock_guard.pending),
-                    _ => continue, // continue and try to decode as decimal just in case
-                }
-            }
-
-            // Convert to decimal
-            let block_number = match u64::from_str_radix(&block_number[2..], 16) {
-                Ok(block_number) => block_number,
-                Err(_) => return None,
-            };
-
-            return Some(block_number);
+        match nn {
+            NamedNumber::Latest => return Some(rwlock_guard.latest),
+            NamedNumber::Earliest => return Some(rwlock_guard.earliest),
+            NamedNumber::Safe => return Some(rwlock_guard.safe),
+            NamedNumber::Finalized => return Some(rwlock_guard.finalized),
+            NamedNumber::Pending => return Some(rwlock_guard.pending),
+            NamedNumber::Null => return None,
         }
     }
 
-    None
+    // Convert to decimal
+    let block_number = match u64::from_str_radix(&block_number[2..], 16) {
+        Ok(block_number) => block_number,
+        Err(_) => return None,
+    };
+
+    Some(block_number)
 }
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
