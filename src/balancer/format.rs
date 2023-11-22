@@ -84,8 +84,7 @@ pub fn get_block_number_from_request(
         _ => return None,
     };
 
-
-    // Iterate through the array and return the position, return None if not present
+    // Get the corresponding blockbumber from the params
     let block_number = tx["params"][position].to_string().replace('\"', "");
 
     // If `null` return None
