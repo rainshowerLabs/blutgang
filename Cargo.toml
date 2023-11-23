@@ -13,7 +13,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 clap = "4.3.0"
-hyper = { version = "1.0.0-rc.4", features = ["full"] }
+hyper = { version = "1.0.1", features = ["full"] }
 http-body-util = "0.1.0-rc.3"
 reqwest = { version = "0.11.18", features = ["blocking", "json"] }
 serde = { version = "1.0.163", features = ["derive"] }
@@ -34,6 +34,7 @@ simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_im
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
 zerocopy = { version = "0.7.20", optional =  true }
 jsonwebtoken = "9.1.0"
+hyper-tungstenite = "0.12.0"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
