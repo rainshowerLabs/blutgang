@@ -87,11 +87,6 @@ pub fn get_block_number_from_request(
     // Get the corresponding blockbumber from the params
     let block_number = tx["params"][position].to_string().replace('\"', "");
 
-    // If `null` return None
-    if block_number == "null" {
-        return None;
-    }
-
     // Return the corresponding named parameter from the RwLock is present
     let nn = has_named_number(&block_number);
     if nn != NamedNumber::Null {
