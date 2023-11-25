@@ -130,7 +130,7 @@ macro_rules! get_response {
                     let tx_string = $tx.to_string();
 
                     // Loop until we get a response
-                    let rx;
+                    let mut rx;
                     let mut retries = 0;
                     loop {
                         // Get the next Rpc in line.
@@ -171,8 +171,6 @@ macro_rules! get_response {
                         }
                     }
 
-                    let mut rx_str = rx.as_str().to_string();
-
                     // Don't cache responses that contain errors or missing trie nodes
                     if cache_method(&tx_string) && cache_result(&rx) {
                         // Insert the response hash into the head_cache
@@ -192,7 +190,7 @@ macro_rules! get_response {
 
                             // Replace the id with Value::Null and insert the request
                             let mut rx_value: Value = unsafe {
-                                simd_json::serde::from_str(&mut rx_str).unwrap()
+                                simd_json::serde::from_str(&mut rx).unwrap()
                             };
                             rx_value["id"] = Value::Null;
 
@@ -200,7 +198,7 @@ macro_rules! get_response {
                         }
                     }
 
-                    rx_str
+                    rx
                 }
             }
             Err(_) => {
