@@ -250,11 +250,11 @@ async fn forward_body(
     let tx_hash;
     #[cfg(not(feature = "xxhash"))]
     {
-        tx_hash = hash(&tx.as_str().unwrap().as_bytes());
+        tx_hash = hash(&tx.to_string().as_bytes());
     }
     #[cfg(feature = "xxhash")]
     {
-        tx_hash = xxh3_64(&tx.as_str().unwrap().as_bytes());
+        tx_hash = xxh3_64(&tx.to_string().as_bytes());
     }
 
     // RPC used to get the response, we use it to update the latency for it later.
