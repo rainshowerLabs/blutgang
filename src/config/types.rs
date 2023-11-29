@@ -246,6 +246,20 @@ impl Settings {
                     .as_integer()
                     .expect("\x1b[31mErr:\x1b[0m Could not parse max_consecutive as int!")
                     as u32;
+
+                let mut delta = rpc_table
+                    .get("max_per_second")
+                    .expect("\x1b[31mErr:\x1b[0m Missing max_per_second from an RPC!")
+                    .as_integer()
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse max_per_second as int!")
+                    as u64;
+
+                // If the delta time isnt 0, we need to get how many microsecond need to pass
+                // before we can send a new request
+                if delta != 0 {
+                    delta = 1_000_000 / delta;
+                }
+
                 let url = rpc_table
                     .get("url")
                     .expect("\x1b[31mErr:\x1b[0m Missing URL from RPC!")
@@ -253,7 +267,7 @@ impl Settings {
                     .expect("\x1b[31mErr:\x1b[0m Could not parse URL from a RPC as str!")
                     .to_string();
 
-                let rpc = Rpc::new(url, max_consecutive, ma_length);
+                let rpc = Rpc::new(url, max_consecutive, delta, ma_length);
                 rpc_list.push(rpc);
             }
         }
@@ -345,13 +359,19 @@ impl Settings {
             .expect("Invalid ma_length");
         let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
 
+        let mut delta = matches.get_one::<u64>("max_per_second").expect("Invalid max_per_second").to_owned();
+
+        if delta != 0 {
+            delta = 1_000_000 / delta;
+        }
+
         // Turn the rpc_list into a csv vec
         let rpc_list: Vec<&str> = rpc_list.split(',').collect();
         let rpc_list: Vec<String> = rpc_list.iter().map(|rpc| rpc.to_string()).collect();
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string(), 6, ma_length))
+            .map(|rpc| Rpc::new(rpc.to_string(), 6, delta, ma_length))
             .collect();
 
         // Build the SocketAddr

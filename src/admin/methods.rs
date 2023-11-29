@@ -212,15 +212,24 @@ fn admin_add_rpc(
         .replace('\"', "")
         .parse::<u32>()
         .unwrap_or(0);
-    let ma_len = params[2]
+    let mut delta = params[2]
+        .to_string()
+        .replace('\"', "")
+        .parse::<u64>()
+        .unwrap_or(0);
+    let ma_len = params[3]
         .to_string()
         .replace('\"', "")
         .parse::<f64>()
         .unwrap_or(0.0);
 
+    if delta != 0 {
+        delta = 1_000_000 / delta;
+    }
+
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
-    rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, ma_len));
+    rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, delta, ma_len));
 
     let rx = json!({
         "id": Null,
@@ -373,6 +382,7 @@ mod tests {
         Arc::new(RwLock::new(vec![Rpc::new(
             "http://example.com".to_string(),
             5,
+            1000,
             0.5,
         )]))
     }
@@ -382,6 +392,7 @@ mod tests {
         Arc::new(RwLock::new(vec![Rpc::new(
             "http://poverty.com".to_string(),
             2,
+            1000,
             0.1,
         )]))
     }
@@ -598,7 +609,7 @@ mod tests {
         rpc_list
             .write()
             .unwrap()
-            .push(Rpc::new("http://example.com".to_string(), 5, 0.5));
+            .push(Rpc::new("http://example.com".to_string(), 5, 1000, 0.5));
         let len = rpc_list.read().unwrap().len();
 
         // Act
