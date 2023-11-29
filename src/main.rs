@@ -16,7 +16,6 @@ use crate::{
         check::health_check,
         head_cache::manage_cache,
         safe_block::NamedBlocknumbers,
-        accept::listen_for_health,
     },
     rpc::types::Rpc,
 };
@@ -107,12 +106,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &config_health,
             )
             .await;
-        });
-
-        // Spawn a web server at /health that responds with Ok to whatever
-        tokio::task::spawn(async move {
-            println!("\x1b[35mInfo:\x1b[0m Responding to health checks ar /health");
-            let _ = listen_for_health(addr_clone).await;
         });
     }
 
