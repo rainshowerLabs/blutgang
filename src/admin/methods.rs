@@ -229,7 +229,12 @@ fn admin_add_rpc(
 
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
-    rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, delta, ma_len));
+    rpc_list.push(Rpc::new(
+        rpc.to_string(),
+        max_consecutive,
+        delta.into(),
+        ma_len,
+    ));
 
     let rx = json!({
         "id": Null,

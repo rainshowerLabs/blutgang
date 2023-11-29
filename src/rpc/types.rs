@@ -34,8 +34,8 @@ pub struct Rpc {
     pub max_consecutive: u32,
     pub consecutive: u32,
     // For max_per_second
-    pub last_used: u64,
-    pub min_time_delta: u64, // microseconds
+    pub last_used: u128,
+    pub min_time_delta: u128, // microseconds
 }
 
 unsafe impl Sync for Rpc {}
@@ -56,7 +56,7 @@ impl Default for Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String, max_consecutive: u32, min_time_delta: u64, ma_length: f64) -> Self {
+    pub fn new(url: String, max_consecutive: u32, min_time_delta: u128, ma_length: f64) -> Self {
         Self {
             url,
             client: Client::new(),

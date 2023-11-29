@@ -267,7 +267,7 @@ impl Settings {
                     .expect("\x1b[31mErr:\x1b[0m Could not parse URL from a RPC as str!")
                     .to_string();
 
-                let rpc = Rpc::new(url, max_consecutive, delta, ma_length);
+                let rpc = Rpc::new(url, max_consecutive, delta.into(), ma_length);
                 rpc_list.push(rpc);
             }
         }
@@ -359,7 +359,10 @@ impl Settings {
             .expect("Invalid ma_length");
         let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
 
-        let mut delta = matches.get_one::<u64>("max_per_second").expect("Invalid max_per_second").to_owned();
+        let mut delta = matches
+            .get_one::<u64>("max_per_second")
+            .expect("Invalid max_per_second")
+            .to_owned();
 
         if delta != 0 {
             delta = 1_000_000 / delta;
@@ -371,7 +374,7 @@ impl Settings {
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string(), 6, delta, ma_length))
+            .map(|rpc| Rpc::new(rpc.to_string(), 6, delta.into(), ma_length))
             .collect();
 
         // Build the SocketAddr

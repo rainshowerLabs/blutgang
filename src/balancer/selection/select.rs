@@ -1,4 +1,5 @@
 use crate::Rpc;
+use std::time::SystemTime;
 
 // Generic entry point fn to select the next rpc and return its position
 pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
@@ -37,15 +38,28 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // Sort by latency
     let indices = argsort(list);
 
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("Failed to get current time");
+
     // Picks the second fastest one if the fastest one has maxed out
-    if list[indices[0]].max_consecutive <= list[indices[0]].consecutive {
-        list[indices[1]].consecutive = 1;
-        list[indices[0]].consecutive = 0;
-        return (list[indices[1]].clone(), Some(indices[1]));
+    // Also take into account min_delta_time
+    let mut choice = 0;
+    for i in indices.iter() {
+        if list[*i].max_consecutive > list[*i].consecutive
+            && (time.as_micros() - list[*i].last_used > list[*i].min_time_delta)
+        {
+            choice = *i;
+            continue;
+        }
+        // remove consecutive
+        list[*i].consecutive = 0;
     }
 
-    list[indices[0]].consecutive += 1;
-    (list[indices[0]].clone(), Some(indices[0]))
+    // If no RPC has been selected, fall back to the fastest RPC
+    list[choice].consecutive += 1;
+    list[choice].last_used = time.as_micros();
+    (list[choice].clone(), Some(indices[0]))
 }
 
 #[cfg(all(
