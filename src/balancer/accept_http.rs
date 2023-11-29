@@ -127,7 +127,7 @@ macro_rules! get_response {
                     // Kinda jank but set the id back to what it was before
                     $tx["id"] = $id.into();
 
-                    let tx_string = $tx.to_string();
+                    let tx_string = $tx.as_str().unwrap();
 
                     // Loop until we get a response
                     let mut rx;
