@@ -1,4 +1,4 @@
-use std::convert::Infallible;
+use std::{convert::Infallible, net::SocketAddr};
 
 use tokio::net::TcpListener;
 
@@ -38,14 +38,13 @@ macro_rules! accept_health {
 }
 
 // Bind to address at /health and respond to everythong with ok 200
-pub async fn listen_for_health(address: TcpListener) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn listen_for_health(address: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
     // Bind to the address/health
     //
     // the address arg is used for the load balancer so we need to modify it
     // to bind to /health
-    let address = address.local_addr()?;
-    let address = format!("{}{}", address, "/health");
-
+    let address = format!("{}/health", address);
+    
     // Create a listener and bind to it
     let listener = TcpListener::bind(address.clone()).await?;
     println!("\x1b[35mInfo:\x1b[0m Bound health to: {}", address);
