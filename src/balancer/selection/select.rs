@@ -52,8 +52,6 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     let mut choice = indices[0];
     let mut choice_consecutive = 0;
     for i in indices.iter().rev() {
-        #[cfg(test)]
-        println!("{}", i);
 
         if list[*i].max_consecutive > list[*i].consecutive
             && (time - list[*i].last_used > list[*i].min_time_delta)
@@ -69,7 +67,7 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // If no RPC has been selected, fall back to the fastest RPC
     list[choice].consecutive = choice_consecutive + 1;
     list[choice].last_used = time;
-    (list[choice].clone(), Some(indices[0]))
+    (list[choice].clone(), Some(choice))
 }
 
 #[cfg(all(
