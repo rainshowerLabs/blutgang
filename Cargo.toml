@@ -52,4 +52,5 @@ no-cache = [] # enable this to disable caching
 debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
 selection-random = ["rand"] # optional random algo
+old-weighted-round-robin = [] # old algo, does not account for max per second
 # add your own below

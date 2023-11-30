@@ -32,7 +32,8 @@ pub fn argsort(data: &Vec<Rpc>) -> Vec<usize> {
 //
 #[cfg(all(
     feature = "selection-weighed-round-robin",
-    not(feature = "selection-random")
+    not(feature = "selection-random"),
+    not(feature = "old-weighted-round-robin"),
 ))]
 fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // Sort by latency
@@ -76,6 +77,25 @@ fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     let mut rng = rand::thread_rng();
     let index = rng.gen_range(0..list.len());
     (list[index].clone(), Some(index))
+}
+
+#[cfg(all(
+    feature = "selection-weighed-round-robin",
+    feature = "old-weighted-round-robin",
+))]
+fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+    // Sort by latency
+    let indices = argsort(list);
+
+    // Picks the second fastest one if the fastest one has maxed out
+    if list[indices[0]].max_consecutive <= list[indices[0]].consecutive {
+        list[indices[1]].consecutive = 1;
+        list[indices[0]].consecutive = 0;
+        return (list[indices[1]].clone(), Some(indices[1]));
+    }
+
+    list[indices[0]].consecutive += 1;
+    (list[indices[0]].clone(), Some(indices[0]))
 }
 
 // Tests
