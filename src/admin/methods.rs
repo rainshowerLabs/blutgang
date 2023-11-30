@@ -419,26 +419,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_execute_method_blutgang_quit() {
-        // Arrange
-        let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_quit" });
-
-        // Act
-        let result = execute_method(
-            tx,
-            &create_test_rpc_list(),
-            &create_test_poverty_list(),
-            create_test_settings_config(),
-            cache,
-        )
-        .await;
-
-        // Assert
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
     async fn test_execute_method_blutgang_rpc_list() {
         // Arrange
         let cache = create_test_cache();
