@@ -2,7 +2,16 @@ use sled::Db;
 use std::sync::Arc;
 
 pub fn setup_data(cache: Arc<Db>) {
-    let version_str = "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":\"blutgang 0.3.0-canary Garreg Mach; `Now there's a way forward.`\"}";
+    let version_str = "blutgang 0.3.0-canary Garreg Mach";
+    let tagline = "`Now there's a way forward.`";
+
+    let version_json = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
+        version_str,
+        tagline
+    );
+
+    println!("\x1b[35mInfo:\x1b[0m Starting {}", version_str);
 
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
@@ -11,7 +20,7 @@ pub fn setup_data(cache: Arc<Db>) {
             176, 76, 1, 109, 13, 127, 134, 25, 55, 111, 28, 182, 82, 155, 135, 143, 204, 161, 53,
             4, 158, 140, 22, 219, 138, 5, 57, 150, 8, 154, 17, 252,
         ],
-        version_str,
+        version_json.as_bytes(),
     );
     // Insert kv pair `web3_clientVersion` `true` to know what we're interacting with
     // `web3_clientVersion` is cached as a blake3 cache
@@ -20,7 +29,7 @@ pub fn setup_data(cache: Arc<Db>) {
             36, 20, 170, 125, 105, 107, 149, 148, 52, 126, 215, 218, 112, 55, 222, 60, 186, 44, 67,
             121, 225, 160, 31, 209, 9, 99, 81, 233, 137, 37, 62, 79,
         ],
-        version_str,
+        version_json.as_bytes(),
     );
 
     // Insert which hashing algo we're using based on the selected features.
