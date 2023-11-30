@@ -96,7 +96,8 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        _ => Err(AdminError::InvalidMethod),
+        Some(_) => Err(AdminError::InvalidMethod),
+        _ => Ok(().into()),
     }
 }
 
