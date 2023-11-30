@@ -189,6 +189,7 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
 // param[0] - RPC url
 // param[1] - max_consecutive
 // param[2] - ma_len
+// param[3] - ma_len
 fn admin_add_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
@@ -198,7 +199,7 @@ fn admin_add_rpc(
         None => return Err(AdminError::InvalidParams),
     };
 
-    if params.len() != 3 {
+    if params.len() != 4 {
         return Err(AdminError::InvalidLen);
     }
 
@@ -562,7 +563,7 @@ mod tests {
     async fn test_execute_method_add_to_rpc_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", 5, 0.5] });
+        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", 5, 10, 0.5] });
 
         let rpc_list = create_test_rpc_list();
         let len = rpc_list.read().unwrap().len();
