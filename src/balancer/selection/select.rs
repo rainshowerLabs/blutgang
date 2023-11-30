@@ -47,10 +47,9 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
 
     // Set fastest rpc as default
     let mut choice = indices[0];
-    for i in &indices[1..] {
+    for i in indices.iter().rev() {
         if list[*i].max_consecutive > list[*i].consecutive
             && (time.as_micros() - list[*i].last_used > list[*i].min_time_delta)
-            && (list[*i].status.latency < list[choice].status.latency)
         {
             choice = *i;
             continue;
