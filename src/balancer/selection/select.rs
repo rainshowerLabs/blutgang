@@ -44,14 +44,19 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
 
     // Picks the second fastest one if the fastest one has maxed out
     // Also take into account min_delta_time
-    let mut choice = 0;
-    for i in indices.iter() {
+
+    // Set fastest rpc as default
+    let mut choice = indices[0];
+    for i in &indices[1..] {
+
         if list[*i].max_consecutive > list[*i].consecutive
             && (time.as_micros() - list[*i].last_used > list[*i].min_time_delta)
+            && (list[*i].status.latency < list[choice].status.latency)
         {
             choice = *i;
             continue;
         }
+
         // remove consecutive
         list[*i].consecutive = 0;
     }
@@ -107,10 +112,15 @@ mod tests {
 
         rpc1.status.latency = 1.0;
         rpc1.max_consecutive = 10;
+        rpc1.min_time_delta = 100;
+
         rpc2.status.latency = 6.0;
         rpc2.max_consecutive = 10;
+        rpc2.min_time_delta = 100;
+
         rpc3.status.latency = 3.0;
         rpc3.max_consecutive = 10;
+        rpc3.min_time_delta = 100;
 
         let mut rpc_list = vec![rpc1, rpc2, rpc3];
 
