@@ -43,7 +43,7 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
         .duration_since(SystemTime::UNIX_EPOCH)
         .expect("Failed to get current time");
 
-    // Picks the second fastest one if the fastest one has maxed out
+    // Picks the second fastest one rpc that meets our requirements
     // Also take into account min_delta_time
 
     // Set fastest rpc as default
@@ -158,6 +158,43 @@ mod tests {
         rpc_list[2].status.latency = 100000.0;
 
         let (rpc, index) = pick(&mut rpc_list);
+        assert_eq!(rpc.status.latency, 7.0);
+        assert_eq!(index, Some(1));
+    }
+
+    // Test max_delay when picking rpcs
+    #[test]
+    fn test_pick_max_delay() {
+        let mut rpc1 = Rpc::default();
+        let mut rpc2 = Rpc::default();
+        let mut rpc3 = Rpc::default();
+
+        rpc1.status.latency = 3.0;
+        rpc1.max_consecutive = 10;
+        rpc1.min_time_delta = 10000;
+        rpc1.last_used = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Failed to get current time").as_micros();
+
+        rpc2.status.latency = 7.0;
+        rpc2.max_consecutive = 10;
+        rpc2.min_time_delta = 1;
+
+        rpc3.status.latency = 5.0;
+        rpc3.max_consecutive = 10;
+        rpc3.min_time_delta = 10000;
+
+        let mut rpc_list = vec![rpc1, rpc2, rpc3];
+
+        // Pick rpc3 becauese rpc1 does not meet last used requirements
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc: {:?}", rpc);
+        assert_eq!(rpc.status.latency, 5.0);
+        assert_eq!(index, Some(2));
+
+        // pick rpc2 because rpc3 was just used
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc index: {:?}", index);
         assert_eq!(rpc.status.latency, 7.0);
         assert_eq!(index, Some(1));
     }
