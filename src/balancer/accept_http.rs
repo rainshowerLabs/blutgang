@@ -356,7 +356,7 @@ pub async fn accept_request(
                 rpc_position
             };
             rpc_list_guard[index].update_latency(time.as_nanos() as f64);
-            rpc_list_guard[index].last_used = time.as_micros() as u128;
+            rpc_list_guard[index].last_used = time.as_micros();
             println!("LA {}", rpc_list_guard[index].status.latency);
         }
     }
