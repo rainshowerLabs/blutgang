@@ -8,6 +8,7 @@ use crate::{
         cache_result,
     },
     balancer::selection::select::pick,
+    balancer::websocket::serve_websocket,
     cache_error,
     no_rpc_available,
     print_cache_error,
@@ -301,7 +302,7 @@ async fn forward_body(
 // RPC lself.
 // In case of a timeout, returns an error.
 pub async fn accept_request(
-    tx: Request<hyper::body::Incoming>,
+    mut tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     finalized_rx: &tokio::sync::watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,

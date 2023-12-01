@@ -36,6 +36,7 @@ zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
 zerocopy-derive = "0.7.28"
 jsonwebtoken = "9.1.0"
 hyper-tungstenite = "0.12.0"
+futures = "0.3.29"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
