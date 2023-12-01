@@ -32,7 +32,8 @@ tokio-stream = {version = "0.1.14", features = ["sync"]}
 hyper-util-blutgang = {version = "0.2.0", features = ["tokio"]}
 simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_impl"] }
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
-zerocopy = { version = "0.7.20" }
+zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
+zerocopy-derive = "0.7.28"
 jsonwebtoken = "9.1.0"
 hyper-tungstenite = "0.12.0"
 
