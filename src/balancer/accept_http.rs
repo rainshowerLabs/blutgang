@@ -38,6 +38,11 @@ use hyper::{
     header::HeaderValue,
     Request,
 };
+use hyper_tungstenite::{
+    is_upgrade_request,
+    upgrade,
+};
+
 use sled::Db;
 
 use tokio::time::timeout;
@@ -304,6 +309,21 @@ pub async fn accept_request(
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Check if the request is a websocket upgrade request.
+    if is_upgrade_request(&tx) {
+        let (response, websocket) = upgrade(&mut tx, None).unwrap();
+
+        // Spawn a task to handle the websocket connection.
+        tokio::spawn(async move {
+            if let Err(e) = serve_websocket(websocket).await {
+                println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
+            }
+        });
+
+        // Return the response so the spawned future can continue.
+        return Ok(response);
+    }
+
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;

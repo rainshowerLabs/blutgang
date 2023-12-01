@@ -42,8 +42,6 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     let time = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .expect("Failed to get current time").as_micros();
-    #[cfg(test)]
-    println!("time: {}", time);
 
     // Picks the second fastest one rpc that meets our requirements
     // Also take into account min_delta_time
