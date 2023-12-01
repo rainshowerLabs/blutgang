@@ -1,3 +1,5 @@
+use crate::config::cache_setup::VERSION_STR;
+
 use futures::{
     sink::SinkExt,
     stream::StreamExt,
@@ -20,13 +22,13 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
             Message::Text(msg) => {
                 println!("Received text message: {msg}");
                 websocket
-                    .send(Message::text("Thank you, come again."))
+                    .send(Message::text(VERSION_STR))
                     .await?;
             }
             Message::Binary(msg) => {
                 println!("Received binary message: {msg:02X?}");
                 websocket
-                    .send(Message::binary(b"Thank you, come again.".to_vec()))
+                    .send(Message::binary(VERSION_STR))
                     .await?;
             }
             Message::Ping(msg) => {
