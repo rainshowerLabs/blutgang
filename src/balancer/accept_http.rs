@@ -1,14 +1,18 @@
 use crate::{
-    balancer::format::{
-        get_block_number_from_request,
-        incoming_to_value,
+    balancer::{
+        format::{
+            get_block_number_from_request,
+            incoming_to_value,
+        },
+        selection::{
+            cache_rules::{
+                cache_method,
+                cache_result,
+            },
+            select::pick,
+        },
+        websocket::serve_websocket,
     },
-    balancer::selection::cache_rules::{
-        cache_method,
-        cache_result,
-    },
-    balancer::selection::select::pick,
-    balancer::websocket::serve_websocket,
     cache_error,
     no_rpc_available,
     print_cache_error,

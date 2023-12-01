@@ -7,8 +7,7 @@ pub fn setup_data(cache: Arc<Db>) {
 
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
-        version_str,
-        tagline
+        version_str, tagline
     );
 
     println!("\x1b[35mInfo:\x1b[0m Starting {}", version_str);
