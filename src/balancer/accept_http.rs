@@ -321,7 +321,7 @@ pub async fn accept_request(
         let (response, websocket) = upgrade(&mut tx, None).unwrap();
 
         // Spawn a task to handle the websocket connection.
-        tokio::spawn(async move {
+        tokio::task::spawn(async move {
             if let Err(e) = serve_websocket(websocket).await {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }
