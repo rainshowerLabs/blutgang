@@ -296,6 +296,7 @@ async fn forward_body(
     let res = hyper::Response::builder()
         .status(200)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(body)
         .unwrap();
 
