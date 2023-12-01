@@ -4,8 +4,11 @@ use futures::stream::StreamExt;
 use hyper_tungstenite::{tungstenite, HyperWebsocket};
 use tungstenite::Message;
 
+// Recommended way to deal with this, idk either
+type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 /// Handle a websocket connection.
-pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
 	let mut websocket = websocket.await?;
 	while let Some(message) = websocket.next().await {
 		match message? {
