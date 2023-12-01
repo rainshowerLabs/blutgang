@@ -236,7 +236,6 @@ async fn forward_body(
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
 ) {
-    println!("HEWWOO :33");
     // Check if body has application/json
     if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
         return (
