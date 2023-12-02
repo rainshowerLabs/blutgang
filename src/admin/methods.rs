@@ -576,7 +576,31 @@ mod tests {
     async fn test_execute_method_add_to_rpc_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", 5, 10, 0.5] });
+        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", "ws://example.com", 5, 10, 0.5] });
+
+        let rpc_list = create_test_rpc_list();
+        let len = rpc_list.read().unwrap().len();
+
+        // Act
+        let result = execute_method(
+            tx,
+            &rpc_list,
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(rpc_list.read().unwrap().len() == len + 1);
+    }
+    
+    #[tokio::test]
+    async fn test_execute_method_add_to_rpc_list_no_ws() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", Null, 5, 10, 0.5] });
 
         let rpc_list = create_test_rpc_list();
         let len = rpc_list.read().unwrap().len();

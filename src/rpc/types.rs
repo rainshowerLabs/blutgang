@@ -1,9 +1,3 @@
-use tungstenite::{
-    connect,
-    WebSocket,
-    stream::MaybeTlsStream,
-};
-
 use crate::rpc::error::RpcError;
 use reqwest::Client;
 
