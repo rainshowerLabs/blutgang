@@ -29,6 +29,7 @@ unsafe impl Sync for Status {}
 pub struct Rpc {
     pub url: String,    // url of the rpc we're forwarding requests to.
     client: Client,     // Reqwest client
+    pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
     pub status: Status, // stores stats related to the rpc.
     // For max_consecutive
     pub max_consecutive: u32,
@@ -44,6 +45,7 @@ impl Default for Rpc {
     fn default() -> Self {
         Self {
             url: "".to_string(),
+            ws_url: None,
             client: Client::new(),
             status: Status::default(),
             max_consecutive: 0,
@@ -56,10 +58,17 @@ impl Default for Rpc {
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String, max_consecutive: u32, min_time_delta: u128, ma_length: f64) -> Self {
+    pub fn new(
+        url: String,
+        ws_url: Option<String>,
+        max_consecutive: u32,
+        min_time_delta: u128,
+        ma_length: f64
+    ) -> Self {
         Self {
             url,
             client: Client::new(),
+            ws_url,
             status: Status {
                 ma_length,
                 ..Default::default()

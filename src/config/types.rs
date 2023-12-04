@@ -16,7 +16,7 @@ use std::{
     fs::{
         self,
     },
-    net::SocketAddr,
+    net::SocketAddr, println,
 };
 
 use toml::Value;
@@ -267,7 +267,23 @@ impl Settings {
                     .expect("\x1b[31mErr:\x1b[0m Could not parse URL from a RPC as str!")
                     .to_string();
 
-                let rpc = Rpc::new(url, max_consecutive, delta.into(), ma_length);
+                // ws_url is an Option<>
+                //
+                // If we cant read it it should be `None`
+                let ws_url = match rpc_table.get("ws_url") {
+                    Some(ws_url) => Some(
+                        ws_url
+                            .as_str()
+                            .expect("\x1b[31mErr:\x1b[0m Could not parse ws_url as str!")
+                            .to_string(),
+                    ),
+                    None => {
+                        println!("Using only HTTP for: {}", table_name);
+                        None
+                    },
+                };
+
+                let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length);
                 rpc_list.push(rpc);
             }
         }
@@ -374,7 +390,7 @@ impl Settings {
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string(), 6, delta.into(), ma_length))
+            .map(|rpc| Rpc::new(rpc.to_string(), None, 6, delta.into(), ma_length))
             .collect();
 
         // Build the SocketAddr
