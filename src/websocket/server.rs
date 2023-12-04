@@ -32,14 +32,12 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
                     .await?;
             }
             Message::Ping(msg) => {
-                // No need to send a reply: tungstenite takes care of this for you.
                 println!("Received ping message: {msg:02X?}");
             }
             Message::Pong(msg) => {
                 println!("Received pong message: {msg:02X?}");
             }
             Message::Close(msg) => {
-                // No need to send a reply: tungstenite takes care of this for you.
                 if let Some(msg) = &msg {
                     println!(
                         "Received close message with code {} and message: {}",
