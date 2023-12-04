@@ -16,10 +16,11 @@ use crate::{
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
+    rpc_response,
     timed_out,
+    websocket::server::serve_websocket,
     NamedBlocknumbers,
     Settings,
-    websocket::server::serve_websocket,
 };
 
 use serde_json::{
@@ -318,7 +319,18 @@ pub async fn accept_request(
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
-        let (response, websocket) = upgrade(&mut tx, None).unwrap();
+        println!("\x1b[35mInfo:\x1b[0m Received WS upgrade request");
+
+        let (response, websocket) = match upgrade(&mut tx, None) {
+            Ok((response, websocket)) => (response, websocket),
+            Err(e) => {
+                println!("\x1b[31mErr:\x1b[0m Websocket upgrade error: {e}");
+                return rpc_response!(500, Full::new(Bytes::from(
+                    "{code:-32004, message:\"error: Websocket upgrade error! Try again later...\"}"
+                        .to_string(),
+                )));
+            }
+        };
 
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {

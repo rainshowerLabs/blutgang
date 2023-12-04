@@ -1,7 +1,6 @@
 use crate::{
-    websocket::client::execute_ws_call,
     config::cache_setup::VERSION_STR,
-
+    websocket::client::execute_ws_call,
 };
 
 use futures::{
@@ -24,20 +23,16 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
     while let Some(message) = websocket.next().await {
         match message? {
             Message::Text(msg) => {
-                println!("Received WS text message: {msg}");
+                println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
 
                 // Forward the message to the best available RPC
                 let resp = execute_ws_call(msg).await?;
 
-                websocket
-                    .send(Message::text(resp))
-                    .await?;
+                websocket.send(Message::text(resp)).await?;
             }
             Message::Binary(msg) => {
                 println!("Received binary message: {msg:02X?}");
-                websocket
-                    .send(Message::binary(VERSION_STR))
-                    .await?;
+                websocket.send(Message::binary(VERSION_STR)).await?;
             }
             Message::Ping(msg) => {
                 println!("Received ping message: {msg:02X?}");

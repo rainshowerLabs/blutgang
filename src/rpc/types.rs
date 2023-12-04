@@ -27,10 +27,10 @@ unsafe impl Sync for Status {}
 
 #[derive(Debug, Clone)]
 pub struct Rpc {
-    pub url: String,    // url of the rpc we're forwarding requests to.
-    client: Client,     // Reqwest client
+    pub url: String,            // url of the rpc we're forwarding requests to.
+    client: Client,             // Reqwest client
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
-    pub status: Status, // stores stats related to the rpc.
+    pub status: Status,         // stores stats related to the rpc.
     // For max_consecutive
     pub max_consecutive: u32,
     pub consecutive: u32,
@@ -63,7 +63,7 @@ impl Rpc {
         ws_url: Option<String>,
         max_consecutive: u32,
         min_time_delta: u128,
-        ma_length: f64
+        ma_length: f64,
     ) -> Self {
         Self {
             url,

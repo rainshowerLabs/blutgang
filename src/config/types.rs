@@ -16,7 +16,8 @@ use std::{
     fs::{
         self,
     },
-    net::SocketAddr, println,
+    net::SocketAddr,
+    println,
 };
 
 use toml::Value;
@@ -271,16 +272,18 @@ impl Settings {
                 //
                 // If we cant read it it should be `None`
                 let ws_url = match rpc_table.get("ws_url") {
-                    Some(ws_url) => Some(
-                        ws_url
-                            .as_str()
-                            .expect("\x1b[31mErr:\x1b[0m Could not parse ws_url as str!")
-                            .to_string(),
-                    ),
+                    Some(ws_url) => {
+                        Some(
+                            ws_url
+                                .as_str()
+                                .expect("\x1b[31mErr:\x1b[0m Could not parse ws_url as str!")
+                                .to_string(),
+                        )
+                    }
                     None => {
                         println!("Using only HTTP for: {}", table_name);
                         None
-                    },
+                    }
                 };
 
                 let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length);

@@ -28,8 +28,6 @@ impl ezsockets::ClientExt for Client {
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
-pub async fn execute_ws_call(
-    call: String,
-) -> Result<String, ezsockets::Error> {
+pub async fn execute_ws_call(call: String) -> Result<String, ezsockets::Error> {
     Ok(format!("Hello from blutgang!: {}", call))
 }
