@@ -21,15 +21,11 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
         match message? {
             Message::Text(msg) => {
                 println!("Received text message: {msg}");
-                websocket
-                    .send(Message::text(VERSION_STR))
-                    .await?;
+                websocket.send(Message::text(VERSION_STR)).await?;
             }
             Message::Binary(msg) => {
                 println!("Received binary message: {msg:02X?}");
-                websocket
-                    .send(Message::binary(VERSION_STR))
-                    .await?;
+                websocket.send(Message::binary(VERSION_STR)).await?;
             }
             Message::Ping(msg) => {
                 // No need to send a reply: tungstenite takes care of this for you.

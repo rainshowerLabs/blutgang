@@ -1,11 +1,11 @@
 #[derive(Debug, Copy, Clone)]
 pub enum CreateRemoveWs {
-	Create,
-	Remove,
+    Create,
+    Remove,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Wsreg {
-	pub create_remove: CreateRemoveWs,
-	pub id: Option<usize>,
+    pub create_remove: CreateRemoveWs,
+    pub id: Option<usize>,
 }

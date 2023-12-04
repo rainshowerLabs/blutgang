@@ -13,14 +13,10 @@ use crate::{
         types::Settings,
     },
     health::{
-        websockets::{
-            types::{
-                Wsreg,
-            },
-        },
         check::health_check,
         head_cache::manage_cache,
         safe_block::NamedBlocknumbers,
+        websockets::types::Wsreg,
     },
     rpc::types::Rpc,
 };
@@ -42,8 +38,8 @@ use serde_json::Value;
 use tokio::{
     net::TcpListener,
     sync::{
-        watch,
         mpsc,
+        watch,
     },
 };
 

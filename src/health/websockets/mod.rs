@@ -1,2 +1,2 @@
-pub mod connection_manager;
+pub mod connections;
 pub mod types;

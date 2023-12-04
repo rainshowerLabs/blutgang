@@ -5,7 +5,6 @@ pub const VERSION_STR: &'static str = "blutgang 0.3.0-canary Garreg Mach";
 const TAGLINE: &'static str = "`Now there's a way forward.`";
 
 pub fn setup_data(cache: Arc<Db>) {
-
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
         VERSION_STR, TAGLINE

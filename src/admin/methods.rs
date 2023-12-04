@@ -212,10 +212,12 @@ fn admin_add_rpc(
     // ws_url is optional so it can be none
     let ws_url = match params[1].is_null() {
         true => None,
-        false => match params[1].as_str().map(|s| s.to_string()) {
-            Some(ws_url) => Some(ws_url),
-            None => return Err(AdminError::ParseError),
-        },
+        false => {
+            match params[1].as_str().map(|s| s.to_string()) {
+                Some(ws_url) => Some(ws_url),
+                None => return Err(AdminError::ParseError),
+            }
+        }
     };
 
     let max_consecutive = params[2]
@@ -595,7 +597,7 @@ mod tests {
         assert!(result.is_ok());
         assert!(rpc_list.read().unwrap().len() == len + 1);
     }
-    
+
     #[tokio::test]
     async fn test_execute_method_add_to_rpc_list_no_ws() {
         // Arrange
@@ -629,10 +631,13 @@ mod tests {
 
         let rpc_list = create_test_rpc_list();
         // rpc_list has only 1 so add another one to keep the 1st one some company
-        rpc_list
-            .write()
-            .unwrap()
-            .push(Rpc::new("http://example.com".to_string(), None, 5, 1000, 0.5));
+        rpc_list.write().unwrap().push(Rpc::new(
+            "http://example.com".to_string(),
+            None,
+            5,
+            1000,
+            0.5,
+        ));
         let len = rpc_list.read().unwrap().len();
 
         // Act
