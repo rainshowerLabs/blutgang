@@ -1,3 +1,5 @@
+use std::format;
+
 use async_trait::async_trait;
 
 pub struct Client {
@@ -23,4 +25,11 @@ impl ezsockets::ClientExt for Client {
         println!("received call: {:?}", call);
         Ok(())
     }
+}
+
+// Receive JSON-RPC call from balancer thread and respond with ws response
+pub async fn execute_ws_call(
+    call: String,
+) -> Result<String, ezsockets::Error> {
+    Ok(format!("Hello from blutgang!: {}", call))
 }

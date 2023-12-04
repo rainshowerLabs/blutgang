@@ -1,4 +1,8 @@
-use crate::config::cache_setup::VERSION_STR;
+use crate::{
+    websocket::client::execute_ws_call,
+    config::cache_setup::VERSION_STR,
+
+};
 
 use futures::{
     sink::SinkExt,
@@ -20,9 +24,13 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
     while let Some(message) = websocket.next().await {
         match message? {
             Message::Text(msg) => {
-                println!("Received text message: {msg}");
+                println!("Received WS text message: {msg}");
+
+                // Forward the message to the best available RPC
+                let resp = execute_ws_call(msg).await?;
+
                 websocket
-                    .send(Message::text(VERSION_STR))
+                    .send(Message::text(resp))
                     .await?;
             }
             Message::Binary(msg) => {
