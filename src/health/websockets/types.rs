@@ -1,9 +1,14 @@
 use futures::{
-    SinkExt, StreamExt
+    SinkExt,
+    StreamExt
 };
 
 use tokio_tungstenite::{
-    tungstenite::Message,
+    tungstenite::{
+        Message,
+        Error,
+        Result
+    },
     MaybeTlsStream,
     WebSocketStream,
     connect_async,
@@ -25,21 +30,19 @@ pub struct Wsreg {
 
 pub struct WsConnection {
     pub url: String,
-    pub index: usize,
     pub socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
 }
 
 impl WsConnection {
-    pub async fn new(url: String, index: usize) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(url: String) -> Result<Self, Error> {
         let (socket, _) = connect_async(url.clone()).await?;
         Ok(Self {
             url,
-            index,
             socket,
         })
     }
 
-    pub async fn send(&mut self, message: String) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send(&mut self, message: String) -> Result<(), Error> {
         self.socket.send(Message::Text(message)).await?;
         Ok(())
     }

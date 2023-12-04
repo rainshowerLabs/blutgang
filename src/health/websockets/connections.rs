@@ -1,3 +1,6 @@
+use crate::health::websockets::types::WsConnection;
+use crate::Rpc;
+use std::sync::{RwLock, atomic::AtomicUsize};
 use crate::health::{
     error::HealthError,
     websockets::types::Wsreg,
@@ -16,6 +19,16 @@ use tokio::sync::{
     mpsc,
     broadcast,
 };
+
+// Creates the WS connections and puts them in a RwLock<Vec>
+pub async fn update_ws(
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    wscon_list: Arc<HashMap<AtomicUsize, RwLock<WsConnection>>>
+) -> Result<(), HealthError> {
+
+
+    Ok(())
+}
 
 // Receives internal WS messages, processes them and sends them to the fastest available node
 pub async fn forward_connection(
