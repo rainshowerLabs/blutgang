@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (wsreg_tx, wsreg_rx) = mpsc::unbounded_channel::<Wsreg>();
 
     // Make a hashmap for the WS registry
-    let ws_connections = Arc::new(RwLock::new(HashMap::<usize, watch::Receiver<Value>>::new()));
+    let ws_connections = Arc::new(HashMap::<usize, watch::Receiver<Value>>::new());
 
     // Create/Open sled DB
     let cache = Arc::new(config.read().unwrap().sled_config.open().unwrap());

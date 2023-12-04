@@ -9,15 +9,21 @@ use std::{
     collections::HashMap,
     sync::{
         Arc,
-        RwLock,
     },
 };
 
-use tokio::sync::mpsc;
+use tokio::sync::{
+    mpsc,
+    broadcast,
+};
 
-pub async fn connection_manager(
+// Receives internal WS messages, processes them and sends them to the fastest available node
+pub async fn forward_connection(
     wsreg_rx: mpsc::Receiver<Wsreg>,
-    ws_connections: Arc<RwLock<HashMap<usize, watch::Receiver<Value>>>>,
+    ws_incoming: broadcast::Receiver<Value>,
+    ws_outgoing: Arc<HashMap<usize, watch::Sender<Value>>>,
 ) -> Result<(), HealthError> {
-    unimplemented!()
+
+
+    Ok(())
 }
