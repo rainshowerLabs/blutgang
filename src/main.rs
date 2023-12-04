@@ -3,6 +3,7 @@ mod balancer;
 mod config;
 mod health;
 mod rpc;
+mod websocket;
 
 use crate::{
     admin::listener::listen_for_admin_requests,

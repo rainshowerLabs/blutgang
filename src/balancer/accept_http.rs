@@ -11,7 +11,6 @@ use crate::{
             },
             select::pick,
         },
-        websocket::serve_websocket,
     },
     cache_error,
     no_rpc_available,
@@ -20,6 +19,7 @@ use crate::{
     timed_out,
     NamedBlocknumbers,
     Settings,
+    websocket::server::serve_websocket,
 };
 
 use serde_json::{
