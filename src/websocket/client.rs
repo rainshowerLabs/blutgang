@@ -27,6 +27,13 @@ impl ezsockets::ClientExt for Client {
     }
 }
 
+// Open
+// fn ws_conn_manager(
+//     rpc_list: Arc<RwLock<Vec<Rpc>>>,
+// ) -> () {
+
+// }
+
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(call: String) -> Result<String, ezsockets::Error> {
     Ok(format!("Hello from blutgang!: {}", call))
