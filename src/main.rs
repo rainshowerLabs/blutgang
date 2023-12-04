@@ -13,6 +13,11 @@ use crate::{
         types::Settings,
     },
     health::{
+        websockets::{
+            types::{
+                Wsreg,
+            },
+        },
         check::health_check,
         head_cache::manage_cache,
         safe_block::NamedBlocknumbers,
@@ -21,7 +26,10 @@ use crate::{
 };
 
 use std::{
-    collections::BTreeMap,
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
     println,
     sync::{
         Arc,
@@ -29,8 +37,15 @@ use std::{
     },
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use serde_json::Value;
+
+use tokio::{
+    net::TcpListener,
+    sync::{
+        watch,
+        mpsc,
+    },
+};
 
 use hyper::{
     server::conn::http1,
@@ -60,6 +75,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
+
+    // WS stuff
+
+    // mpsc for registering/removing channels
+    let (wsreg_tx, wsreg_rx) = mpsc::unbounded_channel::<Wsreg>();
+
+    // Make a hashmap for the WS registry
+    let ws_connections = Arc::new(RwLock::new(HashMap::<usize, watch::Receiver<Value>>::new()));
 
     // Create/Open sled DB
     let cache = Arc::new(config.read().unwrap().sled_config.open().unwrap());
