@@ -123,7 +123,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    let incoming_tx_arc = Arc::new(incoming_tx.clone());
     let (outgoing_tx, outgoing_rx) = watch::channel::<Value>(Value::Null);
+    let outgoing_tx_arc = Arc::new(outgoing_rx.clone());
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;

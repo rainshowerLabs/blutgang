@@ -69,8 +69,6 @@ pub async fn ws_conn_manager(
 
     // continously listen for incoming messages
     loop {
-        println!("ws waiting for incoming message");
-
         let incoming = incoming_rx.recv().await.unwrap();
 
         println!("ws received incoming message: {}", incoming);
@@ -87,8 +85,6 @@ pub async fn execute_ws_call(
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
 
-    println!("ws received incoming call: {}", call);
-
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
@@ -99,14 +95,20 @@ pub async fn execute_ws_call(
     println!("ws SEND");
 
     // Send call to ws_conn_manager
-    incoming_tx.send(call_val).unwrap();
+    match incoming_tx.send(call_val) {
+        Ok(_) => {}
+        Err(e) => {
+            println!("ws_conn_manager error: {}", e);
+        }
+    };
 
     println!("ws SENT");
 
     // Wait for response from ws_conn_manager
     let mut response;
     loop {
-        response = outgoing_rx.borrow().clone();
+        println!("waiting for response");
+        response = outgoing_rx.wait_for(f)
         if response["id"] == rand_id {
             break;
         }
