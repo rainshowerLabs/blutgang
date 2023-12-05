@@ -2,7 +2,7 @@ import threading
 import time
 import websocket
 import json
-import uuid
+import random
 
 # Set the WebSocket server URL
 websocket_url = "ws://127.0.0.1:3000"
