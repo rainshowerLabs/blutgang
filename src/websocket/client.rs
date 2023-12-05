@@ -80,7 +80,7 @@ pub async fn ws_conn_manager(
 pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    outgoing_rx: watch::Receiver<Value>,
+    mut outgoing_rx: watch::Receiver<Value>,
 ) -> Result<String, ezsockets::Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
@@ -105,16 +105,13 @@ pub async fn execute_ws_call(
     println!("ws SENT");
 
     // Wait for response from ws_conn_manager
-    let mut response;
-    loop {
-        println!("waiting for response");
-        response = outgoing_rx.wait_for(f)
-        if response["id"] == rand_id {
-            break;
-        }
-    }
+    let response;
+    println!("waiting for response");
 
-    response["id"] = id;
+    // wait for response["id"] == rand_id 
+    response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap();
 
-    Ok(format!("Hello from blutgang!: {}", response))
+    //response["id"] = id;
+
+    Ok(format!("Hello from blutgang!: {:?}", response))
 }
