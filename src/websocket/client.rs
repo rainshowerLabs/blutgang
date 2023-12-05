@@ -109,9 +109,9 @@ pub async fn execute_ws_call(
     println!("waiting for response");
 
     // wait for response["id"] == rand_id 
-    let response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap();
+    let mut response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap().to_owned();
 
-    //response["id"] = id;
+    response["id"] = id;
 
     Ok(format!("Hello from blutgang!: {:?}", response))
 }
