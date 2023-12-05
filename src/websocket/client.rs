@@ -88,7 +88,7 @@ pub async fn execute_ws_call(
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
-    let id = call_val["id"].clone();
+    // let id = call_val["id"].clone();
     let rand_id = random::<u32>();
     call_val["id"] = rand_id.into();
 
