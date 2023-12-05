@@ -122,7 +122,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
-    let (outgoing_tx, outgoing_rx) = watch::channel(Value::Object);
+    let (outgoing_tx, outgoing_rx) = watch::channel::<Value>(Value::Null);
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {
@@ -185,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io,
                 &rpc_list_rwlock_clone,
                 &cache_clone,
-                channels,
+                channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
                 &config_clone

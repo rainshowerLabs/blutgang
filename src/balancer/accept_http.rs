@@ -79,6 +79,7 @@ struct RequestParams {
     max_retries: u32,
 }
 
+#[derive(Debug, Clone)]
 pub struct RequestChannels {
     pub finalized_rx: Arc<watch::Receiver<u64>>,
     pub incoming_tx: mpsc::UnboundedSender<Value>,
