@@ -25,7 +25,7 @@ blake3 = "1.4.1"
 jemallocator = "0.5.4"
 toml = "0.7.6"
 memchr = "2.5.0"
-rand = {version = "0.8.5", optional = true}
+rand = { version = "0.8.5" }
 chrono = "0.4.28"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
 hyper-util-blutgang = {version = "0.2.0", features = ["tokio"]}
@@ -55,6 +55,6 @@ xxhash = ["xxhash-rust"] # 4x faster caching but potentially less secure
 no-cache = [] # enable this to disable caching
 debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
-selection-random = ["rand"] # optional random algo
+selection-random = [] # optional random algo
 old-weighted-round-robin = [] # old algo, does not account for max per second
 # add your own below

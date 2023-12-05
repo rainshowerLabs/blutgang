@@ -1,6 +1,13 @@
 use ezsockets::ClientConfig;
 use crate::Rpc;
 
+use serde_json::{
+    Value,
+    json,
+};
+
+use rand::random;
+
 use std::{
     format,
     sync::{
@@ -46,8 +53,8 @@ impl ezsockets::ClientExt for Client {
 // whenever we receive something from incoming_rx
 async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    mut incoming_rx: mpsc::UnboundedReceiver<String>,
-    outgoing_tx: watch::Sender<String>,
+    mut incoming_rx: mpsc::UnboundedReceiver<Value>,
+    outgoing_tx: watch::Sender<Value>,
 ) -> () {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
@@ -72,6 +79,32 @@ async fn ws_conn_manager(
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
-pub async fn execute_ws_call(call: String) -> Result<String, ezsockets::Error> {
-    Ok(format!("Hello from blutgang!: {}", call))
+pub async fn execute_ws_call(
+    call: String,
+    incoming_tx: mpsc::UnboundedSender<Value>,
+    outgoing_rx: watch::Receiver<Value>,
+) -> Result<String, ezsockets::Error> {
+    // Convert `call` to value
+    let mut call_val: Value = serde_json::from_str(&call).unwrap();
+
+    // Store id of call and set random id we'll actually forward to the node
+    //
+    // We'll use the random id to look at which call is ours when watching for updates
+    let id = call_val["id"].clone();
+    let rand_id = random::<u32>();
+    call_val["id"] = rand_id.into();
+
+    // Send call to ws_conn_manager
+    incoming_tx.send(call_val).unwrap();
+
+    // Wait for response from ws_conn_manager
+    let mut response;
+    loop {
+        response = outgoing_rx.borrow().clone();
+        if response["id"] == rand_id {
+            break;
+        }
+    }
+
+    Ok(format!("Hello from blutgang!: {}", response))
 }
