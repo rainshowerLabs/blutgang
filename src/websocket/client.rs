@@ -1,3 +1,4 @@
+use ezsockets::ClientConfig;
 use crate::Rpc;
 
 use std::{
@@ -43,7 +44,7 @@ impl ezsockets::ClientExt for Client {
 
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
-fn ws_conn_manager(
+async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     incoming_rx: mpsc::UnboundedReceiver<String>,
     outgoing_tx: watch::Sender<String>,
@@ -53,15 +54,29 @@ fn ws_conn_manager(
 
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-        let config = ClientConfig::new(rpc.ws_url);
+        // convert to reqwest url, if not present, push None
+        if rpc.ws_url.is_none() {
+            ws_handles.push(None);
+        }
+
+        let url = match reqwest::Url::parse(&rpc.ws_url.unwrap()) {
+            Ok(url) => url,
+            Err(_) => {
+                println!(
+                    "\x1b[33mWarning:\x1b[0m Invalid WS URL for RPC: {}, skipping",
+                    rpc.url
+                );
+                continue;
+            }
+        };
+
+        let config = ClientConfig::new(url);
         let (handle, future) = ezsockets::connect(|handle| Client { handle }, config).await;        
         tokio::spawn(async move {
             future.await.unwrap();
         });
-        ws_handles.push(handle);
+        ws_handles.push(Some(handle));
     }
-
-
 
 }
 
