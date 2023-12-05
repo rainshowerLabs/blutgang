@@ -51,6 +51,8 @@ pub async fn ws_conn_manager(
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     outgoing_tx: watch::Sender<Value>,
 ) -> () {
+    println!("ws_conn_manager");
+
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
     let mut ws_handles = Vec::new();
@@ -67,7 +69,10 @@ pub async fn ws_conn_manager(
 
     // continously listen for incoming messages
     loop {
+        println!("ws waiting for incoming message");
+
         let incoming = incoming_rx.recv().await.unwrap();
+
         println!("ws received incoming message: {}", incoming);
         let _ = outgoing_tx.send(incoming);
     }
@@ -82,6 +87,8 @@ pub async fn execute_ws_call(
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
 
+    println!("ws received incoming call: {}", call);
+
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
@@ -89,8 +96,12 @@ pub async fn execute_ws_call(
     let rand_id = random::<u32>();
     call_val["id"] = rand_id.into();
 
+    println!("ws SEND");
+
     // Send call to ws_conn_manager
     incoming_tx.send(call_val).unwrap();
+
+    println!("ws SENT");
 
     // Wait for response from ws_conn_manager
     let mut response;
