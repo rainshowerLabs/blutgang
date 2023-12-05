@@ -46,38 +46,29 @@ impl ezsockets::ClientExt for Client {
 // whenever we receive something from incoming_rx
 async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    incoming_rx: mpsc::UnboundedReceiver<String>,
+    mut incoming_rx: mpsc::UnboundedReceiver<String>,
     outgoing_tx: watch::Sender<String>,
 ) -> () {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
-
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-        // convert to reqwest url, if not present, push None
-        if rpc.ws_url.is_none() {
-            ws_handles.push(None);
-        }
-
-        let url = match reqwest::Url::parse(&rpc.ws_url.unwrap()) {
-            Ok(url) => url,
-            Err(_) => {
-                println!(
-                    "\x1b[33mWarning:\x1b[0m Invalid WS URL for RPC: {}, skipping",
-                    rpc.url
-                );
-                continue;
-            }
-        };
+        let url =  reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
         let config = ClientConfig::new(url);
         let (handle, future) = ezsockets::connect(|handle| Client { handle }, config).await;        
         tokio::spawn(async move {
             future.await.unwrap();
         });
-        ws_handles.push(Some(handle));
+        ws_handles.push(handle);
     }
 
+    // continously listen for incoming messages
+    loop {
+        let incoming = incoming_rx.recv().await.unwrap();
+        println!("ws received incoming message: {}", incoming);
+        let _ = outgoing_tx.send(incoming);
+    }
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
