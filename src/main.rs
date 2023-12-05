@@ -24,6 +24,7 @@ use crate::{
         safe_block::NamedBlocknumbers,
     },
     rpc::types::Rpc,
+    websocket::client::ws_conn_manager,
 };
 
 use std::{
@@ -38,8 +39,8 @@ use std::{
 use tokio::{
     net::TcpListener,
     sync::{
+        mpsc,
         watch,
-        mpsc
     },
 };
 
@@ -123,6 +124,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
     let (outgoing_tx, outgoing_rx) = watch::channel::<Value>(Value::Null);
+    let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    tokio::task::spawn(async move {
+        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
+    });
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {

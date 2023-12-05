@@ -23,11 +23,9 @@ use crate::{
     Settings,
 };
 
-use tokio::{
-    sync::{
-        mpsc,
-        watch,
-    },
+use tokio::sync::{
+    mpsc,
+    watch,
 };
 
 use serde_json::{
@@ -348,7 +346,9 @@ pub async fn accept_request(
 
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
-            if let Err(e) = serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx).await {
+            if let Err(e) =
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx).await
+            {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }
         });

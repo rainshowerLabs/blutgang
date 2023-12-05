@@ -1,10 +1,8 @@
 use serde_json::Value;
 
-use tokio::{
-    sync::{
-        mpsc,
-        watch,
-    },
+use tokio::sync::{
+    mpsc,
+    watch,
 };
 
 use crate::{

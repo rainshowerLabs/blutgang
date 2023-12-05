@@ -1,27 +1,22 @@
-use ezsockets::ClientConfig;
 use crate::Rpc;
+use ezsockets::ClientConfig;
 
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::Value;
 
 use rand::random;
 
+use async_trait::async_trait;
 use std::{
     format,
     sync::{
-        RwLock,
         Arc,
+        RwLock,
     },
 };
-use async_trait::async_trait;
 
-use tokio::{
-    sync::{
-        watch,
-        mpsc,
-    },
+use tokio::sync::{
+    mpsc,
+    watch,
 };
 
 pub struct Client {
@@ -51,7 +46,7 @@ impl ezsockets::ClientExt for Client {
 
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
-async fn ws_conn_manager(
+pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     outgoing_tx: watch::Sender<Value>,
@@ -60,10 +55,10 @@ async fn ws_conn_manager(
 
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-        let url =  reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
+        let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
         let config = ClientConfig::new(url);
-        let (handle, future) = ezsockets::connect(|handle| Client { handle }, config).await;        
+        let (handle, future) = ezsockets::connect(|handle| Client { handle }, config).await;
         tokio::spawn(async move {
             future.await.unwrap();
         });
