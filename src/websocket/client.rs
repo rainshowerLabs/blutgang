@@ -50,7 +50,7 @@ pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     outgoing_tx: watch::Sender<Value>,
-) -> () {
+) {
     println!("ws_conn_manager");
 
     let rpc_list_clone = rpc_list.read().unwrap().clone();
@@ -88,7 +88,7 @@ pub async fn execute_ws_call(
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
-    // let id = call_val["id"].clone();
+    let id = call_val["id"].clone();
     let rand_id = random::<u32>();
     call_val["id"] = rand_id.into();
 
@@ -105,11 +105,11 @@ pub async fn execute_ws_call(
     println!("ws SENT");
 
     // Wait for response from ws_conn_manager
-    let response;
+    
     println!("waiting for response");
 
     // wait for response["id"] == rand_id 
-    response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap();
+    let response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap();
 
     //response["id"] = id;
 
