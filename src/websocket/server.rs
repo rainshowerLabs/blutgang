@@ -1,3 +1,12 @@
+use serde_json::Value;
+
+use tokio::{
+    sync::{
+        mpsc,
+        watch,
+    },
+};
+
 use crate::{
     config::cache_setup::VERSION_STR,
     websocket::client::execute_ws_call,
@@ -18,7 +27,11 @@ use tungstenite::Message;
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// Handle a websocket connection.
-pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
+pub async fn serve_websocket(
+    websocket: HyperWebsocket,
+    incoming_tx: mpsc::UnboundedSender<Value>,
+    outgoing_rx: watch::Receiver<Value>,
+) -> Result<(), Error> {
     let mut websocket = websocket.await?;
     while let Some(message) = websocket.next().await {
         match message? {
@@ -26,7 +39,7 @@ pub async fn serve_websocket(websocket: HyperWebsocket) -> Result<(), Error> {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
 
                 // Forward the message to the best available RPC
-                let resp = execute_ws_call(msg).await?;
+                let resp = execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.clone()).await?;
 
                 websocket.send(Message::text(resp)).await?;
             }

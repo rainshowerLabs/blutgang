@@ -106,5 +106,7 @@ pub async fn execute_ws_call(
         }
     }
 
+    response["id"] = id;
+
     Ok(format!("Hello from blutgang!: {}", response))
 }

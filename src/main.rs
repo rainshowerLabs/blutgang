@@ -5,9 +5,14 @@ mod health;
 mod rpc;
 mod websocket;
 
+use serde_json::Value;
+
 use crate::{
     admin::listener::listen_for_admin_requests,
-    balancer::accept_http::accept_request,
+    balancer::accept_http::{
+        accept_request,
+        RequestChannels,
+    },
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
@@ -30,8 +35,13 @@ use std::{
     },
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use tokio::{
+    net::TcpListener,
+    sync::{
+        watch,
+        mpsc
+    },
+};
 
 use hyper::{
     server::conn::http1,
@@ -110,6 +120,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // websocket connections
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    let (outgoing_tx, outgoing_rx) = watch::channel(Value::Object);
+
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
@@ -159,13 +173,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
 
+        let channels = RequestChannels {
+            finalized_rx: finalized_rx_clone,
+            incoming_tx: incoming_tx.clone(),
+            outgoing_rx: outgoing_rx.clone(),
+        };
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
                 &cache_clone,
-                &finalized_rx_clone,
+                channels,
                 &named_blocknumbers_clone,
                 &head_cache_clone,
                 &config_clone

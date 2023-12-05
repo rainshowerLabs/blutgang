@@ -23,6 +23,13 @@ use crate::{
     Settings,
 };
 
+use tokio::{
+    sync::{
+        mpsc,
+        watch,
+    },
+};
+
 use serde_json::{
     to_vec,
     Value,
@@ -72,6 +79,12 @@ struct RequestParams {
     max_retries: u32,
 }
 
+pub struct RequestChannels {
+    pub finalized_rx: Arc<watch::Receiver<u64>>,
+    pub incoming_tx: mpsc::UnboundedSender<Value>,
+    pub outgoing_rx: watch::Receiver<Value>,
+}
+
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
@@ -79,7 +92,7 @@ macro_rules! accept {
         $io:expr,
         $rpc_list_rwlock:expr,
         $cache:expr,
-        $finalized_rx:expr,
+        $channels:expr,
         $named_numbers:expr,
         $head_cache:expr,
         $config:expr
@@ -93,7 +106,7 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        $finalized_rx,
+                        $channels,
                         $named_numbers,
                         $head_cache,
                         Arc::clone($cache),
@@ -228,7 +241,7 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
@@ -311,7 +324,7 @@ async fn forward_body(
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    channels: RequestChannels,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
@@ -334,7 +347,7 @@ pub async fn accept_request(
 
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
-            if let Err(e) = serve_websocket(websocket).await {
+            if let Err(e) = serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx).await {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }
         });
@@ -364,7 +377,7 @@ pub async fn accept_request(
     (response, rpc_position) = forward_body(
         tx,
         &rpc_list_rwlock,
-        finalized_rx,
+        &channels.finalized_rx,
         named_numbers,
         head_cache,
         cache,
