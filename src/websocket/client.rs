@@ -1,4 +1,7 @@
-use crate::Rpc;
+use crate::{
+    Rpc,
+    balancer::selection::select::pick,
+};
 use ezsockets::ClientConfig;
 
 use serde_json::Value;
@@ -70,8 +73,15 @@ pub async fn ws_conn_manager(
     // continously listen for incoming messages
     loop {
         let incoming = incoming_rx.recv().await.unwrap();
-
         println!("ws received incoming message: {}", incoming);
+
+        // Get the index of the fastest node from rpc_list
+        let (mut rpc, rpc_position);
+        {
+            let mut rpc_list_guard = rpc_list.write().unwrap();
+            (rpc, rpc_position) = pick(&mut rpc_list_guard);
+        }
+
         let _ = outgoing_tx.send(incoming);
     }
 }
