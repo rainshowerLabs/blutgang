@@ -1,11 +1,11 @@
 use crate::{
-    Rpc,
     balancer::selection::select::pick,
+    Rpc,
 };
 
 use tokio_tungstenite::{
     connect_async,
-    tungstenite::protocol::Message
+    tungstenite::protocol::Message,
 };
 
 use serde_json::Value;
@@ -20,14 +20,13 @@ use std::{
     },
 };
 
-use tokio::{
-    sync::{
-        mpsc,
-        watch,
-    },
-};
 use futures_util::{
     SinkExt,
+    StreamExt,
+};
+use tokio::sync::{
+    mpsc,
+    watch,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -65,18 +64,22 @@ pub async fn ws_conn_manager(
         }
 
         // Send request to ws_handles[rpc_position]
-        let a = ws_handles[rpc_position.unwrap_or(0)]
+        let _ = ws_handles[rpc_position.unwrap_or(0)]
             .send(Message::Text(incoming.to_string()))
             .await;
 
+        // get the response from ws_handles[rpc_position]
+        let a = ws_handles[rpc_position.unwrap_or(0)].next().await.unwrap();
+
         // send the response to outgoing_tx
         match a {
-            Ok(_) => {
+            Ok(a) => {
                 println!("ws_conn_manager: sent message to ws");
-                outgoing_tx.send(incoming).unwrap();
+                let a = serde_json::from_str(&a.into_text().unwrap()).unwrap();
+                outgoing_tx.send(a).unwrap();
             }
             Err(e) => {
-                println!("ws_conn_manager error: {}", e);
+                println!("ws_conn_manager error: couldnt get response!: {}", e);
             }
         }
     }
@@ -111,7 +114,11 @@ pub async fn execute_ws_call(
     println!("ws SENT");
 
     // Wait for response from ws_conn_manager
-    let mut response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap().to_owned();
+    let mut response = outgoing_rx
+        .wait_for(|v| v["id"] == rand_id)
+        .await
+        .unwrap()
+        .to_owned();
 
     response["id"] = id;
 
