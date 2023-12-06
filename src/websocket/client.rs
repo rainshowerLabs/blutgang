@@ -2,13 +2,16 @@ use crate::{
     Rpc,
     balancer::selection::select::pick,
 };
-use ezsockets::ClientConfig;
+
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::protocol::Message
+};
 
 use serde_json::Value;
 
 use rand::random;
 
-use async_trait::async_trait;
 use std::{
     format,
     sync::{
@@ -17,35 +20,19 @@ use std::{
     },
 };
 
-use tokio::sync::{
-    mpsc,
-    watch,
+use tokio::{
+    sync::{
+        mpsc,
+        watch,
+    },
+    io::{
+        AsyncReadExt,
+        AsyncWriteExt
+    },
 };
+use futures_util::{future, pin_mut, StreamExt, SinkExt};
 
-pub struct Client {
-    pub handle: ezsockets::Client<Self>,
-}
-
-#[async_trait]
-impl ezsockets::ClientExt for Client {
-    type Call = ();
-
-    async fn on_text(&mut self, text: String) -> Result<(), ezsockets::Error> {
-        println!("received message: {}", text);
-        Ok(())
-    }
-
-    async fn on_binary(&mut self, bytes: Vec<u8>) -> Result<(), ezsockets::Error> {
-        println!("received bytes: {:?}", bytes);
-        Ok(())
-    }
-
-    async fn on_call(&mut self, call: Self::Call) -> Result<(), ezsockets::Error> {
-        let () = call;
-        println!("received call: {:?}", call);
-        Ok(())
-    }
-}
+type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
@@ -62,27 +49,31 @@ pub async fn ws_conn_manager(
     for rpc in rpc_list_clone {
         let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
-        let config = ClientConfig::new(url);
-        let (handle, future) = ezsockets::connect(|handle| Client { handle }, config).await;
-        tokio::spawn(async move {
-            future.await.unwrap();
-        });
-        ws_handles.push(handle);
+        let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
+        // push clients to ws_handles
+        ws_handles.push(ws_stream);
     }
 
-    // continously listen for incoming messages
+    // continuously listen for incoming messages
     loop {
         let incoming = incoming_rx.recv().await.unwrap();
         println!("ws received incoming message: {}", incoming);
 
         // Get the index of the fastest node from rpc_list
-        let (mut rpc, rpc_position);
+        let rpc_position;
         {
             let mut rpc_list_guard = rpc_list.write().unwrap();
-            (rpc, rpc_position) = pick(&mut rpc_list_guard);
+            (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-        let _ = outgoing_tx.send(incoming);
+        // Send request to ws_handles[rpc_position]
+        let a = ws_handles[rpc_position.unwrap_or(0)]
+            .send(Message::Text(incoming.to_string()))
+            .await;
+
+        // You may need to handle responses here if required
+        println!("ws response: {:?}", a);
+
     }
 }
 
@@ -91,7 +82,7 @@ pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut outgoing_rx: watch::Receiver<Value>,
-) -> Result<String, ezsockets::Error> {
+) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
 
@@ -115,10 +106,6 @@ pub async fn execute_ws_call(
     println!("ws SENT");
 
     // Wait for response from ws_conn_manager
-    
-    println!("waiting for response");
-
-    // wait for response["id"] == rand_id 
     let mut response = outgoing_rx.wait_for(|v| v["id"] == rand_id).await.unwrap().to_owned();
 
     response["id"] = id;
