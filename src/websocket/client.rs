@@ -54,7 +54,6 @@ pub async fn ws_conn_manager(
     // continuously listen for incoming messages
     loop {
         let incoming = incoming_rx.recv().await.unwrap();
-        println!("ws received incoming message: {}", incoming);
 
         // Get the index of the fastest node from rpc_list
         let rpc_position;
@@ -101,8 +100,6 @@ pub async fn execute_ws_call(
     let rand_id = random::<u32>();
     call_val["id"] = rand_id.into();
 
-    println!("ws SEND");
-
     // Send call to ws_conn_manager
     match incoming_tx.send(call_val) {
         Ok(_) => {}
@@ -110,8 +107,6 @@ pub async fn execute_ws_call(
             println!("ws_conn_manager error: {}", e);
         }
     };
-
-    println!("ws SENT");
 
     // Wait for response from ws_conn_manager
     let mut response = outgoing_rx
