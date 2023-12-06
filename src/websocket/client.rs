@@ -25,12 +25,10 @@ use tokio::{
         mpsc,
         watch,
     },
-    io::{
-        AsyncReadExt,
-        AsyncWriteExt
-    },
 };
-use futures_util::{future, pin_mut, StreamExt, SinkExt};
+use futures_util::{
+    SinkExt,
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -71,9 +69,16 @@ pub async fn ws_conn_manager(
             .send(Message::Text(incoming.to_string()))
             .await;
 
-        // You may need to handle responses here if required
-        println!("ws response: {:?}", a);
-
+        // send the response to outgoing_tx
+        match a {
+            Ok(_) => {
+                println!("ws_conn_manager: sent message to ws");
+                outgoing_tx.send(incoming).unwrap();
+            }
+            Err(e) => {
+                println!("ws_conn_manager error: {}", e);
+            }
+        }
     }
 }
 
