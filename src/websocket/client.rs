@@ -84,6 +84,46 @@ pub async fn ws_conn_manager(
     }
 }
 
+// Creates a task makes a new ws connection, listens to incoming messages and
+// returns them via a channel
+pub async fn ws_conn(
+    rpc: Rpc,
+    mut incoming_tx: mpsc::UnboundedReceiver<Value>,
+    outgoing_rx: watch::Sender<Value>,
+) {
+    let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
+
+    tokio::spawn(async move {
+        let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
+
+        let (mut write, mut read) = ws_stream.split();
+
+        // continuously listen for incoming messages
+        loop {
+            let incoming = incoming_tx.recv().await.unwrap();
+
+            // Send request to ws_stream
+            let _ = write.send(Message::Text(incoming.to_string())).await;
+
+            // get the response from ws_stream
+            let a = read.next().await.unwrap();
+
+            // send the response to outgoing_tx
+            match a {
+                Ok(a) => {
+                    println!("ws_conn: sent message to ws");
+                    let a = serde_json::from_str(&a.into_text().unwrap()).unwrap();
+                    outgoing_rx.send(a).unwrap();
+                }
+                Err(e) => {
+                    println!("ws_conn error: couldnt get response!: {}", e);
+                }
+            }
+        }
+    });
+
+}
+
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
     call: String,
