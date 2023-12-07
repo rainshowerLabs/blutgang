@@ -102,18 +102,25 @@ pub async fn ws_conn(
         loop {
             let incoming = incoming_tx.recv().await.unwrap();
 
+            // add close connection functionality
+            // TODO: this type should be an enum
+            if incoming["method"] == "close" {
+                let _ = write.close();
+                break;
+            }
+
             // Send request to ws_stream
             let _ = write.send(Message::Text(incoming.to_string())).await;
 
             // get the response from ws_stream
-            let a = read.next().await.unwrap();
+            let rax = read.next().await.unwrap();
 
             // send the response to outgoing_tx
-            match a {
-                Ok(a) => {
+            match rax {
+                Ok(rax) => {
                     println!("ws_conn: sent message to ws");
-                    let a = serde_json::from_str(&a.into_text().unwrap()).unwrap();
-                    outgoing_rx.send(a).unwrap();
+                    let rax = serde_json::from_str(&rax.into_text().unwrap()).unwrap();
+                    outgoing_rx.send(rax).unwrap();
                 }
                 Err(e) => {
                     println!("ws_conn error: couldnt get response!: {}", e);
