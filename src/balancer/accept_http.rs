@@ -1,3 +1,8 @@
+use tokio_tungstenite::WebSocketStream;
+use hyper_util::rt::TokioIo;
+use hyper::upgrade::Upgraded;
+
+use std::collections::HashMap;
 use crate::{
     balancer::{
         format::{
@@ -22,6 +27,9 @@ use crate::{
     NamedBlocknumbers,
     Settings,
 };
+
+
+
 
 use tokio::sync::{
     mpsc,
@@ -82,6 +90,7 @@ pub struct RequestChannels {
     pub finalized_rx: Arc<watch::Receiver<u64>>,
     pub incoming_tx: mpsc::UnboundedSender<Value>,
     pub outgoing_rx: watch::Receiver<Value>,
+    pub ws_registry: Arc<RwLock<HashMap<u64, Arc<WebSocketStream<TokioIo<Upgraded>>>>>>,
 }
 
 // Macros for accepting requests
@@ -344,10 +353,12 @@ pub async fn accept_request(
             }
         };
 
+        let ws_registry = Arc::clone(&channels.ws_registry);
+
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
             if let Err(e) =
-                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx).await
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, ws_registry).await
             {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }

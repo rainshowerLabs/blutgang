@@ -189,7 +189,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.0.1",
  "hyper-tungstenite",
- "hyper-util-blutgang",
+ "hyper-util",
  "jemallocator",
  "jsonwebtoken",
  "memchr",
@@ -809,26 +809,6 @@ name = "hyper-util"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ca339002caeb0d159cc6e023dff48e199f081e42fa039895c7c6f38b37f2e9d"
-dependencies = [
- "bytes",
- "futures-channel",
- "futures-util",
- "http 1.0.0",
- "http-body 1.0.0",
- "hyper 1.0.1",
- "pin-project-lite",
- "socket2 0.5.5",
- "tokio",
- "tower",
- "tower-service",
- "tracing",
-]
-
-[[package]]
-name = "hyper-util-blutgang"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a191257e51a3541b6e443179e9b83bc116ba805efdcec773e269edd755b4e9e"
 dependencies = [
  "bytes",
  "futures-channel",

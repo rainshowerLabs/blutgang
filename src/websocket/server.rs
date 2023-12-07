@@ -1,9 +1,21 @@
+use rand::random;
+use hyper_util::rt::TokioIo;
+use hyper::upgrade::Upgraded;
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        RwLock,
+    }
+};
+
 use serde_json::Value;
 
 use tokio::sync::{
     mpsc,
     watch,
 };
+use tokio_tungstenite::WebSocketStream;
 
 use crate::{
     config::cache_setup::VERSION_STR,
@@ -29,15 +41,28 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: watch::Receiver<Value>,
+    ws_registry: Arc<RwLock<HashMap<u64, Arc<WebSocketStream<TokioIo<Upgraded>>>>>>,
 ) -> Result<(), Error> {
+    // Create a random ID for this connection
+    //
+    // We use this to register our connection internally
+    let channel_id = random::<u64>();
+
     let mut websocket = websocket.await?;
+
+    // Register the channel
+    // {
+    //     let mut ws_reg_guard = ws_registry.write().unwrap();
+    //     ws_reg_guard.insert(channel_id, websocket.clone());
+    // }
+
     while let Some(message) = websocket.next().await {
         match message? {
             Message::Text(msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
 
                 // Forward the message to the best available RPC
-                let resp = execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.clone()).await?;
+                let resp = execute_ws_call(msg, channel_id, incoming_tx.clone(), outgoing_rx.clone()).await?;
 
                 websocket.send(Message::text(resp)).await?;
             }
@@ -52,6 +77,12 @@ pub async fn serve_websocket(
                 println!("Received pong message: {msg:02X?}");
             }
             Message::Close(msg) => {
+                // Remove the channel from the registry
+                {
+                    let mut ws_reg_guard = ws_registry.write().unwrap();
+                    ws_reg_guard.remove(&channel_id);
+                }
+
                 if let Some(msg) = &msg {
                     println!(
                         "Received close message with code {} and message: {}",
