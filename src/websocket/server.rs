@@ -31,6 +31,7 @@ pub async fn serve_websocket(
     outgoing_rx: watch::Receiver<Value>,
 ) -> Result<(), Error> {
     let mut websocket = websocket.await?;
+
     while let Some(message) = websocket.next().await {
         match message? {
             Message::Text(msg) => {

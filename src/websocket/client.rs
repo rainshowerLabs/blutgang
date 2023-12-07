@@ -27,6 +27,7 @@ use futures_util::{
 use tokio::sync::{
     mpsc,
     watch,
+    broadcast,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -36,19 +37,22 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
-    outgoing_tx: watch::Sender<Value>,
 ) {
     println!("ws_conn_manager");
 
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
+    let (outgoing_tx, mut outgoing_rx) = broadcast::channel(2048);
+
+    // We want to create a ws connection for each rpc in rpc_list
+    // We also want to have a corresponding channel and put it in a Vec
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-        let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
 
-        let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
-        // push clients to ws_handles
-        ws_handles.push(ws_stream);
+        ws_handles.push(incoming_tx);
+
+        ws_conn(rpc, incoming_rx, outgoing_tx.clone()).await;
     }
 
     // continuously listen for incoming messages
@@ -62,25 +66,16 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-        // Send request to ws_handles[rpc_position]
-        let _ = ws_handles[rpc_position.unwrap_or(0)]
-            .send(Message::Text(incoming.to_string()))
-            .await;
+        // Spawn a task to send the incoming message and return the response
+        let incoming_rx_clone = ws_handles[rpc_position.unwrap_or(0)].clone();
 
-        // get the response from ws_handles[rpc_position]
-        let a = ws_handles[rpc_position.unwrap_or(0)].next().await.unwrap();
+        tokio::task::spawn(async move {
+            // Send request to ws_handles[rpc_position]
+            let _ = incoming_rx_clone.send(incoming);
 
-        // send the response to outgoing_tx
-        match a {
-            Ok(a) => {
-                println!("ws_conn_manager: sent message to ws");
-                let a = serde_json::from_str(&a.into_text().unwrap()).unwrap();
-                outgoing_tx.send(a).unwrap();
-            }
-            Err(e) => {
-                println!("ws_conn_manager error: couldnt get response!: {}", e);
-            }
-        }
+        });
+
+
     }
 }
 
@@ -89,7 +84,7 @@ pub async fn ws_conn_manager(
 pub async fn ws_conn(
     rpc: Rpc,
     mut incoming_tx: mpsc::UnboundedReceiver<Value>,
-    outgoing_rx: watch::Sender<Value>,
+    outgoing_rx: broadcast::Sender<Value>,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
