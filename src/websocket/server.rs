@@ -39,13 +39,7 @@ pub async fn serve_websocket(
                     execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.resubscribe()).await?;
 
                 websocket.send(Message::text(resp)).await?;
-            }
-            Message::Ping(msg) => {
-                println!("Received ping message: {msg:02X?}");
-            }
-            Message::Pong(msg) => {
-                println!("Received pong message: {msg:02X?}");
-            }
+            },
             Message::Close(msg) => {
                 if let Some(msg) = &msg {
                     println!(
@@ -55,10 +49,11 @@ pub async fn serve_websocket(
                 } else {
                     println!("Received close message");
                 }
-            }
+            },
+            Message::Ping(_) | Message::Pong(_) => {},
             _  => {
                 websocket.send(Message::text("Wrn: Unsupported message format, please use text!")).await?;
-            }
+            },
         }
     }
 
