@@ -13,10 +13,11 @@ use serde_json::Value;
 use rand::random;
 
 use std::{
+    println,
     sync::{
         Arc,
         RwLock,
-    }, println,
+    },
 };
 
 use futures_util::{
@@ -72,7 +73,6 @@ pub async fn ws_conn_manager(
         }
 
         println!("ws_handles len: {:?}", ws_handles.len());
-
 
         // Error if rpc_position is None
         let rpc_position = if let Some(rpc_position) = rpc_position {
