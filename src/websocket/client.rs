@@ -27,32 +27,42 @@ use futures_util::{
 use tokio::sync::{
     mpsc,
     watch,
-    broadcast,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+struct ConnectionChannels {
+    incoming_tx: mpsc::UnboundedSender<Value>,
+    outgoing_rx: watch::Receiver<Value>,
+}
+
 
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
+    outgoing_tx: watch::Sender<Value>
 ) {
     println!("ws_conn_manager");
 
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
-    let (outgoing_tx, mut outgoing_rx) = broadcast::channel(2048);
-
     // We want to create a ws connection for each rpc in rpc_list
     // We also want to have a corresponding channel and put it in a Vec
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
+        let (ws_conn_outgoing_tx, ws_conn_outgoing_rx) = watch::channel(Value::Null);
 
-        ws_handles.push(incoming_tx);
+        let connections = ConnectionChannels {
+            incoming_tx: ws_conn_incoming_tx,
+            outgoing_rx: ws_conn_outgoing_rx,
+        };
 
-        ws_conn(rpc, incoming_rx, outgoing_tx.clone()).await;
+        ws_handles.push(connections);
+
+        ws_conn(rpc, ws_conn_incoming_rx, ws_conn_outgoing_tx).await;
     }
 
     // continuously listen for incoming messages
@@ -66,15 +76,6 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-        // Spawn a task to send the incoming message and return the response
-        let incoming_rx_clone = ws_handles[rpc_position.unwrap_or(0)].clone();
-
-        tokio::task::spawn(async move {
-            // Send request to ws_handles[rpc_position]
-            let _ = incoming_rx_clone.send(incoming);
-
-        });
-
 
     }
 }
@@ -84,7 +85,7 @@ pub async fn ws_conn_manager(
 pub async fn ws_conn(
     rpc: Rpc,
     mut incoming_tx: mpsc::UnboundedReceiver<Value>,
-    outgoing_rx: broadcast::Sender<Value>,
+    outgoing_rx: watch::Sender<Value>,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
@@ -123,14 +124,13 @@ pub async fn ws_conn(
             }
         }
     });
-
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    mut outgoing_rx: watch::Receiver<Value>,
+    mut outgoing_rx: watch::Sender<Value>,
 ) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
