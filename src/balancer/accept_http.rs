@@ -138,74 +138,72 @@ macro_rules! get_response {
         $max_retries:expr
     ) => {
         match $cache.get($tx_hash.as_bytes()) {
-            Ok(rax) => {
-                if let Some(mut rax) = rax {
-                    $rpc_position = None;
+            Ok(Some(mut rax)) => {
+                $rpc_position = None;
+                // Reconstruct ID
+                let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
 
-                    // Reconstruct ID
-                    let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                cached["id"] = $id.into();
+                cached.to_string()
+            },
+            Ok(None) => {
+                // Kinda jank but set the id back to what it was before
+                $tx["id"] = $id.into();
 
-                    cached["id"] = $id.into();
-                    cached.to_string()
-                } else {
-                    // Kinda jank but set the id back to what it was before
-                    $tx["id"] = $id.into();
+                // Loop until we get a response
+                let mut rx;
+                let mut retries = 0;
+                loop {
+                    // Get the next Rpc in line.
+                    let mut rpc;
+                    {
+                        let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                        (rpc, $rpc_position) = pick(&mut rpc_list);
+                    }
+                    println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
 
-                    // Loop until we get a response
-                    let mut rx;
-                    let mut retries = 0;
-                    loop {
-                        // Get the next Rpc in line.
-                        let mut rpc;
-                        {
-                            let mut rpc_list = $rpc_list_rwlock.write().unwrap();
-                            (rpc, $rpc_position) = pick(&mut rpc_list);
-                        }
-                        println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
-
-                        // Check if we have any RPCs in the list, if not return error
-                        if $rpc_position == None {
-                            return (no_rpc_available!(), None);
-                        }
-
-                        // Send the request. And return a timeout if it takes too long
-                        //
-                        // Check if it contains any errors or if its `latest` and insert it if it isn't
-                        match timeout(
-                            Duration::from_millis($ttl.try_into().unwrap()),
-                            rpc.send_request($tx.clone()),
-                        )
-                        .await
-                        {
-                            Ok(rxa) => {
-                                rx = rxa.unwrap();
-                                break;
-                            },
-                            Err(_) => {
-                                println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
-                                rpc.update_latency($ttl as f64);
-                                retries += 1;
-                            },
-                        };
-
-                        if retries == $max_retries {
-                            return (timed_out!(), $rpc_position,);
-                        }
+                    // Check if we have any RPCs in the list, if not return error
+                    if $rpc_position == None {
+                        return (no_rpc_available!(), None);
                     }
 
-                    // Don't cache responses that contain errors or missing trie nodes
-                    cache_querry(
-                        &mut rx,
-                        $tx,
-                        $tx_hash,
-                        $finalized_rx,
-                        $named_numbers,
-                        $cache,
-                        $head_cache
-                    );
+                    // Send the request. And return a timeout if it takes too long
+                    //
+                    // Check if it contains any errors or if its `latest` and insert it if it isn't
+                    match timeout(
+                        Duration::from_millis($ttl.try_into().unwrap()),
+                        rpc.send_request($tx.clone()),
+                    )
+                    .await
+                    {
+                        Ok(rxa) => {
+                            rx = rxa.unwrap();
+                            break;
+                        },
+                        Err(_) => {
+                            println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                            rpc.update_latency($ttl as f64);
+                            retries += 1;
+                        },
+                    };
 
-                    rx
+                    if retries == $max_retries {
+                        return (timed_out!(), $rpc_position,);
+                    }
                 }
+
+                // Don't cache responses that contain errors or missing trie nodes
+                cache_querry(
+                    &mut rx,
+                    $tx,
+                    $tx_hash,
+                    $finalized_rx,
+                    $named_numbers,
+                    $cache,
+                    $head_cache
+                );
+
+                rx
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
@@ -329,7 +327,7 @@ pub async fn accept_request(
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
             if let Err(e) =
-                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx).await
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, cache).await
             {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }

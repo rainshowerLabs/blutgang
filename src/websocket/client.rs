@@ -20,6 +20,17 @@ use std::{
     },
 };
 
+use sled::Db;
+
+// Select either blake3 or xxhash based on the features
+#[cfg(not(feature = "xxhash"))]
+use blake3::hash;
+
+#[cfg(feature = "xxhash")]
+use xxhash_rust::xxh3::xxh3_64;
+#[cfg(feature = "xxhash")]
+use zerocopy::AsBytes; // Impls AsBytes trait for u64
+
 use futures_util::{
     SinkExt,
     StreamExt,
@@ -145,6 +156,7 @@ pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
+    cache: Arc<Db>,
 ) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
@@ -153,6 +165,31 @@ pub async fn execute_ws_call(
     //
     // We'll use the random id to look at which call is ours when watching for updates
     let id = call_val["id"].clone();
+
+    // Hash the request with either blake3 or xxhash depending on the enabled feature
+    let tx_hash;
+    #[cfg(not(feature = "xxhash"))]
+    {
+        tx_hash = hash(call_val.to_string().as_bytes());
+    }
+    #[cfg(feature = "xxhash")]
+    {
+        tx_hash = xxh3_64(call_val.to_string().as_bytes());
+    }
+
+    // Check if we have a cached response
+    match cache.get(tx_hash.as_bytes()) {
+        Ok(Some(mut rax)) => {
+            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+            cached["id"] = id;
+            return Ok(cached.to_string());
+        }
+        Ok(None) => {}
+        Err(e) => {
+            println!("Error getting cached response: {}", e);
+        }
+    }
+
     let rand_id = random::<u32>();
     call_val["id"] = rand_id.into();
 
