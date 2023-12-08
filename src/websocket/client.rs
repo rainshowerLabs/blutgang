@@ -26,14 +26,13 @@ use futures_util::{
 };
 use tokio::sync::{
     mpsc,
-    watch,
+    broadcast,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 struct ConnectionChannels {
     incoming_tx: mpsc::UnboundedSender<Value>,
-    outgoing_rx: watch::Receiver<Value>,
 }
 
 
@@ -42,7 +41,7 @@ struct ConnectionChannels {
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
-    outgoing_tx: watch::Sender<Value>
+    broadcast_tx: broadcast::Sender<Value>,
 ) {
     println!("ws_conn_manager");
 
@@ -53,16 +52,14 @@ pub async fn ws_conn_manager(
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
-        let (ws_conn_outgoing_tx, ws_conn_outgoing_rx) = watch::channel(Value::Null);
 
         let connections = ConnectionChannels {
             incoming_tx: ws_conn_incoming_tx,
-            outgoing_rx: ws_conn_outgoing_rx,
         };
 
         ws_handles.push(connections);
 
-        ws_conn(rpc, ws_conn_incoming_rx, ws_conn_outgoing_tx).await;
+        ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
     }
 
     // continuously listen for incoming messages
@@ -85,7 +82,7 @@ pub async fn ws_conn_manager(
 pub async fn ws_conn(
     rpc: Rpc,
     mut incoming_tx: mpsc::UnboundedReceiver<Value>,
-    outgoing_rx: watch::Sender<Value>,
+    outgoing_rx: broadcast::Sender<Value>,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
 
@@ -130,7 +127,7 @@ pub async fn ws_conn(
 pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    mut outgoing_rx: watch::Sender<Value>,
+    mut broadcast_rx: broadcast::Receiver<Value>,
 ) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
@@ -150,13 +147,20 @@ pub async fn execute_ws_call(
         }
     };
 
-    // Wait for response from ws_conn_manager
-    let mut response = outgoing_rx
-        .wait_for(|v| v["id"] == rand_id)
+    // Wait until we get a response matching our id
+    let mut response = broadcast_rx
+        .recv()
         .await
-        .unwrap()
-        .to_owned();
+        .expect("Failed to receive response from WS");
 
+    while response["id"] != id {
+        response = broadcast_rx
+            .recv()
+            .await
+            .expect("Failed to receive response from WS");
+    }
+
+    // Set id to the original id    
     response["id"] = id;
 
     Ok(format!("Hello from blutgang!: {:?}", response))
