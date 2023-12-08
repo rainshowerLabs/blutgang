@@ -5,10 +5,7 @@ use tokio::sync::{
     mpsc,
 };
 
-use crate::{
-    config::cache_setup::VERSION_STR,
-    websocket::client::execute_ws_call,
-};
+use crate::websocket::client::execute_ws_call;
 
 use futures::{
     sink::SinkExt,
@@ -43,10 +40,6 @@ pub async fn serve_websocket(
 
                 websocket.send(Message::text(resp)).await?;
             }
-            Message::Binary(msg) => {
-                println!("Received binary message: {msg:02X?}");
-                websocket.send(Message::binary(VERSION_STR)).await?;
-            }
             Message::Ping(msg) => {
                 println!("Received ping message: {msg:02X?}");
             }
@@ -63,8 +56,8 @@ pub async fn serve_websocket(
                     println!("Received close message");
                 }
             }
-            Message::Frame(_msg) => {
-                unreachable!();
+            _  => {
+                websocket.send(Message::text("Wrn: Unsupported message format, please use text!")).await?;
             }
         }
     }
