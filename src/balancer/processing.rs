@@ -31,7 +31,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 
 // Check if we should cache the querry, and if so cache it in the DB
 pub fn cache_querry(
-    rx: &mut String,
+    rx: &mut str,
     method: &str,
     method_val: Value,
     tx_hash: Hash,
@@ -49,10 +49,7 @@ pub fn cache_querry(
         if let Some(num) = num {
             if num > *finalized_rx.borrow() {
                 let mut head_cache = head_cache.write().unwrap();
-                head_cache
-                    .entry(num)
-                    .or_insert_with(Vec::new)
-                    .push(tx_hash.to_string());
+                head_cache.entry(num).or_default().push(tx_hash.to_string());
             }
 
             // Replace the id with Value::Null and insert the request
