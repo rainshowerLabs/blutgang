@@ -1,8 +1,8 @@
 use serde_json::Value;
 
 use tokio::sync::{
-    mpsc,
     broadcast,
+    mpsc,
 };
 
 use crate::{
@@ -38,7 +38,8 @@ pub async fn serve_websocket(
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
 
                 // Forward the message to the best available RPC
-                let resp = execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.resubscribe()).await?;
+                let resp =
+                    execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.resubscribe()).await?;
 
                 websocket.send(Message::text(resp)).await?;
             }

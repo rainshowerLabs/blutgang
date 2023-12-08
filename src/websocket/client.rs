@@ -25,8 +25,8 @@ use futures_util::{
     StreamExt,
 };
 use tokio::sync::{
-    mpsc,
     broadcast,
+    mpsc,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -34,7 +34,6 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 struct ConnectionChannels {
     incoming_tx: mpsc::UnboundedSender<Value>,
 }
-
 
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
@@ -112,7 +111,7 @@ pub async fn ws_conn(
             // add close connection functionality
             // TODO: this type should be an enum
             if incoming["method"] == "close" {
-                let _ = write.close();
+                let _ = write.close().await;
                 break;
             }
 
@@ -174,7 +173,7 @@ pub async fn execute_ws_call(
             .expect("Failed to receive response from WS");
     }
 
-    // Set id to the original id    
+    // Set id to the original id
     response["id"] = id;
 
     Ok(format!("Hello from blutgang!: {:?}", response))

@@ -24,8 +24,8 @@ use crate::{
 };
 
 use tokio::sync::{
-    mpsc,
     broadcast,
+    mpsc,
     watch,
 };
 
