@@ -13,11 +13,10 @@ use serde_json::Value;
 use rand::random;
 
 use std::{
-    format,
     sync::{
         Arc,
         RwLock,
-    },
+    }, println,
 };
 
 use futures_util::{
@@ -72,6 +71,9 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
+        println!("ws_handles len: {:?}", ws_handles.len());
+
+
         // Error if rpc_position is None
         let rpc_position = if let Some(rpc_position) = rpc_position {
             rpc_position
@@ -106,7 +108,9 @@ pub async fn ws_conn(
 
         // continuously listen for incoming messages
         loop {
+            println!("HELLO!");
             let incoming = incoming_tx.recv().await.unwrap();
+            println!("HELLO!!!!!!!!");
 
             // add close connection functionality
             // TODO: this type should be an enum
@@ -124,7 +128,7 @@ pub async fn ws_conn(
             // send the response to outgoing_tx
             match rax {
                 Ok(rax) => {
-                    println!("ws_conn: sent message to ws");
+                    println!("ws_conn: sent message to ws: {}", rax);
                     let rax = serde_json::from_str(&rax.into_text().unwrap()).unwrap();
                     outgoing_rx.send(rax).unwrap();
                 }
@@ -166,15 +170,17 @@ pub async fn execute_ws_call(
         .await
         .expect("Failed to receive response from WS");
 
-    while response["id"] != id {
-        response = broadcast_rx
-            .recv()
-            .await
-            .expect("Failed to receive response from WS");
+    if response["id"] != rand_id {
+        while response["id"] != id {
+            response = broadcast_rx
+                .recv()
+                .await
+                .expect("Failed to receive response from WS");
+        }
     }
 
     // Set id to the original id
     response["id"] = id;
 
-    Ok(format!("Hello from blutgang!: {:?}", response))
+    Ok(response.to_string())
 }

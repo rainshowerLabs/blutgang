@@ -37,7 +37,6 @@ jsonwebtoken = "9.1.0"
 hyper-tungstenite = "0.12.0"
 futures = "0.3.29"
 tungstenite = "0.20.1"
-async-trait = "0.1.74"
 tokio-tungstenite = {version = "0.20.1", features = ["native-tls"]}
 futures-util = "0.3.29"
 
