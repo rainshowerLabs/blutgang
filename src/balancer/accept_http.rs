@@ -25,6 +25,7 @@ use crate::{
 
 use tokio::sync::{
     mpsc,
+    broadcast,
     watch,
 };
 
@@ -77,11 +78,21 @@ struct RequestParams {
     max_retries: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RequestChannels {
     pub finalized_rx: Arc<watch::Receiver<u64>>,
     pub incoming_tx: mpsc::UnboundedSender<Value>,
-    pub outgoing_rx: watch::Receiver<Value>,
+    pub outgoing_rx: broadcast::Receiver<Value>,
+}
+
+impl Clone for RequestChannels {
+    fn clone(&self) -> Self {
+        Self {
+            finalized_rx: Arc::clone(&self.finalized_rx),
+            incoming_tx: self.incoming_tx.clone(),
+            outgoing_rx: self.outgoing_rx.resubscribe(),
+        }
+    }
 }
 
 // Macros for accepting requests

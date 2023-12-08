@@ -2,7 +2,7 @@ use serde_json::Value;
 
 use tokio::sync::{
     mpsc,
-    watch,
+    broadcast,
 };
 
 use crate::{
@@ -28,7 +28,7 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    outgoing_rx: watch::Receiver<Value>,
+    outgoing_rx: broadcast::Receiver<Value>,
 ) -> Result<(), Error> {
     let mut websocket = websocket.await?;
 
@@ -38,7 +38,7 @@ pub async fn serve_websocket(
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
 
                 // Forward the message to the best available RPC
-                let resp = execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.clone()).await?;
+                let resp = execute_ws_call(msg, incoming_tx.clone(), outgoing_rx.resubscribe()).await?;
 
                 websocket.send(Message::text(resp)).await?;
             }

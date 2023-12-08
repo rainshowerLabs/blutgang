@@ -40,6 +40,7 @@ use tokio::{
     net::TcpListener,
     sync::{
         mpsc,
+        broadcast,
         watch,
     },
 };
@@ -123,7 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
-    let (outgoing_tx, outgoing_rx) = watch::channel::<Value>(Value::Null);
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
+
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
@@ -181,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let channels = RequestChannels {
             finalized_rx: finalized_rx_clone,
             incoming_tx: incoming_tx.clone(),
-            outgoing_rx: outgoing_rx.clone(),
+            outgoing_rx: outgoing_rx.resubscribe(),
         };
 
         // Spawn a tokio task to serve multiple connections concurrently
