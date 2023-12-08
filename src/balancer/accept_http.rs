@@ -151,8 +151,6 @@ macro_rules! get_response {
                     // Kinda jank but set the id back to what it was before
                     $tx["id"] = $id.into();
 
-                    let tx_string = $tx.to_string();
-
                     // Loop until we get a response
                     let mut rx;
                     let mut retries = 0;
@@ -198,15 +196,13 @@ macro_rules! get_response {
                     // Don't cache responses that contain errors or missing trie nodes
                     cache_querry(
                         &mut rx,
-                        &tx_string,
-                        $tx["method"].clone(),
+                        $tx,
                         $tx_hash,
                         $finalized_rx,
                         $named_numbers,
                         $cache,
                         $head_cache
                     );
-
 
                     rx
                 }

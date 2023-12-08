@@ -32,17 +32,18 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 // Check if we should cache the querry, and if so cache it in the DB
 pub fn cache_querry(
     rx: &mut str,
-    method: &str,
-    method_val: Value,
+    method: Value,
     tx_hash: Hash,
     finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     cache: Arc<Db>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
 ) {
-    if can_cache(method, rx) {
+    let tx_string = method.to_string();
+
+    if can_cache(&tx_string, rx) {
         // Insert the response hash into the head_cache
-        let num = get_block_number_from_request(method_val, named_numbers);
+        let num = get_block_number_from_request(method, named_numbers);
 
         // Insert the key of the request we made into our `head_cache`
         // so we can invalidate it and remove it from the DB if it reorgs.
@@ -53,6 +54,7 @@ pub fn cache_querry(
             }
 
             // Replace the id with Value::Null and insert the request
+            // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
             rx_value["id"] = Value::Null;
 
