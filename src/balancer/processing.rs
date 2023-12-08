@@ -22,30 +22,25 @@ use serde_json::Value;
 use simd_json::to_vec;
 use sled::Db;
 
-pub fn can_cache(
-    method: &str,
-    result: &str,
-) -> bool {
-	if cache_method(method) && cache_result(result) {
-		return true;
-	}
-	false
+pub fn can_cache(method: &str, result: &str) -> bool {
+    if cache_method(method) && cache_result(result) {
+        return true;
+    }
+    false
 }
-
 
 // Check if we should cache the querry, and if so cache it in the DB
 pub fn cache_querry(
     rx: &mut String,
     method: &str,
     method_val: Value,
-    result: &str,
     tx_hash: Hash,
     finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     cache: Arc<Db>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
 ) {
-    if can_cache(method, result) {
+    if can_cache(method, rx) {
         // Insert the response hash into the head_cache
         let num = get_block_number_from_request(method_val, named_numbers);
 

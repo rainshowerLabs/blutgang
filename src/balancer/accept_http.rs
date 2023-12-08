@@ -1,16 +1,8 @@
 use crate::{
     balancer::{
-        format::{
-            get_block_number_from_request,
-            incoming_to_value,
-        },
-        selection::{
-            cache_rules::{
-                cache_method,
-                cache_result,
-            },
-            select::pick,
-        },
+        format::incoming_to_value,
+        processing::cache_querry,
+        selection::select::pick,
     },
     cache_error,
     no_rpc_available,
@@ -29,10 +21,7 @@ use tokio::sync::{
     watch,
 };
 
-use serde_json::{
-    to_vec,
-    Value,
-};
+use serde_json::Value;
 use simd_json;
 
 // Select either blake3 or xxhash based on the features
@@ -207,31 +196,17 @@ macro_rules! get_response {
                     }
 
                     // Don't cache responses that contain errors or missing trie nodes
-                    if cache_method(&tx_string) && cache_result(&rx) {
-                        // Insert the response hash into the head_cache
-                        let num = get_block_number_from_request($tx, $named_numbers);
+                    cache_querry(
+                        &mut rx,
+                        &tx_string,
+                        $tx["method"].clone(),
+                        $tx_hash,
+                        $finalized_rx,
+                        $named_numbers,
+                        $cache,
+                        $head_cache
+                    );
 
-                        // Insert the key of the request we made into our `head_cache`
-                        // so we can invalidate it and remove it from the DB if it reorgs.
-                        if let Some(num) = num {
-                            if num > *$finalized_rx.borrow() {
-                                let mut head_cache = $head_cache.write().unwrap();
-                                head_cache
-                                    .entry(num)
-                                    .or_insert_with(Vec::new)
-                                    .push($tx_hash.to_string());
-
-                            }
-
-                            // Replace the id with Value::Null and insert the request
-                            let mut rx_value: Value = unsafe {
-                                simd_json::serde::from_str(&mut rx).unwrap()
-                            };
-                            rx_value["id"] = Value::Null;
-
-                            $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
-                        }
-                    }
 
                     rx
                 }
