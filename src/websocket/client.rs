@@ -180,11 +180,14 @@ pub async fn execute_ws_call(
     // Check if we have a cached response
     match cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
+            println!("Got cached response!");
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
             return Ok(cached.to_string());
         }
-        Ok(None) => {}
+        Ok(None) => {
+            println!("No cached response");
+        }
         Err(e) => {
             println!("Error getting cached response: {}", e);
         }
