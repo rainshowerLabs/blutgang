@@ -73,7 +73,21 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
+        // Error if rpc_position is None
+        let rpc_position = if let Some(rpc_position) = rpc_position {
+            rpc_position
+        } else {
+            println!("ws_conn_manager error: no rpc_position");
+            continue;
+        };
 
+        // Send message to the corresponding ws_conn
+        match ws_handles[rpc_position].incoming_tx.send(incoming) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("ws_conn_manager error: {}", e);
+            }
+        };
     }
 }
 
