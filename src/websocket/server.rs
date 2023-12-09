@@ -1,13 +1,10 @@
 use crate::balancer::processing::CacheArgs;
 use serde_json::Value;
-use std::sync::Arc;
 
 use tokio::sync::{
     broadcast,
     mpsc,
 };
-
-use sled::Db;
 
 use crate::websocket::client::execute_ws_call;
 
@@ -30,7 +27,7 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: broadcast::Receiver<Value>,
-    cache_args: &CacheArgs<'_>,
+    cache_args: &CacheArgs,
 ) -> Result<(), Error> {
     let mut websocket = websocket.await?;
 

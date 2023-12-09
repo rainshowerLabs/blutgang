@@ -26,8 +26,6 @@ use std::{
     },
 };
 
-use sled::Db;
-
 // Select either blake3 or xxhash based on the features
 #[cfg(not(feature = "xxhash"))]
 use blake3::hash;
@@ -162,7 +160,7 @@ pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
-    cache_args: &CacheArgs<'_>,
+    cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();

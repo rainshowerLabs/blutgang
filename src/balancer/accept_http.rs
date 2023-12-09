@@ -274,14 +274,14 @@ async fn forward_body(
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
-        &cache,
+        cache,
         tx_hash,
         rpc_position,
         id,
         rpc_list_rwlock,
-        finalized_rx,
-        named_numbers,
-        head_cache,
+        finalized_rx.clone(),
+        named_numbers.clone(),
+        head_cache.clone(),
         params.ttl,
         params.max_retries
     );
@@ -331,10 +331,18 @@ pub async fn accept_request(
             }
         };
 
+        let cache_args = CacheArgs {
+            finalized_rx: channels.finalized_rx.as_ref().clone(),
+            named_numbers: named_numbers.clone(),
+            cache: cache,
+            head_cache: head_cache.clone(),
+        };
+
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
+
             if let Err(e) =
-                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, cache).await
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, &cache_args).await
             {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }
