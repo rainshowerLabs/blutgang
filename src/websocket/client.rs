@@ -57,8 +57,6 @@ pub async fn ws_conn_manager(
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     broadcast_tx: broadcast::Sender<Value>,
 ) {
-    println!("ws_conn_manager");
-
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
     // We want to create a ws connection for each rpc in rpc_list
@@ -87,7 +85,6 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-        println!("ws_handles len: {:?}", ws_handles.len());
 
         // Error if rpc_position is None
         let rpc_position = if let Some(rpc_position) = rpc_position {
@@ -123,9 +120,7 @@ pub async fn ws_conn(
 
         // continuously listen for incoming messages
         loop {
-            println!("HELLO!");
             let incoming = incoming_tx.recv().await.unwrap();
-            println!("HELLO!!!!!!!!");
 
             // add close connection functionality
             // TODO: this type should be an enum
@@ -143,7 +138,6 @@ pub async fn ws_conn(
             // send the response to outgoing_tx
             match rax {
                 Ok(rax) => {
-                    println!("ws_conn: sent message to ws: {}", rax);
                     let rax = serde_json::from_str(&rax.into_text().unwrap()).unwrap();
                     outgoing_rx.send(rax).unwrap();
                 }
@@ -182,15 +176,14 @@ pub async fn execute_ws_call(
     }
 
     // Check if we have a cached response
+    // TODO: responses arent shared??
     match cache_args.cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
-            println!("Got cached response!");
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
             return Ok(cached.to_string());
         }
         Ok(None) => {
-            println!("No cached response");
         }
         Err(e) => {
             println!("Error getting cached response: {}", e);
