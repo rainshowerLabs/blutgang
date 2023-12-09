@@ -138,7 +138,7 @@ pub async fn ws_conn(
             // send the response to outgoing_tx
             match rax {
                 Ok(rax) => {
-                    let rax = serde_json::from_str(&rax.into_text().unwrap()).unwrap();
+                    let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
                     outgoing_rx.send(rax).unwrap();
                 }
                 Err(e) => {
@@ -151,13 +151,13 @@ pub async fn ws_conn(
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
-    call: String,
+    mut call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     // Convert `call` to value
-    let mut call_val: Value = match serde_json::from_str(&call) {
+    let mut call_val: Value = match unsafe { simd_json::from_str(&mut call) } {
         Ok(call_val) => call_val,
         Err(e) => {
             println!("Error parsing call: {}", e);
