@@ -1,5 +1,11 @@
 use crate::{
-    balancer::selection::select::pick,
+    balancer::{
+        selection::select::pick,
+        processing::{
+            cache_querry,
+            CacheArgs,
+        },
+    },
     Rpc,
 };
 
@@ -156,7 +162,7 @@ pub async fn execute_ws_call(
     call: String,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
-    cache: Arc<Db>,
+    cache_args: &CacheArgs<'_>,
 ) -> Result<String, Error> {
     // Convert `call` to value
     let mut call_val: Value = serde_json::from_str(&call).unwrap();
@@ -178,7 +184,7 @@ pub async fn execute_ws_call(
     }
 
     // Check if we have a cached response
-    match cache.get(tx_hash.as_bytes()) {
+    match cache_args.cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
             println!("Got cached response!");
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
@@ -197,7 +203,7 @@ pub async fn execute_ws_call(
     call_val["id"] = rand_id.into();
 
     // Send call to ws_conn_manager
-    match incoming_tx.send(call_val) {
+    match incoming_tx.send(call_val.clone()) {
         Ok(_) => {}
         Err(e) => {
             println!("ws_conn_manager error: {}", e);
@@ -218,6 +224,14 @@ pub async fn execute_ws_call(
                 .expect("Failed to receive response from WS");
         }
     }
+
+    // Cache if possible
+    cache_querry(
+        &mut response.to_string(),
+        call_val,
+        tx_hash,
+        cache_args,
+    );
 
     // Set id to the original id
     response["id"] = id;

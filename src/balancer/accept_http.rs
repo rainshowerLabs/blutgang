@@ -1,7 +1,10 @@
 use crate::{
     balancer::{
         format::incoming_to_value,
-        processing::cache_querry,
+        processing::{
+            cache_querry,
+            CacheArgs,
+        },
         selection::select::pick,
     },
     cache_error,
@@ -192,15 +195,19 @@ macro_rules! get_response {
                     }
                 }
 
+                let cache_args = CacheArgs {
+                    finalized_rx: $finalized_rx,
+                    named_numbers: $named_numbers,
+                    cache: $cache,
+                    head_cache: $head_cache,
+                };
+
                 // Don't cache responses that contain errors or missing trie nodes
                 cache_querry(
                     &mut rx,
                     $tx,
                     $tx_hash,
-                    $finalized_rx,
-                    $named_numbers,
-                    $cache,
-                    $head_cache
+                    &cache_args,
                 );
 
                 rx
@@ -267,7 +274,7 @@ async fn forward_body(
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
-        cache,
+        &cache,
         tx_hash,
         rpc_position,
         id,
