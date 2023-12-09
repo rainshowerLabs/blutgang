@@ -25,16 +25,20 @@ blake3 = "1.4.1"
 jemallocator = "0.5.4"
 toml = "0.7.6"
 memchr = "2.5.0"
-rand = {version = "0.8.5", optional = true}
+rand = { version = "0.8.5" }
 chrono = "0.4.28"
-regex = "1.9.5"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
 hyper-util-blutgang = {version = "0.2.0", features = ["tokio"]}
 simd-json = { version = "0.12.0", features = ["approx-number-parsing", "serde_impl"] }
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
-zerocopy = { version = "0.7.20" }
+zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
+zerocopy-derive = "0.7.28"
 jsonwebtoken = "9.1.0"
 hyper-tungstenite = "0.12.0"
+futures = "0.3.29"
+tungstenite = "0.20.1"
+tokio-tungstenite = {version = "0.20.1", features = ["native-tls"]}
+futures-util = "0.3.29"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
@@ -51,6 +55,6 @@ xxhash = ["xxhash-rust"] # 4x faster caching but potentially less secure
 no-cache = [] # enable this to disable caching
 debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
-selection-random = ["rand"] # optional random algo
+selection-random = [] # optional random algo
 old-weighted-round-robin = [] # old algo, does not account for max per second
 # add your own below

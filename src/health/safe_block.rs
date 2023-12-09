@@ -98,7 +98,7 @@ pub async fn get_safe_block(
 
     // Return as NamedBlocknumbers
     let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
-    nn_rwlock.safe = safe;
+    nn_rwlock.finalized = safe;
 
     Ok(safe)
 }

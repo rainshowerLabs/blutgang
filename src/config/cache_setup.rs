@@ -1,17 +1,16 @@
 use sled::Db;
 use std::sync::Arc;
 
-pub fn setup_data(cache: Arc<Db>) {
-    let version_str = "blutgang 0.3.0-canary Garreg Mach";
-    let tagline = "`Now there's a way forward.`";
+pub const VERSION_STR: &str = "blutgang 0.3.0-canary Garreg Mach";
+const TAGLINE: &str = "`Now there's a way forward.`";
 
+pub fn setup_data(cache: Arc<Db>) {
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
-        version_str,
-        tagline
+        VERSION_STR, TAGLINE
     );
 
-    println!("\x1b[35mInfo:\x1b[0m Starting {}", version_str);
+    println!("\x1b[35mInfo:\x1b[0m Starting {}", VERSION_STR);
 
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache

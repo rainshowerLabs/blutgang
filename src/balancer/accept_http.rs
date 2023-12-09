@@ -1,26 +1,30 @@
 use crate::{
-    balancer::format::{
-        get_block_number_from_request,
-        incoming_to_value,
+    balancer::{
+        format::incoming_to_value,
+        processing::{
+            cache_querry,
+            CacheArgs,
+        },
+        selection::select::pick,
     },
-    balancer::selection::cache_rules::{
-        cache_method,
-        cache_result,
-    },
-    balancer::selection::select::pick,
     cache_error,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
+    rpc_response,
     timed_out,
+    websocket::server::serve_websocket,
     NamedBlocknumbers,
     Settings,
 };
 
-use serde_json::{
-    to_vec,
-    Value,
+use tokio::sync::{
+    broadcast,
+    mpsc,
+    watch,
 };
+
+use serde_json::Value;
 use simd_json;
 
 // Select either blake3 or xxhash based on the features
@@ -38,6 +42,11 @@ use hyper::{
     header::HeaderValue,
     Request,
 };
+use hyper_tungstenite::{
+    is_upgrade_request,
+    upgrade,
+};
+
 use sled::Db;
 
 use tokio::time::timeout;
@@ -61,6 +70,23 @@ struct RequestParams {
     max_retries: u32,
 }
 
+#[derive(Debug)]
+pub struct RequestChannels {
+    pub finalized_rx: Arc<watch::Receiver<u64>>,
+    pub incoming_tx: mpsc::UnboundedSender<Value>,
+    pub outgoing_rx: broadcast::Receiver<Value>,
+}
+
+impl Clone for RequestChannels {
+    fn clone(&self) -> Self {
+        Self {
+            finalized_rx: Arc::clone(&self.finalized_rx),
+            incoming_tx: self.incoming_tx.clone(),
+            outgoing_rx: self.outgoing_rx.resubscribe(),
+        }
+    }
+}
+
 // Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
@@ -68,7 +94,7 @@ macro_rules! accept {
         $io:expr,
         $rpc_list_rwlock:expr,
         $cache:expr,
-        $finalized_rx:expr,
+        $channels:expr,
         $named_numbers:expr,
         $head_cache:expr,
         $config:expr
@@ -82,7 +108,7 @@ macro_rules! accept {
                     let response = accept_request(
                         req,
                         Arc::clone($rpc_list_rwlock),
-                        $finalized_rx,
+                        $channels,
                         $named_numbers,
                         $head_cache,
                         Arc::clone($cache),
@@ -91,6 +117,7 @@ macro_rules! accept {
                     response
                 }),
             )
+            .with_upgrades()
             .await
         {
             println!("\x1b[31mErr:\x1b[0m Error serving connection: {:?}", err);
@@ -114,92 +141,76 @@ macro_rules! get_response {
         $max_retries:expr
     ) => {
         match $cache.get($tx_hash.as_bytes()) {
-            Ok(rax) => {
-                if let Some(mut rax) = rax {
-                    $rpc_position = None;
+            Ok(Some(mut rax)) => {
+                $rpc_position = None;
+                // Reconstruct ID
+                let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
 
-                    // Reconstruct ID
-                    let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                cached["id"] = $id.into();
+                cached.to_string()
+            },
+            Ok(None) => {
+                // Kinda jank but set the id back to what it was before
+                $tx["id"] = $id.into();
 
-                    cached["id"] = $id.into();
-                    cached.to_string()
-                } else {
-                    // Kinda jank but set the id back to what it was before
-                    $tx["id"] = $id.into();
+                // Loop until we get a response
+                let mut rx;
+                let mut retries = 0;
+                loop {
+                    // Get the next Rpc in line.
+                    let mut rpc;
+                    {
+                        let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                        (rpc, $rpc_position) = pick(&mut rpc_list);
+                    }
+                    println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
 
-                    let tx_string = $tx.to_string();
-
-                    // Loop until we get a response
-                    let mut rx;
-                    let mut retries = 0;
-                    loop {
-                        // Get the next Rpc in line.
-                        let mut rpc;
-                        {
-                            let mut rpc_list = $rpc_list_rwlock.write().unwrap();
-                            (rpc, $rpc_position) = pick(&mut rpc_list);
-                        }
-                        println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
-
-                        // Check if we have any RPCs in the list, if not return error
-                        if $rpc_position == None {
-                            return (no_rpc_available!(), None);
-                        }
-
-                        // Send the request. And return a timeout if it takes too long
-                        //
-                        // Check if it contains any errors or if its `latest` and insert it if it isn't
-                        match timeout(
-                            Duration::from_millis($ttl.try_into().unwrap()),
-                            rpc.send_request($tx.clone()),
-                        )
-                        .await
-                        {
-                            Ok(rxa) => {
-                                rx = rxa.unwrap();
-                                break;
-                            },
-                            Err(_) => {
-                                println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
-                                rpc.update_latency($ttl as f64);
-                                retries += 1;
-                            },
-                        };
-
-                        if retries == $max_retries {
-                            return (timed_out!(), $rpc_position,);
-                        }
+                    // Check if we have any RPCs in the list, if not return error
+                    if $rpc_position == None {
+                        return (no_rpc_available!(), None);
                     }
 
-                    // Don't cache responses that contain errors or missing trie nodes
-                    if cache_method(&tx_string) && cache_result(&rx) {
-                        // Insert the response hash into the head_cache
-                        let num = get_block_number_from_request($tx, $named_numbers);
+                    // Send the request. And return a timeout if it takes too long
+                    //
+                    // Check if it contains any errors or if its `latest` and insert it if it isn't
+                    match timeout(
+                        Duration::from_millis($ttl.try_into().unwrap()),
+                        rpc.send_request($tx.clone()),
+                    )
+                    .await
+                    {
+                        Ok(rxa) => {
+                            rx = rxa.unwrap();
+                            break;
+                        },
+                        Err(_) => {
+                            println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                            rpc.update_latency($ttl as f64);
+                            retries += 1;
+                        },
+                    };
 
-                        // Insert the key of the request we made into our `head_cache`
-                        // so we can invalidate it and remove it from the DB if it reorgs.
-                        if let Some(num) = num {
-                            if num > *$finalized_rx.borrow() {
-                                let mut head_cache = $head_cache.write().unwrap();
-                                head_cache
-                                    .entry(num)
-                                    .or_insert_with(Vec::new)
-                                    .push($tx_hash.to_string());
-
-                            }
-
-                            // Replace the id with Value::Null and insert the request
-                            let mut rx_value: Value = unsafe {
-                                simd_json::serde::from_str(&mut rx).unwrap()
-                            };
-                            rx_value["id"] = Value::Null;
-
-                            $cache.insert($tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()).unwrap();
-                        }
+                    if retries == $max_retries {
+                        return (timed_out!(), $rpc_position,);
                     }
-
-                    rx
                 }
+
+                let cache_args = CacheArgs {
+                    finalized_rx: $finalized_rx,
+                    named_numbers: $named_numbers,
+                    cache: $cache,
+                    head_cache: $head_cache,
+                };
+
+                // Don't cache responses that contain errors or missing trie nodes
+                cache_querry(
+                    &mut rx,
+                    $tx,
+                    $tx_hash,
+                    &cache_args,
+                );
+
+                rx
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
@@ -216,7 +227,7 @@ macro_rules! get_response {
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
@@ -268,9 +279,9 @@ async fn forward_body(
         rpc_position,
         id,
         rpc_list_rwlock,
-        finalized_rx,
-        named_numbers,
-        head_cache,
+        finalized_rx.clone(),
+        named_numbers.clone(),
+        head_cache.clone(),
         params.ttl,
         params.max_retries
     );
@@ -285,6 +296,7 @@ async fn forward_body(
     let res = hyper::Response::builder()
         .status(200)
         .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
         .body(body)
         .unwrap();
 
@@ -296,14 +308,50 @@ async fn forward_body(
 // RPC lself.
 // In case of a timeout, returns an error.
 pub async fn accept_request(
-    tx: Request<hyper::body::Incoming>,
+    mut tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    finalized_rx: &tokio::sync::watch::Receiver<u64>,
+    channels: RequestChannels,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // Check if the request is a websocket upgrade request.
+    if is_upgrade_request(&tx) {
+        println!("\x1b[35mInfo:\x1b[0m Received WS upgrade request");
+
+        let (response, websocket) = match upgrade(&mut tx, None) {
+            Ok((response, websocket)) => (response, websocket),
+            Err(e) => {
+                println!("\x1b[31mErr:\x1b[0m Websocket upgrade error: {e}");
+                return rpc_response!(500, Full::new(Bytes::from(
+                    "{code:-32004, message:\"error: Websocket upgrade error! Try again later...\"}"
+                        .to_string(),
+                )));
+            }
+        };
+
+        let cache_args = CacheArgs {
+            finalized_rx: channels.finalized_rx.as_ref().clone(),
+            named_numbers: named_numbers.clone(),
+            cache: cache,
+            head_cache: head_cache.clone(),
+        };
+
+        // Spawn a task to handle the websocket connection.
+        tokio::task::spawn(async move {
+
+            if let Err(e) =
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, &cache_args).await
+            {
+                println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
+            }
+        });
+
+        // Return the response so the spawned future can continue.
+        return Ok(response);
+    }
+
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
@@ -325,7 +373,7 @@ pub async fn accept_request(
     (response, rpc_position) = forward_body(
         tx,
         &rpc_list_rwlock,
-        finalized_rx,
+        &channels.finalized_rx,
         named_numbers,
         head_cache,
         cache,

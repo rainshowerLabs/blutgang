@@ -41,9 +41,8 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
 
     let time = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("Failed to get current time").as_micros();
-    #[cfg(test)]
-    println!("time: {}", time);
+        .expect("Failed to get current time")
+        .as_micros();
 
     // Picks the second fastest one rpc that meets our requirements
     // Also take into account min_delta_time
@@ -52,7 +51,6 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     let mut choice = indices[0];
     let mut choice_consecutive = 0;
     for i in indices.iter().rev() {
-
         if list[*i].max_consecutive > list[*i].consecutive
             && (time - list[*i].last_used > list[*i].min_time_delta)
         {
@@ -177,7 +175,8 @@ mod tests {
         rpc1.min_time_delta = 1701357164371770;
         rpc1.last_used = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("Failed to get current time").as_micros();
+            .expect("Failed to get current time")
+            .as_micros();
 
         rpc2.status.latency = 7.0;
         rpc2.max_consecutive = 10;

@@ -3,10 +3,16 @@ mod balancer;
 mod config;
 mod health;
 mod rpc;
+mod websocket;
+
+use serde_json::Value;
 
 use crate::{
     admin::listener::listen_for_admin_requests,
-    balancer::accept_http::accept_request,
+    balancer::accept_http::{
+        accept_request,
+        RequestChannels,
+    },
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
@@ -18,6 +24,7 @@ use crate::{
         safe_block::NamedBlocknumbers,
     },
     rpc::types::Rpc,
+    websocket::client::ws_conn_manager,
 };
 
 use std::{
@@ -29,8 +36,14 @@ use std::{
     },
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use tokio::{
+    net::TcpListener,
+    sync::{
+        broadcast,
+        mpsc,
+        watch,
+    },
+};
 
 use hyper::{
     server::conn::http1,
@@ -109,6 +122,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 
+    // websocket connections
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
+
+    let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    tokio::task::spawn(async move {
+        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
+    });
+
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
@@ -158,13 +180,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
 
+        let channels = RequestChannels {
+            finalized_rx: finalized_rx_clone,
+            incoming_tx: incoming_tx.clone(),
+            outgoing_rx: outgoing_rx.resubscribe(),
+        };
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             accept!(
                 io,
                 &rpc_list_rwlock_clone,
                 &cache_clone,
-                &finalized_rx_clone,
+                channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
                 &config_clone
