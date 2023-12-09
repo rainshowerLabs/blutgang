@@ -47,7 +47,6 @@ pub fn cache_querry(
     tx_hash: Hash,
     cache_args: &CacheArgs,
 ) {
-    println!("AUISDGHAUIDGHAUIODGAUIDGILADGAYLDGAYUKLDGAUKLDGAUILDGUIKLADFG");
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {

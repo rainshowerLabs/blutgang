@@ -157,7 +157,16 @@ pub async fn execute_ws_call(
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     // Convert `call` to value
-    let mut call_val: Value = serde_json::from_str(&call).unwrap();
+    let mut call_val: Value = match serde_json::from_str(&call) {
+        Ok(call_val) => call_val,
+        Err(e) => {
+            println!("Error parsing call: {}", e);
+            return Ok(
+                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}"
+                    .to_string(),
+            );
+        }
+    };
 
     // Store id of call and set random id we'll actually forward to the node
     //
