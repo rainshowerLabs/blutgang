@@ -49,6 +49,21 @@ pub enum RequestResult {
     Subscription(String),
 }
 
+impl From<RequestResult> for Value {
+    fn from(rax: RequestResult) -> Self {
+        match rax {
+            RequestResult::Call(mut rax) => {
+                let rax: Value = unsafe{ simd_json::serde::from_str(&mut rax).unwrap() };
+                rax
+            }
+            RequestResult::Subscription(mut rax) => {
+                let rax: Value = unsafe{ simd_json::serde::from_str(&mut rax).unwrap() };
+                rax
+            }
+        }
+    }
+}
+
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // Open WS connections to our nodes and accept and process internal WS calls
@@ -157,12 +172,14 @@ pub async fn ws_conn(
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
-    mut call: Value,
+    call: RequestResult,
     user_id: u64,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
-) -> Result<RequestResult, Error> {
+) -> Result<String, Error> {
+    let mut call: Value = call.into();
+
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
@@ -185,7 +202,7 @@ pub async fn execute_ws_call(
         Ok(Some(mut rax)) => {
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
-            return Ok(RequestResult::Call(cached.to_string()));
+            return Ok(cached.to_string());
         }
         Ok(None) => {}
         Err(e) => {
@@ -202,7 +219,7 @@ pub async fn execute_ws_call(
             Ok(Some(mut rax)) => {
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
                 cached["id"] = id;
-                return Ok(RequestResult::Subscription(cached.to_string()));
+                return Ok(cached.to_string());
             }
             Ok(None) => {}
             Err(e) => println!("Error accesssing subtree: {}", e),
@@ -243,5 +260,5 @@ pub async fn execute_ws_call(
     // Set id to the original id
     response["id"] = id;
 
-    Ok(RequestResult::Call(response.to_string()))
+    Ok(response.to_string())
 }
