@@ -82,6 +82,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Clear database if specified
     if do_clear_clone {
+        // Also drop the "subscriptions" tree
+        let _ = cache.drop_tree("subscriptions");
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
