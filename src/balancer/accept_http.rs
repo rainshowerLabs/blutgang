@@ -342,7 +342,7 @@ pub async fn accept_request(
         tokio::task::spawn(async move {
 
             if let Err(e) =
-                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, &cache_args).await
+                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, cache_args).await
             {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }

@@ -27,28 +27,38 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: broadcast::Receiver<Value>,
-    cache_args: &CacheArgs,
+    cache_args: CacheArgs,
 ) -> Result<(), Error> {
     let websocket = websocket.await?;
 
     // Split the Sink so we can do async send/recv
     let (mut websocket_sink, mut websocket_stream) = websocket.split();
 
+    // Create channels for message send/receiving
+    let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
+
+    // Spawn taks for sending messages to the client
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            println!("\x1b[35mInfo:\x1b[0m Sending WS message: {}", msg);
+            // Forward the message to the best available RPC
+            let resp = execute_ws_call(
+                msg.to_string(),
+                incoming_tx.clone(),
+                outgoing_rx.resubscribe(),
+                &cache_args,
+            )
+            .await.unwrap();
+            websocket_sink.send(Message::text(resp)).await.unwrap();
+        }
+    });
+
     while let Some(message) = websocket_stream.next().await {
         match message? {
-            Message::Text(msg) => {
+            Message::Text(mut msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
-
-                // Forward the message to the best available RPC
-                let resp = execute_ws_call(
-                    msg,
-                    incoming_tx.clone(),
-                    outgoing_rx.resubscribe(),
-                    cache_args,
-                )
-                .await?;
-
-                websocket_sink.send(Message::text(resp)).await?;
+                // Send message to the channel
+                tx.send(unsafe { simd_json::from_str(&mut msg)? }).unwrap();
             },
             Message::Close(msg) => {
                 if let Some(msg) = &msg {
@@ -60,14 +70,7 @@ pub async fn serve_websocket(
                     println!("Received close message");
                 }
             },
-            Message::Ping(_) | Message::Pong(_) => {},
-            _ => {
-                websocket_sink
-                    .send(Message::text(
-                        "Wrn: Unsupported message format, please use text!",
-                    ))
-                    .await?;
-            },
+            _ => {},
         }
     }
 
