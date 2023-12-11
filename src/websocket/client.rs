@@ -109,12 +109,12 @@ pub async fn ws_conn(
     outgoing_rx: broadcast::Sender<Value>,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
+    let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
 
+    let (mut write, mut read) = ws_stream.split();
+
+    // Create a task for sending messages to RPC
     tokio::spawn(async move {
-        let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
-
-        let (mut write, mut read) = ws_stream.split();
-
         // continuously listen for incoming messages
         loop {
             let incoming = incoming_tx.recv().await.unwrap();
@@ -128,11 +128,14 @@ pub async fn ws_conn(
 
             // Send request to ws_stream
             let _ = write.send(Message::Text(incoming.to_string())).await;
+        }
+    });
 
-            // get the response from ws_stream
+    // Create task for continously reading responses we got from our node and broadcasting them
+    tokio::spawn(async move {
+        loop {
             let rax = read.next().await.unwrap();
 
-            // send the response to outgoing_tx
             match rax {
                 Ok(rax) => {
                     let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
@@ -144,6 +147,8 @@ pub async fn ws_conn(
             }
         }
     });
+
+
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
