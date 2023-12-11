@@ -40,7 +40,6 @@ pub async fn serve_websocket(
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            println!("\x1b[35mInfo:\x1b[0m Sending WS message: {}", msg);
             // Forward the message to the best available RPC
             let resp = execute_ws_call(
                 msg.to_string(),
