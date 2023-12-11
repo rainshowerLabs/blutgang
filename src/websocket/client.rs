@@ -190,6 +190,9 @@ pub async fn execute_ws_call(
     // Replace call id with our user id
     call["id"] = user_id.into();
 
+    // Check if we're subscribing
+    let is_subscription = call["method"] == "eth_subscribe";
+
     // Send call to ws_conn_manager
     match incoming_tx.send(call.clone()) {
         Ok(_) => {}
