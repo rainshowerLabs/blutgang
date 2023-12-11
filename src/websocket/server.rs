@@ -1,9 +1,9 @@
 use crate::{
+    balancer::processing::CacheArgs,
     websocket::client::{
         execute_ws_call,
         RequestResult,
     },
-    balancer::processing::CacheArgs
 };
 
 use rand::random;
@@ -60,10 +60,17 @@ pub async fn serve_websocket(
                 &cache_args,
             )
             .await
-            .unwrap_or(RequestResult::Call("{\"error\": \"Failed to execute call\"}".to_string()));
+            .unwrap_or(RequestResult::Call(
+                "{\"error\": \"Failed to execute call\"}".to_string(),
+            ));
 
             match resp {
-                RequestResult::Call(resp) => websocket_sink.send(Message::text::<String>(resp.into())).await.unwrap(),
+                RequestResult::Call(resp) => {
+                    websocket_sink
+                        .send(Message::text::<String>(resp.into()))
+                        .await
+                        .unwrap()
+                }
                 RequestResult::Subscription(_) => println!("majmuneeeee"),
             }
         }
