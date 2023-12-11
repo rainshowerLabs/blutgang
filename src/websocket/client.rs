@@ -168,7 +168,7 @@ pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    mut broadcast_rx: broadcast::Receiver<Value>,
+    broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<RequestResult, Error> {
     // Store id of call and set random id we'll actually forward to the node
@@ -202,7 +202,9 @@ pub async fn execute_ws_call(
     }
 
     // Check if our call was a subscription
-    if call["method"] == "eth_subscribe" {
+    let is_subscription = call["method"] == "eth_subscribe";
+
+    if is_subscription {
         // Check if our tx_hash exists in the sled "subscriptions" subtree
         let subscriptions = cache_args.cache.open_tree("subscriptions")?;
 
@@ -228,21 +230,10 @@ pub async fn execute_ws_call(
         }
     };
 
-    // Wait until we get a response matching our id
-    let mut response = broadcast_rx
-        .recv()
-        .await
-        .expect("Failed to receive response from WS");
-
-    while response["id"] != user_id {
-        response = broadcast_rx
-            .recv()
-            .await
-            .expect("Failed to receive response from WS");
-    }
+    let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     // Cache if possible
-    if call["method"] == "eth_subscribe" {
+    if is_subscription {
         let _ = insert_and_return_subscription(tx_hash, response.clone(), cache_args);
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
@@ -251,5 +242,30 @@ pub async fn execute_ws_call(
     // Set id to the original id
     response["id"] = id;
 
+    if is_subscription {
+        return Ok(RequestResult::Subscription(response.to_string()));
+    }
+
     Ok(RequestResult::Call(response.to_string()))
+}
+
+// Listens for responses that match our id on the broadcast channel
+async fn listen_for_response(
+    user_id: u64,
+    mut broadcast_rx: broadcast::Receiver<Value>,
+) -> Result<Value, Error> {
+    // Wait until we get a response matching our id
+    let mut response = broadcast_rx
+        .recv()
+        .await
+        .expect("Failed to receive response from WS");
+
+    while response["id"] != <u64 as Into<Value>>::into(user_id) {
+        response = broadcast_rx
+            .recv()
+            .await
+            .expect("Failed to receive response from WS");
+    }
+
+    Ok(response)
 }
