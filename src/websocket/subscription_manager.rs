@@ -19,7 +19,7 @@ pub fn insert_and_return_subscription(
     // Insert the subscription for this tx_hash into the subtree
     tree.insert(
         tx_hash.as_bytes(),
-        &subscription_id.as_u64().unwrap().to_be_bytes(),
+        &*subscription_id.as_str().unwrap(),
     )?;
 
     Ok(subscription_id.to_string())
