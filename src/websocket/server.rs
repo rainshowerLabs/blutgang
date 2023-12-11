@@ -1,8 +1,8 @@
-use crate::websocket::subscription_manager::RequestResult;
 use crate::{
     balancer::processing::CacheArgs,
-    websocket::client::{
-        execute_ws_call,
+    websocket::{
+        client::execute_ws_call,
+        subscription_manager::RequestResult,
     },
 };
 
@@ -60,9 +60,7 @@ pub async fn serve_websocket(
                 &cache_args,
             )
             .await
-            .unwrap_or(
-                "{\"error\": \"Failed to execute call\"}".to_string(),
-            );
+            .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
 
             websocket_sink
                 .send(Message::text::<String>(resp))
@@ -76,7 +74,10 @@ pub async fn serve_websocket(
             Message::Text(mut msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
-                tx.send(RequestResult::Call(unsafe { simd_json::from_str(&mut msg)? })).unwrap();
+                tx.send(RequestResult::Call(unsafe {
+                    simd_json::from_str(&mut msg)?
+                }))
+                .unwrap();
             }
             Message::Close(msg) => {
                 if let Some(msg) = &msg {

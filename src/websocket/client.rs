@@ -58,7 +58,6 @@ pub async fn ws_conn_manager(
     // We also want to have a corresponding channel and put it in a Vec
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
-
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
 
         ws_handles.push(Some(ws_conn_incoming_tx));
@@ -100,11 +99,6 @@ pub async fn ws_conn_manager(
             }
         };
     }
-}
-
-// Reads all incoming data from all RPCs and broadcasts it
-fn _read_and_broadcast(_arg: u32) -> u32 {
-    unimplemented!()
 }
 
 // Creates a task makes a new ws connection, listens to incoming messages and

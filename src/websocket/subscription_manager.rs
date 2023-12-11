@@ -12,12 +12,12 @@ pub enum RequestResult {
 }
 
 impl From<RequestResult> for Value {
-	fn from(req: RequestResult) -> Self {
-		match req {
-			RequestResult::Call(call) => call,
-			RequestResult::Subscription(sub) => sub,
-		}
-	}
+    fn from(req: RequestResult) -> Self {
+        match req {
+            RequestResult::Call(call) => call,
+            RequestResult::Subscription(sub) => sub,
+        }
+    }
 }
 
 // We want to return the subscription id and insert it into a subtree
