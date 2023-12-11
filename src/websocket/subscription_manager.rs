@@ -22,5 +22,5 @@ pub fn insert_and_return_subscription(
         &subscription_id.as_u64().unwrap().to_be_bytes(),
     )?;
 
-    return Ok(subscription_id.to_string());
+    Ok(subscription_id.to_string())
 }

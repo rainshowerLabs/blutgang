@@ -67,7 +67,7 @@ pub async fn serve_websocket(
             match resp {
                 RequestResult::Call(resp) => {
                     websocket_sink
-                        .send(Message::text::<String>(resp.into()))
+                        .send(Message::text::<String>(resp))
                         .await
                         .unwrap()
                 }
