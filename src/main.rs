@@ -27,7 +27,10 @@ use crate::{
     rpc::types::Rpc,
     websocket::{
         client::ws_conn_manager,
-        subscription_manager::RequestResult,
+        subscription_manager::{
+            RequestResult,
+            subscription_dispatcher,
+        },
     },
 };
 
@@ -136,10 +139,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
 
     // Map of subscriptions to users
+    // TODO: I feel like this is sub optimal for performance
     let subscribed_users = Arc::new(DashMap::<u64, Vec<u64>>::new());
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    let sink_map_ws = Arc::clone(&sink_map);
+    let subscribed_users_ws = Arc::clone(&subscribed_users);
+    let outgoing_rx_ws = outgoing_rx.resubscribe();
+
     tokio::task::spawn(async move {
+        subscription_dispatcher(outgoing_rx_ws, sink_map_ws, subscribed_users_ws);
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
     });
 

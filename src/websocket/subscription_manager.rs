@@ -1,7 +1,14 @@
-use crate::balancer::processing::CacheArgs;
+use crate::{
+    balancer::processing::CacheArgs,
+    rpc::types::hex_to_decimal,
+};
 use blake3::Hash;
+use dashmap::DashMap;
 use serde_json::Value;
 use simd_json::to_vec;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -41,4 +48,47 @@ pub fn insert_and_return_subscription(
 }
 
 // Sends all subscriptions to their relevant nodes
-// pub fn subscription_dispatch()
+pub fn subscription_dispatcher(
+    mut rx: broadcast::Receiver<Value>,
+    sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+    subscribed_users: Arc<DashMap<u64, Vec<u64>>>,
+) {
+    tokio::spawn(async move {
+        loop {
+            // Receive the WS response
+            let response = rx.recv().await.unwrap();
+
+            // Check if its a subscription
+            if response["method"] != "eth_subscription" {
+                continue;
+            }
+
+            // Get the subscription id
+            let id = response["params"]["subscription"].as_str().unwrap();
+            let id = hex_to_decimal(id).unwrap();
+
+            // Get all the users that are subscribed to this subscription
+            let a = subscribed_users.clone();
+            let users = a.get(&id);
+            let users = users.as_deref();
+
+            // If there are no users, we can skip this
+            // TODO: UNSUBSCRIBE!!!
+            if users.is_none() || users.unwrap().is_empty() {
+                continue;
+            }
+
+            let users = users.unwrap();
+
+            // Send the response to all the users
+            for user in users {
+                // Get the user's channel
+                let tx = sink_map.get(user).unwrap();
+
+                // Send the response
+                tx.send(RequestResult::Subscription(response.clone()))
+                    .unwrap();
+            }
+        }
+    });
+}

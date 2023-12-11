@@ -91,6 +91,7 @@ pub async fn serve_websocket(
             Message::Close(msg) => {
                 // Remove the user from the sink map
                 sink_map.remove(&user_id);
+
                 if let Some(msg) = &msg {
                     println!(
                         "\x1b[35mInfo:\x1b[0mReceived close message with code {} and message: {}",

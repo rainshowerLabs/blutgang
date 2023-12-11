@@ -6,6 +6,7 @@ use crate::{
         },
         selection::select::pick,
     },
+    rpc::types::hex_to_decimal,
     websocket::subscription_manager::insert_and_return_subscription,
     Rpc,
 };
@@ -223,6 +224,17 @@ pub async fn execute_ws_call(
     // Cache if possible
     if is_subscription {
         let _ = insert_and_return_subscription(tx_hash, response.clone(), cache_args);
+        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
+
+        // Register the subscription id with the user
+        //
+        // We'll have to append or create the vec
+        if let Some(subscribed_users) = &cache_args.subscribed_users {
+            subscribed_users
+                .entry(subscription_id)
+                .or_default()
+                .push(user_id);
+        }
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }
