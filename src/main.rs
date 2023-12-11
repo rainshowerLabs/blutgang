@@ -103,6 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
+    let finalized_rx_arc = Arc::new(finalized_rx);
 
     if health_check_clone {
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
@@ -153,13 +154,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
     let cache_clone = Arc::clone(&cache);
-    let finalized_rx_clone = finalized_rx.clone();
-
+    let finalized_rxclone = Arc::clone(&finalized_rx_arc);
     tokio::task::spawn(async move {
         let _ = manage_cache(
             &head_cache_clone,
             blocknum_rx,
-            finalized_rx_clone.clone(),
+            finalized_rxclone,
             &cache_clone,
         )
         .await;
@@ -178,11 +178,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let cache_clone = Arc::clone(&cache);
         let head_cache_clone = Arc::clone(&head_cache);
+        let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
 
         let channels = RequestChannels {
-            finalized_rx: finalized_rx.clone(),
+            finalized_rx: finalized_rx_clone,
             incoming_tx: incoming_tx.clone(),
             outgoing_rx: outgoing_rx.resubscribe(),
         };

@@ -72,7 +72,7 @@ struct RequestParams {
 
 #[derive(Debug)]
 pub struct RequestChannels {
-    pub finalized_rx: watch::Receiver<u64>,
+    pub finalized_rx: Arc<watch::Receiver<u64>>,
     pub incoming_tx: mpsc::UnboundedSender<Value>,
     pub outgoing_rx: broadcast::Receiver<Value>,
 }
@@ -80,7 +80,7 @@ pub struct RequestChannels {
 impl Clone for RequestChannels {
     fn clone(&self) -> Self {
         Self {
-            finalized_rx: self.finalized_rx.clone(),
+            finalized_rx: Arc::clone(&self.finalized_rx),
             incoming_tx: self.incoming_tx.clone(),
             outgoing_rx: self.outgoing_rx.resubscribe(),
         }
@@ -332,7 +332,7 @@ pub async fn accept_request(
         };
 
         let cache_args = CacheArgs {
-            finalized_rx: channels.finalized_rx.clone(),
+            finalized_rx: channels.finalized_rx.as_ref().clone(),
             named_numbers: named_numbers.clone(),
             cache,
             head_cache: head_cache.clone(),
