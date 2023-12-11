@@ -43,12 +43,6 @@ use tokio::sync::{
     mpsc,
 };
 
-#[derive(Debug)]
-pub enum RequestResult {
-    Call(String),
-    Subscription(String),
-}
-
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // Open WS connections to our nodes and accept and process internal WS calls
@@ -170,7 +164,7 @@ pub async fn execute_ws_call(
     incoming_tx: mpsc::UnboundedSender<Value>,
     broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
-) -> Result<RequestResult, Error> {
+) -> Result<String, Error> {
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
@@ -193,7 +187,7 @@ pub async fn execute_ws_call(
         Ok(Some(mut rax)) => {
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
-            return Ok(RequestResult::Call(cached.to_string()));
+            return Ok(cached.to_string());
         }
         Ok(None) => {}
         Err(e) => {
@@ -212,7 +206,7 @@ pub async fn execute_ws_call(
             Ok(Some(mut rax)) => {
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
                 cached["id"] = id;
-                return Ok(RequestResult::Subscription(cached.to_string()));
+                return Ok(cached.to_string());
             }
             Ok(None) => {}
             Err(e) => println!("Error accesssing subtree: {}", e),
@@ -242,11 +236,7 @@ pub async fn execute_ws_call(
     // Set id to the original id
     response["id"] = id;
 
-    if is_subscription {
-        return Ok(RequestResult::Subscription(response.to_string()));
-    }
-
-    Ok(RequestResult::Call(response.to_string()))
+    Ok(response.to_string())
 }
 
 // Listens for responses that match our id on the broadcast channel

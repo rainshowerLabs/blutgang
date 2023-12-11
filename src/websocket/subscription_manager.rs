@@ -5,6 +5,12 @@ use simd_json::to_vec;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
+#[derive(Debug)]
+pub enum RequestResult {
+    Call(String),
+    Subscription(String),
+}
+
 // We want to return the subscription id and insert it into a subtree
 //
 // If multiple nodes have made the same subscription request, we can just return

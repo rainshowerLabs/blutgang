@@ -2,7 +2,6 @@ use crate::{
     balancer::processing::CacheArgs,
     websocket::client::{
         execute_ws_call,
-        RequestResult,
     },
 };
 
@@ -60,25 +59,14 @@ pub async fn serve_websocket(
                 &cache_args,
             )
             .await
-            .unwrap_or(RequestResult::Call(
+            .unwrap_or(
                 "{\"error\": \"Failed to execute call\"}".to_string(),
-            ));
+            );
 
-            match resp {
-                RequestResult::Call(resp) => {
-                    websocket_sink
-                        .send(Message::text::<String>(resp))
-                        .await
-                        .unwrap()
-                }
-                RequestResult::Subscription(resp) => {
-                    println!("Registered subscription");
-                    websocket_sink
-                        .send(Message::text::<String>(resp))
-                        .await
-                        .unwrap()
-                }
-            }
+            websocket_sink
+                .send(Message::text::<String>(resp))
+                .await
+                .unwrap()
         }
     });
 
