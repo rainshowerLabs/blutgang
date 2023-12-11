@@ -46,10 +46,6 @@ use tokio::sync::{
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-struct ConnectionChannels {
-    incoming_tx: mpsc::UnboundedSender<Value>,
-}
-
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
 pub async fn ws_conn_manager(
@@ -65,11 +61,7 @@ pub async fn ws_conn_manager(
     for rpc in rpc_list_clone {
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
 
-        let connections = ConnectionChannels {
-            incoming_tx: ws_conn_incoming_tx,
-        };
-
-        ws_handles.push(connections);
+        ws_handles.push(ws_conn_incoming_tx);
 
         ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
     }
@@ -95,7 +87,7 @@ pub async fn ws_conn_manager(
         };
 
         // Send message to the corresponding ws_conn
-        match ws_handles[rpc_position].incoming_tx.send(incoming) {
+        match ws_handles[rpc_position].send(incoming) {
             Ok(_) => {}
             Err(e) => {
                 println!("ws_conn_manager error: {}", e);
