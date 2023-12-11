@@ -79,9 +79,10 @@ pub async fn ws_conn_manager(
     // We also want to have a corresponding channel and put it in a Vec
     let mut ws_handles = Vec::new();
     for rpc in rpc_list_clone {
+
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
 
-        ws_handles.push(ws_conn_incoming_tx);
+        ws_handles.push(Some(ws_conn_incoming_tx));
 
         ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
     }
@@ -106,10 +107,17 @@ pub async fn ws_conn_manager(
         };
 
         // Send message to the corresponding ws_conn
-        match ws_handles[rpc_position].send(incoming) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("ws_conn_manager error: {}", e);
+        match &ws_handles[rpc_position] {
+            Some(ws) => {
+                match ws.send(incoming) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("ws_conn_manager error: {}", e);
+                    }
+                };
+            }
+            None => {
+                println!("No WS connection at that index!");
             }
         };
     }
