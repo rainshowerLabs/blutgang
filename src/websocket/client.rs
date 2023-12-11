@@ -16,8 +16,6 @@ use tokio_tungstenite::{
 
 use serde_json::Value;
 
-use rand::random;
-
 use std::{
     println,
     sync::{
@@ -136,7 +134,7 @@ pub async fn ws_conn(
         loop {
             let rax = read.next().await.unwrap();
             println!("ws_conn: got response: {:?}", rax);
-            
+
             match rax {
                 Ok(rax) => {
                     let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
@@ -153,6 +151,7 @@ pub async fn ws_conn(
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
     mut call: Value,
+    user_id: u64,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
@@ -188,8 +187,8 @@ pub async fn execute_ws_call(
         }
     }
 
-    let rand_id = random::<u32>();
-    call["id"] = rand_id.into();
+    // Replace call id with our user id
+    call["id"] = user_id.into();
 
     // Send call to ws_conn_manager
     match incoming_tx.send(call.clone()) {
@@ -205,8 +204,8 @@ pub async fn execute_ws_call(
         .await
         .expect("Failed to receive response from WS");
 
-    if response["id"] != rand_id {
-        while response["id"] != id {
+    if response["id"] != user_id {
+        while response["id"] != user_id {
             response = broadcast_rx
                 .recv()
                 .await
