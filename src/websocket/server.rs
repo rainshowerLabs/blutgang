@@ -1,4 +1,11 @@
-use crate::balancer::processing::CacheArgs;
+use crate::{
+    websocket::client::{
+        execute_ws_call,
+        RequestResult,
+    },
+    balancer::processing::CacheArgs
+};
+
 use rand::random;
 use serde_json::Value;
 
@@ -6,8 +13,6 @@ use tokio::sync::{
     broadcast,
     mpsc,
 };
-
-use crate::websocket::client::execute_ws_call;
 
 use futures::{
     sink::SinkExt,
@@ -55,8 +60,12 @@ pub async fn serve_websocket(
                 &cache_args,
             )
             .await
-            .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
-            websocket_sink.send(Message::text(resp)).await.unwrap();
+            .unwrap_or(RequestResult::Call("{\"error\": \"Failed to execute call\"}".to_string()));
+
+            match resp {
+                RequestResult::Call(resp) => websocket_sink.send(Message::text::<String>(resp.into())).await.unwrap(),
+                RequestResult::Subscription(_) => println!("majmuneeeee"),
+            }
         }
     });
 
