@@ -5,6 +5,7 @@ mod health;
 mod rpc;
 mod websocket;
 
+use dashmap::DashMap;
 use serde_json::Value;
 
 use crate::{
@@ -24,7 +25,13 @@ use crate::{
         safe_block::NamedBlocknumbers,
     },
     rpc::types::Rpc,
-    websocket::client::ws_conn_manager,
+    websocket::{
+        client::ws_conn_manager,
+        subscription_manager::{
+            RequestResult,
+            subscription_dispatcher,
+        },
+    },
 };
 
 use std::{
@@ -82,6 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Clear database if specified
     if do_clear_clone {
+        // Also drop the "subscriptions" tree
+        let _ = cache.drop_tree("subscriptions");
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
@@ -126,8 +135,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
 
+    // Map of user ids to channels
+    let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
+
+    // Map of subscriptions to users
+    // TODO: I feel like this is sub optimal for performance
+    let subscribed_users = Arc::new(DashMap::<u64, Vec<u64>>::new());
+
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    let sink_map_ws = Arc::clone(&sink_map);
+    let subscribed_users_ws = Arc::clone(&subscribed_users);
+    let outgoing_rx_ws = outgoing_rx.resubscribe();
+
     tokio::task::spawn(async move {
+        subscription_dispatcher(outgoing_rx_ws, sink_map_ws, subscribed_users_ws);
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
     });
 
@@ -179,6 +200,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
+        let sink_map_clone = Arc::clone(&sink_map);
+        let subscribed_users_clone = Arc::clone(&subscribed_users);
 
         let channels = RequestChannels {
             finalized_rx: finalized_rx_clone,
@@ -195,6 +218,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
+                &sink_map_clone,
+                &subscribed_users_clone,
                 &config_clone
             );
         });

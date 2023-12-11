@@ -1,12 +1,21 @@
-use crate::balancer::processing::CacheArgs;
+use dashmap::DashMap;
+use std::sync::Arc;
+
+use crate::{
+    balancer::processing::CacheArgs,
+    websocket::{
+        client::execute_ws_call,
+        subscription_manager::RequestResult,
+    },
+};
+
+use rand::random;
 use serde_json::Value;
 
 use tokio::sync::{
     broadcast,
     mpsc,
 };
-
-use crate::websocket::client::execute_ws_call;
 
 use futures::{
     sink::SinkExt,
@@ -27,27 +36,62 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: broadcast::Receiver<Value>,
-    cache_args: &CacheArgs,
+    sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+
+    cache_args: CacheArgs,
 ) -> Result<(), Error> {
-    let mut websocket = websocket.await?;
+    let websocket = websocket.await?;
 
-    while let Some(message) = websocket.next().await {
+    // Split the Sink so we can do async send/recv
+    let (mut websocket_sink, mut websocket_stream) = websocket.split();
+
+    // Create channels for message send/receiving
+    let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
+
+    // Generate an id for our user
+    //
+    // We use this to identify which requests are for us
+    let user_id = random::<u64>();
+
+    // Add the user to the sink map
+    println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
+    sink_map.insert(user_id, tx.clone());
+
+    // Spawn taks for sending messages to the client
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            // Forward the message to the best available RPC
+            let resp = execute_ws_call(
+                msg.into(),
+                user_id,
+                incoming_tx.clone(),
+                outgoing_rx.resubscribe(),
+                &cache_args,
+            )
+            .await
+            .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
+
+            websocket_sink
+                .send(Message::text::<String>(resp))
+                .await
+                .unwrap()
+        }
+    });
+
+    while let Some(message) = websocket_stream.next().await {
         match message? {
-            Message::Text(msg) => {
+            Message::Text(mut msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
-
-                // Forward the message to the best available RPC
-                let resp = execute_ws_call(
-                    msg,
-                    incoming_tx.clone(),
-                    outgoing_rx.resubscribe(),
-                    cache_args,
-                )
-                .await?;
-
-                websocket.send(Message::text(resp)).await?;
+                // Send message to the channel
+                tx.send(RequestResult::Call(unsafe {
+                    simd_json::from_str(&mut msg)?
+                }))
+                .unwrap();
             }
             Message::Close(msg) => {
+                // Remove the user from the sink map
+                sink_map.remove(&user_id);
+
                 if let Some(msg) = &msg {
                     println!(
                         "\x1b[35mInfo:\x1b[0mReceived close message with code {} and message: {}",
@@ -57,14 +101,7 @@ pub async fn serve_websocket(
                     println!("Received close message");
                 }
             }
-            Message::Ping(_) | Message::Pong(_) => {}
-            _ => {
-                websocket
-                    .send(Message::text(
-                        "Wrn: Unsupported message format, please use text!",
-                    ))
-                    .await?;
-            }
+            _ => {}
         }
     }
 

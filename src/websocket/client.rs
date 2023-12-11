@@ -1,11 +1,13 @@
 use crate::{
     balancer::{
-        selection::select::pick,
         processing::{
             cache_querry,
             CacheArgs,
         },
+        selection::select::pick,
     },
+    rpc::types::hex_to_decimal,
+    websocket::subscription_manager::insert_and_return_subscription,
     Rpc,
 };
 
@@ -15,8 +17,6 @@ use tokio_tungstenite::{
 };
 
 use serde_json::Value;
-
-use rand::random;
 
 use std::{
     println,
@@ -46,10 +46,6 @@ use tokio::sync::{
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-struct ConnectionChannels {
-    incoming_tx: mpsc::UnboundedSender<Value>,
-}
-
 // Open WS connections to our nodes and accept and process internal WS calls
 // whenever we receive something from incoming_rx
 pub async fn ws_conn_manager(
@@ -65,11 +61,7 @@ pub async fn ws_conn_manager(
     for rpc in rpc_list_clone {
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
 
-        let connections = ConnectionChannels {
-            incoming_tx: ws_conn_incoming_tx,
-        };
-
-        ws_handles.push(connections);
+        ws_handles.push(Some(ws_conn_incoming_tx));
 
         ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
     }
@@ -85,7 +77,6 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-
         // Error if rpc_position is None
         let rpc_position = if let Some(rpc_position) = rpc_position {
             rpc_position
@@ -95,10 +86,17 @@ pub async fn ws_conn_manager(
         };
 
         // Send message to the corresponding ws_conn
-        match ws_handles[rpc_position].incoming_tx.send(incoming) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("ws_conn_manager error: {}", e);
+        match &ws_handles[rpc_position] {
+            Some(ws) => {
+                match ws.send(incoming) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("ws_conn_manager error: {}", e);
+                    }
+                };
+            }
+            None => {
+                println!("No WS connection at that index!");
             }
         };
     }
@@ -112,12 +110,12 @@ pub async fn ws_conn(
     outgoing_rx: broadcast::Sender<Value>,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
+    let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
 
+    let (mut write, mut read) = ws_stream.split();
+
+    // Create a task for sending messages to RPC
     tokio::spawn(async move {
-        let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
-
-        let (mut write, mut read) = ws_stream.split();
-
         // continuously listen for incoming messages
         loop {
             let incoming = incoming_tx.recv().await.unwrap();
@@ -131,14 +129,19 @@ pub async fn ws_conn(
 
             // Send request to ws_stream
             let _ = write.send(Message::Text(incoming.to_string())).await;
+        }
+    });
 
-            // get the response from ws_stream
+    // Create task for continously reading responses we got from our node and broadcasting them
+    tokio::spawn(async move {
+        loop {
             let rax = read.next().await.unwrap();
+            println!("ws_conn: got response: {:?}", rax);
 
-            // send the response to outgoing_tx
             match rax {
                 Ok(rax) => {
-                    let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
+                    let rax =
+                        unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
                     outgoing_rx.send(rax).unwrap();
                 }
                 Err(e) => {
@@ -151,90 +154,114 @@ pub async fn ws_conn(
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
-    mut call: String,
+    mut call: Value,
+    user_id: u64,
     incoming_tx: mpsc::UnboundedSender<Value>,
-    mut broadcast_rx: broadcast::Receiver<Value>,
+    broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
-    // Convert `call` to value
-    let mut call_val: Value = match unsafe { simd_json::from_str(&mut call) } {
-        Ok(call_val) => call_val,
-        Err(e) => {
-            println!("Error parsing call: {}", e);
-            return Ok(
-                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}"
-                    .to_string(),
-            );
-        }
-    };
-
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
-    let id = call_val["id"].take();
+    let id = call["id"].take();
 
     // Hash the request with either blake3 or xxhash depending on the enabled feature
     let tx_hash;
     #[cfg(not(feature = "xxhash"))]
     {
-        tx_hash = hash(call_val.to_string().as_bytes());
+        tx_hash = hash(call.to_string().as_bytes());
     }
     #[cfg(feature = "xxhash")]
     {
-        tx_hash = xxh3_64(call_val.to_string().as_bytes());
+        tx_hash = xxh3_64(call.to_string().as_bytes());
     }
 
     // Check if we have a cached response
     // TODO: responses arent shared??
     match cache_args.cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
-           let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
             return Ok(cached.to_string());
         }
-        Ok(None) => {
-        }
+        Ok(None) => {}
         Err(e) => {
             println!("Error getting cached response: {}", e);
         }
     }
 
-    let rand_id = random::<u32>();
-    call_val["id"] = rand_id.into();
+    // Check if our call was a subscription
+    let is_subscription = call["method"] == "eth_subscribe";
+
+    if is_subscription {
+        // Check if our tx_hash exists in the sled "subscriptions" subtree
+        let subscriptions = cache_args.cache.open_tree("subscriptions")?;
+
+        match subscriptions.get(tx_hash.as_bytes()) {
+            Ok(Some(mut rax)) => {
+                let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                cached["id"] = id;
+                return Ok(cached.to_string());
+            }
+            Ok(None) => {}
+            Err(e) => println!("Error accesssing subtree: {}", e),
+        }
+    }
+
+    // Replace call id with our user id
+    call["id"] = user_id.into();
 
     // Send call to ws_conn_manager
-    match incoming_tx.send(call_val.clone()) {
+    match incoming_tx.send(call.clone()) {
         Ok(_) => {}
         Err(e) => {
             println!("ws_conn_manager error: {}", e);
         }
     };
 
+    let mut response = listen_for_response(user_id, broadcast_rx).await?;
+
+    // Cache if possible
+    if is_subscription {
+        let _ = insert_and_return_subscription(tx_hash, response.clone(), cache_args);
+        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
+
+        // Register the subscription id with the user
+        //
+        // We'll have to append or create the vec
+        if let Some(subscribed_users) = &cache_args.subscribed_users {
+            subscribed_users
+                .entry(subscription_id)
+                .or_default()
+                .push(user_id);
+        }
+    } else {
+        cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
+    }
+
+    // Set id to the original id
+    response["id"] = id;
+
+    Ok(response.to_string())
+}
+
+// Listens for responses that match our id on the broadcast channel
+async fn listen_for_response(
+    user_id: u64,
+    mut broadcast_rx: broadcast::Receiver<Value>,
+) -> Result<Value, Error> {
     // Wait until we get a response matching our id
     let mut response = broadcast_rx
         .recv()
         .await
         .expect("Failed to receive response from WS");
 
-    if response["id"] != rand_id {
-        while response["id"] != id {
-            response = broadcast_rx
-                .recv()
-                .await
-                .expect("Failed to receive response from WS");
-        }
+    while response["id"] != <u64 as Into<Value>>::into(user_id) {
+        response = broadcast_rx
+            .recv()
+            .await
+            .expect("Failed to receive response from WS");
     }
 
-    // Cache if possible
-    cache_querry(
-        &mut response.to_string(),
-        call_val,
-        tx_hash,
-        cache_args,
-    );
-
-    // Set id to the original id
-    response["id"] = id;
-
-    Ok(response.to_string())
+    Ok(response)
 }

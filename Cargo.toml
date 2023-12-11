@@ -39,6 +39,7 @@ futures = "0.3.29"
 tungstenite = "0.20.1"
 tokio-tungstenite = {version = "0.20.1", features = ["native-tls"]}
 futures-util = "0.3.29"
+dashmap = "5.5.3"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
