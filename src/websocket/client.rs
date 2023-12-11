@@ -203,12 +203,11 @@ pub async fn execute_ws_call(
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
                 cached["id"] = id;
                 return Ok(RequestResult::Subscription(cached.to_string()));
-            },
-            Ok(None) => {},
+            }
+            Ok(None) => {}
             Err(e) => println!("Error accesssing subtree: {}", e),
         }
     }
-
 
     // Replace call id with our user id
     call["id"] = user_id.into();

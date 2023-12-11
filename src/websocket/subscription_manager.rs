@@ -1,7 +1,7 @@
-use simd_json::to_vec;
 use crate::balancer::processing::CacheArgs;
 use blake3::Hash;
 use serde_json::Value;
+use simd_json::to_vec;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -20,9 +20,7 @@ pub fn insert_and_return_subscription(
     let tree = cache_args.cache.open_tree("subscriptions")?;
 
     // Insert the subscription for this tx_hash into the subtree
-    let _ = tree.insert(
-        tx_hash.as_bytes(),
-        to_vec(&response).unwrap().as_slice());
+    let _ = tree.insert(tx_hash.as_bytes(), to_vec(&response).unwrap().as_slice());
 
     Ok(response)
 }

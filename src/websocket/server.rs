@@ -77,7 +77,7 @@ pub async fn serve_websocket(
                         .send(Message::text::<String>(resp))
                         .await
                         .unwrap()
-                },
+                }
             }
         }
     });
