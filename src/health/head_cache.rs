@@ -16,7 +16,7 @@ use tokio_stream::{
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
-    finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
+    finalized_rx: tokio::sync::watch::Receiver<u64>,
     cache: &Arc<sled::Db>,
 ) -> Result<(), sled::Error> {
     let mut block_number = 0;
