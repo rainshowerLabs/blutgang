@@ -24,3 +24,6 @@ pub fn insert_and_return_subscription(
 
     Ok(subscription_id.to_string())
 }
+
+// Sends all subscriptions to their relevant nodes
+pub fn subscription_dispatch()
