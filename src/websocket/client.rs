@@ -171,7 +171,7 @@ pub async fn execute_ws_call(
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
-    let id = call_val["id"].clone();
+    let id = call_val["id"].take();
 
     // Hash the request with either blake3 or xxhash depending on the enabled feature
     let tx_hash;
@@ -188,7 +188,7 @@ pub async fn execute_ws_call(
     // TODO: responses arent shared??
     match cache_args.cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
-            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+           let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
             return Ok(cached.to_string());
         }

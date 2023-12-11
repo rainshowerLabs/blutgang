@@ -33,7 +33,6 @@ pub struct CacheArgs{
 // TODO: we should find a way to check values directly and not convert Value to str
 pub fn can_cache(method: &str, result: &str) -> bool {
     if cache_method(method) && cache_result(result) {
-        println!("we out here");
         return true;
     }
     println!("womp womp");
