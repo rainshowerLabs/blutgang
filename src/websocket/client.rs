@@ -1,4 +1,5 @@
 use crate::{
+    websocket::subscription_manager::insert_and_return_subscription,
     balancer::{
         selection::select::pick,
         processing::{
@@ -22,6 +23,7 @@ use std::{
         Arc,
         RwLock,
     },
+    str::from_utf8,
 };
 
 // Select either blake3 or xxhash based on the features
@@ -41,6 +43,12 @@ use tokio::sync::{
     broadcast,
     mpsc,
 };
+
+#[derive(Debug)]
+pub enum RequestResult {
+    Call(String),
+    Subscription(String),
+}
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -155,7 +163,7 @@ pub async fn execute_ws_call(
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
-) -> Result<String, Error> {
+) -> Result<RequestResult, Error> {
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
@@ -178,7 +186,7 @@ pub async fn execute_ws_call(
         Ok(Some(mut rax)) => {
            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
-            return Ok(cached.to_string());
+            return Ok(RequestResult::Call(cached.to_string()));
         }
         Ok(None) => {
         }
@@ -189,9 +197,6 @@ pub async fn execute_ws_call(
 
     // Replace call id with our user id
     call["id"] = user_id.into();
-
-    // Check if we're subscribing
-    let is_subscription = call["method"] == "eth_subscribe";
 
     // Send call to ws_conn_manager
     match incoming_tx.send(call.clone()) {
@@ -214,6 +219,31 @@ pub async fn execute_ws_call(
             .expect("Failed to receive response from WS");
     }
 
+    // Check if our call was a subscription
+    if call["method"] == "eth_subscribe" {
+        // Check if our tx_hash exists in the sled "subscriptions" subtree
+        let subscriptions = cache_args.cache.open_tree("subscriptions")?;
+
+        match subscriptions.get(tx_hash.as_bytes()) {
+            Ok(Some(subscription_id)) => {
+                return Ok(RequestResult::Subscription(from_utf8(subscription_id.as_ref()).unwrap().to_string()));
+            }
+            Ok(None) => {
+                return Ok(RequestResult::Subscription(insert_and_return_subscription(
+                    tx_hash,
+                    response,
+                    subscriptions,
+                )?));
+
+            }
+            Err(e) => {
+                println!("Error accesssing subtree: {}", e);
+            }
+        }
+
+    }
+
+
     // Cache if possible
     cache_querry(
         &mut response.to_string(),
@@ -225,5 +255,5 @@ pub async fn execute_ws_call(
     // Set id to the original id
     response["id"] = id;
 
-    Ok(response.to_string())
+    Ok(RequestResult::Call(response.to_string()))
 }
