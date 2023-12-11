@@ -43,16 +43,17 @@ pub async fn serve_websocket(
             if msg["method"] == "eth_subscribe" {
                 // Send message to the channel
                 websocket_sink.send(Message::text("majmune")).await.unwrap();
+            } else {
+                // Forward the message to the best available RPC
+                let resp = execute_ws_call(
+                    msg,
+                    incoming_tx.clone(),
+                    outgoing_rx.resubscribe(),
+                    &cache_args,
+                )
+                .await.unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
+                websocket_sink.send(Message::text(resp)).await.unwrap();
             }
-            // Forward the message to the best available RPC
-            let resp = execute_ws_call(
-                msg,
-                incoming_tx.clone(),
-                outgoing_rx.resubscribe(),
-                &cache_args,
-            )
-            .await.unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
-            websocket_sink.send(Message::text(resp)).await.unwrap();
         }
     });
 
