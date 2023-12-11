@@ -10,14 +10,17 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 // the same subscription id to all of them.
 // TODO: add referance counting !!!!!!!!!!!!!!!!!!!
 pub fn insert_and_return_subscription(
-	tx_hash: Hash,
-	response: Value,
-	tree: Tree,
+    tx_hash: Hash,
+    response: Value,
+    tree: Tree,
 ) -> Result<String, Error> {
-	let subscription_id = response["result"].clone();
+    let subscription_id = response["result"].clone();
 
-	// Insert the subscription for this tx_hash into the subtree
-	tree.insert(tx_hash.as_bytes(), &subscription_id.as_u64().unwrap().to_be_bytes())?;
+    // Insert the subscription for this tx_hash into the subtree
+    tree.insert(
+        tx_hash.as_bytes(),
+        &subscription_id.as_u64().unwrap().to_be_bytes(),
+    )?;
 
-	return Ok(subscription_id.to_string());
+    return Ok(subscription_id.to_string());
 }

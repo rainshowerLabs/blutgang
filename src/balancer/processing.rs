@@ -23,7 +23,7 @@ use simd_json::to_vec;
 use sled::Db;
 
 #[derive(Debug, Clone)]
-pub struct CacheArgs{
+pub struct CacheArgs {
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub cache: Arc<Db>,
@@ -39,12 +39,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 }
 
 // Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry(
-    rx: &mut str,
-    method: Value,
-    tx_hash: Hash,
-    cache_args: &CacheArgs,
-) {
+pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -64,7 +59,8 @@ pub fn cache_querry(
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
             rx_value["id"] = Value::Null;
 
-            cache_args.cache
+            cache_args
+                .cache
                 .insert(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice())
                 .unwrap();
         }

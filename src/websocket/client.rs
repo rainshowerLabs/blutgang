@@ -1,12 +1,12 @@
 use crate::{
-    websocket::subscription_manager::insert_and_return_subscription,
     balancer::{
-        selection::select::pick,
         processing::{
             cache_querry,
             CacheArgs,
         },
+        selection::select::pick,
     },
+    websocket::subscription_manager::insert_and_return_subscription,
     Rpc,
 };
 
@@ -19,11 +19,11 @@ use serde_json::Value;
 
 use std::{
     println,
+    str::from_utf8,
     sync::{
         Arc,
         RwLock,
     },
-    str::from_utf8,
 };
 
 // Select either blake3 or xxhash based on the features
@@ -83,7 +83,6 @@ pub async fn ws_conn_manager(
             (_, rpc_position) = pick(&mut rpc_list_guard);
         }
 
-
         // Error if rpc_position is None
         let rpc_position = if let Some(rpc_position) = rpc_position {
             rpc_position
@@ -102,7 +101,7 @@ pub async fn ws_conn_manager(
     }
 }
 
-// Reads all incoming data from all RPCs and broadcasts it 
+// Reads all incoming data from all RPCs and broadcasts it
 fn _read_and_broadcast(_arg: u32) -> u32 {
     unimplemented!()
 }
@@ -145,7 +144,8 @@ pub async fn ws_conn(
 
             match rax {
                 Ok(rax) => {
-                    let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
+                    let rax =
+                        unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
                     outgoing_rx.send(rax).unwrap();
                 }
                 Err(e) => {
@@ -184,12 +184,11 @@ pub async fn execute_ws_call(
     // TODO: responses arent shared??
     match cache_args.cache.get(tx_hash.as_bytes()) {
         Ok(Some(mut rax)) => {
-           let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
             return Ok(RequestResult::Call(cached.to_string()));
         }
-        Ok(None) => {
-        }
+        Ok(None) => {}
         Err(e) => {
             println!("Error getting cached response: {}", e);
         }
@@ -226,7 +225,9 @@ pub async fn execute_ws_call(
 
         match subscriptions.get(tx_hash.as_bytes()) {
             Ok(Some(subscription_id)) => {
-                return Ok(RequestResult::Subscription(from_utf8(subscription_id.as_ref()).unwrap().to_string()));
+                return Ok(RequestResult::Subscription(
+                    from_utf8(subscription_id.as_ref()).unwrap().to_string(),
+                ));
             }
             Ok(None) => {
                 return Ok(RequestResult::Subscription(insert_and_return_subscription(
@@ -234,23 +235,15 @@ pub async fn execute_ws_call(
                     response,
                     subscriptions,
                 )?));
-
             }
             Err(e) => {
                 println!("Error accesssing subtree: {}", e);
             }
         }
-
     }
 
-
     // Cache if possible
-    cache_querry(
-        &mut response.to_string(),
-        call,
-        tx_hash,
-        cache_args,
-    );
+    cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
 
     // Set id to the original id
     response["id"] = id;

@@ -334,15 +334,19 @@ pub async fn accept_request(
         let cache_args = CacheArgs {
             finalized_rx: channels.finalized_rx.as_ref().clone(),
             named_numbers: named_numbers.clone(),
-            cache: cache,
+            cache,
             head_cache: head_cache.clone(),
         };
 
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
-
-            if let Err(e) =
-                serve_websocket(websocket, channels.incoming_tx, channels.outgoing_rx, cache_args).await
+            if let Err(e) = serve_websocket(
+                websocket,
+                channels.incoming_tx,
+                channels.outgoing_rx,
+                cache_args,
+            )
+            .await
             {
                 println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
             }

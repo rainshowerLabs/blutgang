@@ -1,5 +1,5 @@
-use rand::random;
 use crate::balancer::processing::CacheArgs;
+use rand::random;
 use serde_json::Value;
 
 use tokio::sync::{
@@ -54,7 +54,8 @@ pub async fn serve_websocket(
                 outgoing_rx.resubscribe(),
                 &cache_args,
             )
-            .await.unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
+            .await
+            .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
             websocket_sink.send(Message::text(resp)).await.unwrap();
         }
     });
@@ -65,7 +66,7 @@ pub async fn serve_websocket(
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
                 tx.send(unsafe { simd_json::from_str(&mut msg)? }).unwrap();
-            },
+            }
             Message::Close(msg) => {
                 if let Some(msg) = &msg {
                     println!(
@@ -75,8 +76,8 @@ pub async fn serve_websocket(
                 } else {
                     println!("Received close message");
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
