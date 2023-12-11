@@ -71,7 +71,13 @@ pub async fn serve_websocket(
                         .await
                         .unwrap()
                 }
-                RequestResult::Subscription(_) => println!("majmuneeeee"),
+                RequestResult::Subscription(resp) => {
+                    println!("Registered subscription");
+                    websocket_sink
+                        .send(Message::text::<String>(resp))
+                        .await
+                        .unwrap()
+                },
             }
         }
     });

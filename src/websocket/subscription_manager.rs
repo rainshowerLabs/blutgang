@@ -1,6 +1,7 @@
+use simd_json::to_vec;
+use crate::balancer::processing::CacheArgs;
 use blake3::Hash;
 use serde_json::Value;
-use sled::Tree;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -11,19 +12,20 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 // TODO: add referance counting !!!!!!!!!!!!!!!!!!!
 pub fn insert_and_return_subscription(
     tx_hash: Hash,
-    response: Value,
-    tree: Tree,
-) -> Result<String, Error> {
-    let subscription_id = response["result"].clone();
+    mut response: Value,
+    cache_args: &CacheArgs,
+) -> Result<Value, Error> {
+    response["id"] = Value::Null;
+
+    let tree = cache_args.cache.open_tree("subscriptions")?;
 
     // Insert the subscription for this tx_hash into the subtree
-    tree.insert(
+    let _ = tree.insert(
         tx_hash.as_bytes(),
-        &*subscription_id.as_str().unwrap(),
-    )?;
+        to_vec(&response).unwrap().as_slice());
 
-    Ok(subscription_id.to_string())
+    Ok(response)
 }
 
 // Sends all subscriptions to their relevant nodes
-pub fn subscription_dispatch()
+// pub fn subscription_dispatch()

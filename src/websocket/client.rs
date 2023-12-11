@@ -19,7 +19,6 @@ use serde_json::Value;
 
 use std::{
     println,
-    str::from_utf8,
     sync::{
         Arc,
         RwLock,
@@ -194,6 +193,23 @@ pub async fn execute_ws_call(
         }
     }
 
+    // Check if our call was a subscription
+    if call["method"] == "eth_subscribe" {
+        // Check if our tx_hash exists in the sled "subscriptions" subtree
+        let subscriptions = cache_args.cache.open_tree("subscriptions")?;
+
+        match subscriptions.get(tx_hash.as_bytes()) {
+            Ok(Some(mut rax)) => {
+                let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                cached["id"] = id;
+                return Ok(RequestResult::Subscription(cached.to_string()));
+            },
+            Ok(None) => {},
+            Err(e) => println!("Error accesssing subtree: {}", e),
+        }
+    }
+
+
     // Replace call id with our user id
     call["id"] = user_id.into();
 
@@ -218,32 +234,12 @@ pub async fn execute_ws_call(
             .expect("Failed to receive response from WS");
     }
 
-    // Check if our call was a subscription
-    if call["method"] == "eth_subscribe" {
-        // Check if our tx_hash exists in the sled "subscriptions" subtree
-        let subscriptions = cache_args.cache.open_tree("subscriptions")?;
-
-        match subscriptions.get(tx_hash.as_bytes()) {
-            Ok(Some(subscription_id)) => {
-                return Ok(RequestResult::Subscription(
-                    from_utf8(subscription_id.as_ref()).unwrap().to_string(),
-                ));
-            }
-            Ok(None) => {
-                return Ok(RequestResult::Subscription(insert_and_return_subscription(
-                    tx_hash,
-                    response,
-                    subscriptions,
-                )?));
-            }
-            Err(e) => {
-                println!("Error accesssing subtree: {}", e);
-            }
-        }
-    }
-
     // Cache if possible
-    cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
+    if call["method"] == "eth_subscribe" {
+        let _ = insert_and_return_subscription(tx_hash, response.clone(), cache_args);
+    } else {
+        cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
+    }
 
     // Set id to the original id
     response["id"] = id;
