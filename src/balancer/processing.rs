@@ -35,7 +35,6 @@ pub fn can_cache(method: &str, result: &str) -> bool {
     if cache_method(method) && cache_result(result) {
         return true;
     }
-    println!("womp womp");
     false
 }
 
