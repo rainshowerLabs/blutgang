@@ -1,5 +1,4 @@
 use crate::balancer::processing::CacheArgs;
-use memchr::memmem;
 use serde_json::Value;
 
 use tokio::sync::{
@@ -41,13 +40,13 @@ pub async fn serve_websocket(
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if memmem::find(&msg.to_string().as_bytes(), b"eth_subscribe").is_some() {
+            if msg["method"] == "eth_subscribe" {
                 // Send message to the channel
                 websocket_sink.send(Message::text("majmune")).await.unwrap();
             }
             // Forward the message to the best available RPC
             let resp = execute_ws_call(
-                msg.to_string(),
+                msg,
                 incoming_tx.clone(),
                 outgoing_rx.resubscribe(),
                 &cache_args,

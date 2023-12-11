@@ -151,37 +151,25 @@ pub async fn ws_conn(
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
 pub async fn execute_ws_call(
-    mut call: String,
+    mut call: Value,
     incoming_tx: mpsc::UnboundedSender<Value>,
     mut broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
-    // Convert `call` to value
-    let mut call_val: Value = match unsafe { simd_json::from_str(&mut call) } {
-        Ok(call_val) => call_val,
-        Err(e) => {
-            println!("Error parsing call: {}", e);
-            return Ok(
-                "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32700,\"message\":\"Parse error\"},\"id\":null}"
-                    .to_string(),
-            );
-        }
-    };
-
     // Store id of call and set random id we'll actually forward to the node
     //
     // We'll use the random id to look at which call is ours when watching for updates
-    let id = call_val["id"].take();
+    let id = call["id"].take();
 
     // Hash the request with either blake3 or xxhash depending on the enabled feature
     let tx_hash;
     #[cfg(not(feature = "xxhash"))]
     {
-        tx_hash = hash(call_val.to_string().as_bytes());
+        tx_hash = hash(call.to_string().as_bytes());
     }
     #[cfg(feature = "xxhash")]
     {
-        tx_hash = xxh3_64(call_val.to_string().as_bytes());
+        tx_hash = xxh3_64(call.to_string().as_bytes());
     }
 
     // Check if we have a cached response
@@ -200,10 +188,10 @@ pub async fn execute_ws_call(
     }
 
     let rand_id = random::<u32>();
-    call_val["id"] = rand_id.into();
+    call["id"] = rand_id.into();
 
     // Send call to ws_conn_manager
-    match incoming_tx.send(call_val.clone()) {
+    match incoming_tx.send(call.clone()) {
         Ok(_) => {}
         Err(e) => {
             println!("ws_conn_manager error: {}", e);
@@ -228,7 +216,7 @@ pub async fn execute_ws_call(
     // Cache if possible
     cache_querry(
         &mut response.to_string(),
-        call_val,
+        call,
         tx_hash,
         cache_args,
     );
