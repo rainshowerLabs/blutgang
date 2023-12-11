@@ -135,7 +135,8 @@ pub async fn ws_conn(
     tokio::spawn(async move {
         loop {
             let rax = read.next().await.unwrap();
-
+            println!("ws_conn: got response: {:?}", rax);
+            
             match rax {
                 Ok(rax) => {
                     let rax = unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
@@ -147,8 +148,6 @@ pub async fn ws_conn(
             }
         }
     });
-
-
 }
 
 // Receive JSON-RPC call from balancer thread and respond with ws response
