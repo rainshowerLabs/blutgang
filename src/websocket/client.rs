@@ -104,6 +104,11 @@ pub async fn ws_conn_manager(
     }
 }
 
+// Reads all incoming data from all RPCs and broadcasts it 
+fn _read_and_broadcast(_arg: u32) -> u32 {
+    unimplemented!()
+}
+
 // Creates a task makes a new ws connection, listens to incoming messages and
 // returns them via a channel
 pub async fn ws_conn(
