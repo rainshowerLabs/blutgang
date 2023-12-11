@@ -1,3 +1,4 @@
+use rand::random;
 use crate::balancer::processing::CacheArgs;
 use serde_json::Value;
 
@@ -37,12 +38,18 @@ pub async fn serve_websocket(
     // Create channels for message send/receiving
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
 
+    // Generate an id for our user
+    //
+    // We use this to identify which requests are for us
+    let user_id = random::<u64>();
+
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             // Forward the message to the best available RPC
             let resp = execute_ws_call(
                 msg,
+                user_id,
                 incoming_tx.clone(),
                 outgoing_rx.resubscribe(),
                 &cache_args,
