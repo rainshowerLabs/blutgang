@@ -41,7 +41,7 @@ pub async fn serve_websocket(
     let (mut websocket_sink, mut websocket_stream) = websocket.split();
 
     // Create channels for message send/receiving
-    let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
 
     // Generate an id for our user
     //
@@ -51,34 +51,34 @@ pub async fn serve_websocket(
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            // Check if we received a subscription or an incoming call
-            //
-            // If we received a subscription, just pass it on to the client
-            // If its a call, execute it
-            let resp: String;
-            match msg {
-                RequestResult::Subscription(sub) => {
-                    resp = sub.into();
+            // Forward the message to the best available RPC
+            let resp = execute_ws_call(
+                msg,
+                user_id,
+                incoming_tx.clone(),
+                outgoing_rx.resubscribe(),
+                &cache_args,
+            )
+            .await
+            .unwrap_or(RequestResult::Call(
+                "{\"error\": \"Failed to execute call\"}".to_string(),
+            ));
+
+            match resp {
+                RequestResult::Call(resp) => {
+                    websocket_sink
+                        .send(Message::text::<String>(resp))
+                        .await
+                        .unwrap()
                 }
-                RequestResult::Call(_) => {
-                    // Forward the message to the best available RPC
-                    resp = execute_ws_call(
-                        msg,
-                        user_id,
-                        incoming_tx.clone(),
-                        outgoing_rx.resubscribe(),
-                        &cache_args,
-                    )
-                    .await
-                    .unwrap_or(
-                        "{\"error\": \"Failed to execute call\"}".to_string()
-                    );
+                RequestResult::Subscription(resp) => {
+                    println!("Registered subscription");
+                    websocket_sink
+                        .send(Message::text::<String>(resp))
+                        .await
+                        .unwrap()
                 }
             }
-
-            websocket_sink.send(Message::text::<String>(resp))
-            .await
-            .unwrap()
         }
     });
 
@@ -87,7 +87,7 @@ pub async fn serve_websocket(
             Message::Text(mut msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
-                tx.send(RequestResult::Call( unsafe { simd_json::from_str(&mut msg)? })).unwrap();
+                tx.send(unsafe { simd_json::from_str(&mut msg)? }).unwrap();
             }
             Message::Close(msg) => {
                 if let Some(msg) = &msg {

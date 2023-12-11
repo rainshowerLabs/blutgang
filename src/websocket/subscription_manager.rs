@@ -26,4 +26,4 @@ pub fn insert_and_return_subscription(
 }
 
 // Sends all subscriptions to their relevant nodes
-// pub fn subscription_dispatch() 
+// pub fn subscription_dispatch()
