@@ -103,6 +103,7 @@ macro_rules! accept {
         $named_numbers:expr,
         $head_cache:expr,
         $sink_map:expr,
+        $subscribed_users:expr,
         $config:expr
     ) => {
         // Bind the incoming connection to our service
@@ -118,6 +119,7 @@ macro_rules! accept {
                         $named_numbers,
                         $head_cache,
                         $sink_map,
+                        $subscribed_users,
                         Arc::clone($cache),
                         $config,
                     );
@@ -207,6 +209,7 @@ macro_rules! get_response {
                     named_numbers: $named_numbers,
                     cache: $cache,
                     head_cache: $head_cache,
+                    subscribed_users: None,
                 };
 
                 // Don't cache responses that contain errors or missing trie nodes
@@ -321,6 +324,7 @@ pub async fn accept_request(
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sink_map: &Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+    subscribed_users: &Arc<DashMap<u64, Vec<u64>>>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -344,6 +348,7 @@ pub async fn accept_request(
             named_numbers: named_numbers.clone(),
             cache,
             head_cache: head_cache.clone(),
+            subscribed_users: Some(subscribed_users.clone()),
         };
 
         // Spawn a task to handle the websocket connection.

@@ -1,3 +1,4 @@
+use dashmap::DashMap;
 use std::{
     collections::BTreeMap,
     sync::{
@@ -22,12 +23,13 @@ use serde_json::Value;
 use simd_json::to_vec;
 use sled::Db;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct CacheArgs {
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub cache: Arc<Db>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    pub subscribed_users: Option<Arc<DashMap<u64, Vec<u64>>>>,
 }
 
 // TODO: we should find a way to check values directly and not convert Value to str

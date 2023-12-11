@@ -54,6 +54,7 @@ pub async fn serve_websocket(
     let user_id = random::<u64>();
 
     // Add the user to the sink map
+    println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
     sink_map.insert(user_id, tx.clone());
 
     // Spawn taks for sending messages to the client

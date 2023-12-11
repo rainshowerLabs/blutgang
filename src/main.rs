@@ -135,6 +135,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Map of user ids to channels
     let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
 
+    // Map of subscriptions to users
+    let subscribed_users = Arc::new(DashMap::<u64, Vec<u64>>::new());
+
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
@@ -189,6 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
         let sink_map_clone = Arc::clone(&sink_map);
+        let subscribed_users_clone = Arc::clone(&subscribed_users);
 
         let channels = RequestChannels {
             finalized_rx: finalized_rx_clone,
@@ -206,6 +210,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 &named_blocknumbers_clone,
                 &head_cache_clone,
                 &sink_map_clone,
+                &subscribed_users_clone,
                 &config_clone
             );
         });
