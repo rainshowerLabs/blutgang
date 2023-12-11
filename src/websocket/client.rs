@@ -204,13 +204,11 @@ pub async fn execute_ws_call(
         .await
         .expect("Failed to receive response from WS");
 
-    if response["id"] != user_id {
-        while response["id"] != user_id {
-            response = broadcast_rx
-                .recv()
-                .await
-                .expect("Failed to receive response from WS");
-        }
+    while response["id"] != user_id {
+        response = broadcast_rx
+            .recv()
+            .await
+            .expect("Failed to receive response from WS");
     }
 
     // Cache if possible
