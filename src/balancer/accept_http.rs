@@ -13,7 +13,10 @@ use crate::{
     rpc::types::Rpc,
     rpc_response,
     timed_out,
-    websocket::server::serve_websocket,
+    websocket::{
+        server::serve_websocket,
+        subscription_manager::RequestResult,
+    },
     NamedBlocknumbers,
     Settings,
 };
@@ -23,6 +26,8 @@ use tokio::sync::{
     mpsc,
     watch,
 };
+
+use dashmap::DashMap;
 
 use serde_json::Value;
 use simd_json;
@@ -97,6 +102,7 @@ macro_rules! accept {
         $channels:expr,
         $named_numbers:expr,
         $head_cache:expr,
+        $sink_map:expr,
         $config:expr
     ) => {
         // Bind the incoming connection to our service
@@ -111,6 +117,7 @@ macro_rules! accept {
                         $channels,
                         $named_numbers,
                         $head_cache,
+                        $sink_map,
                         Arc::clone($cache),
                         $config,
                     );
@@ -313,6 +320,7 @@ pub async fn accept_request(
     channels: RequestChannels,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    sink_map: &Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -339,11 +347,13 @@ pub async fn accept_request(
         };
 
         // Spawn a task to handle the websocket connection.
+        let sink_clone = sink_map.clone();
         tokio::task::spawn(async move {
             if let Err(e) = serve_websocket(
                 websocket,
                 channels.incoming_tx,
                 channels.outgoing_rx,
+                sink_clone,
                 cache_args,
             )
             .await

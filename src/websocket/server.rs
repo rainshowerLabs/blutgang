@@ -1,3 +1,6 @@
+use dashmap::DashMap;
+use std::sync::Arc;
+
 use crate::{
     balancer::processing::CacheArgs,
     websocket::{
@@ -33,6 +36,8 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: broadcast::Receiver<Value>,
+    sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+
     cache_args: CacheArgs,
 ) -> Result<(), Error> {
     let websocket = websocket.await?;
@@ -47,6 +52,9 @@ pub async fn serve_websocket(
     //
     // We use this to identify which requests are for us
     let user_id = random::<u64>();
+
+    // Add the user to the sink map
+    sink_map.insert(user_id, tx.clone());
 
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
@@ -80,6 +88,8 @@ pub async fn serve_websocket(
                 .unwrap();
             }
             Message::Close(msg) => {
+                // Remove the user from the sink map
+                sink_map.remove(&user_id);
                 if let Some(msg) = &msg {
                     println!(
                         "\x1b[35mInfo:\x1b[0mReceived close message with code {} and message: {}",

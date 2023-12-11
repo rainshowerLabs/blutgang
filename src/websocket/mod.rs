@@ -1,3 +1,3 @@
 pub mod client;
 pub mod server;
-mod subscription_manager;
+pub mod subscription_manager;

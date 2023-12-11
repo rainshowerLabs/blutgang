@@ -5,6 +5,7 @@ mod health;
 mod rpc;
 mod websocket;
 
+use dashmap::DashMap;
 use serde_json::Value;
 
 use crate::{
@@ -24,7 +25,10 @@ use crate::{
         safe_block::NamedBlocknumbers,
     },
     rpc::types::Rpc,
-    websocket::client::ws_conn_manager,
+    websocket::{
+        client::ws_conn_manager,
+        subscription_manager::RequestResult,
+    },
 };
 
 use std::{
@@ -128,6 +132,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
 
+    // Map of user ids to channels
+    let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
+
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     tokio::task::spawn(async move {
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
@@ -181,6 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
+        let sink_map_clone = Arc::clone(&sink_map);
 
         let channels = RequestChannels {
             finalized_rx: finalized_rx_clone,
@@ -197,6 +205,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
+                &sink_map_clone,
                 &config_clone
             );
         });
