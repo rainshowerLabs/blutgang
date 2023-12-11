@@ -29,9 +29,12 @@ pub async fn serve_websocket(
     outgoing_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<(), Error> {
-    let mut websocket = websocket.await?;
+    let websocket = websocket.await?;
 
-    while let Some(message) = websocket.next().await {
+    // Split the Sink so we can do async send/recv
+    let (mut websocket_sink, mut websocket_stream) = websocket.split();
+
+    while let Some(message) = websocket_stream.next().await {
         match message? {
             Message::Text(msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
@@ -45,8 +48,8 @@ pub async fn serve_websocket(
                 )
                 .await?;
 
-                websocket.send(Message::text(resp)).await?;
-            }
+                websocket_sink.send(Message::text(resp)).await?;
+            },
             Message::Close(msg) => {
                 if let Some(msg) = &msg {
                     println!(
@@ -56,15 +59,15 @@ pub async fn serve_websocket(
                 } else {
                     println!("Received close message");
                 }
-            }
-            Message::Ping(_) | Message::Pong(_) => {}
+            },
+            Message::Ping(_) | Message::Pong(_) => {},
             _ => {
-                websocket
+                websocket_sink
                     .send(Message::text(
                         "Wrn: Unsupported message format, please use text!",
                     ))
                     .await?;
-            }
+            },
         }
     }
 
