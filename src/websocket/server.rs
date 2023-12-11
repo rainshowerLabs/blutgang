@@ -1,3 +1,4 @@
+use crate::websocket::subscription_manager::RequestResult;
 use crate::{
     balancer::processing::CacheArgs,
     websocket::client::{
@@ -40,7 +41,7 @@ pub async fn serve_websocket(
     let (mut websocket_sink, mut websocket_stream) = websocket.split();
 
     // Create channels for message send/receiving
-    let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
+    let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
 
     // Generate an id for our user
     //
@@ -52,7 +53,7 @@ pub async fn serve_websocket(
         while let Some(msg) = rx.recv().await {
             // Forward the message to the best available RPC
             let resp = execute_ws_call(
-                msg,
+                msg.into(),
                 user_id,
                 incoming_tx.clone(),
                 outgoing_rx.resubscribe(),
@@ -75,7 +76,7 @@ pub async fn serve_websocket(
             Message::Text(mut msg) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
-                tx.send(unsafe { simd_json::from_str(&mut msg)? }).unwrap();
+                tx.send(RequestResult::Call(unsafe { simd_json::from_str(&mut msg)? })).unwrap();
             }
             Message::Close(msg) => {
                 if let Some(msg) = &msg {

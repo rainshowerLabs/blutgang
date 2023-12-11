@@ -7,8 +7,17 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 #[derive(Debug)]
 pub enum RequestResult {
-    Call(String),
-    Subscription(String),
+    Call(Value),
+    Subscription(Value),
+}
+
+impl From<RequestResult> for Value {
+	fn from(req: RequestResult) -> Self {
+		match req {
+			RequestResult::Call(call) => call,
+			RequestResult::Subscription(sub) => sub,
+		}
+	}
 }
 
 // We want to return the subscription id and insert it into a subtree
