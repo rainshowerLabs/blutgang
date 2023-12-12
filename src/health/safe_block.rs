@@ -158,9 +158,17 @@ pub async fn subscribe_to_new_heads(
                 nn_rwlock.latest = a;
             }
             Ok(Err(e)) => {
+                // set latest to 0
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                nn_rwlock.latest = 0;
+
                 println!("Error in newHeads subscription: {}", e);
             }
             Err(_) => {
+                // set latest to 0
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                nn_rwlock.latest = 0;
+                
                 println!("Timeout in newHeads subscription");
             }
         };
