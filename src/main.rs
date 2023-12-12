@@ -5,6 +5,7 @@ mod health;
 mod rpc;
 mod websocket;
 
+use crate::health::safe_block::subscribe_to_new_heads;
 use dashmap::DashMap;
 use serde_json::Value;
 
@@ -103,34 +104,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(addr_clone).await?;
     println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr_clone);
 
-    // Spawn a thread for the health check
-    //
-    // Also handle the finalized block tracking in this thread
-    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
-    let (blocknum_tx, blocknum_rx) = watch::channel(0);
-    let (finalized_tx, finalized_rx) = watch::channel(0);
-    let finalized_rx_arc = Arc::new(finalized_rx);
-
-    if health_check_clone {
-        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
-        let poverty_list_health = Arc::clone(&rpc_poverty_list);
-        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
-        let config_health = Arc::clone(&config);
-
-        tokio::task::spawn(async move {
-            let _ = health_check(
-                rpc_list_health,
-                poverty_list_health,
-                &blocknum_tx,
-                finalized_tx,
-                &named_blocknumbers_health,
-                &config_health,
-            )
-            .await;
-        });
-    }
-
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
@@ -151,6 +124,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         subscription_dispatcher(outgoing_rx_ws, sink_map_ws, subscribed_users_ws);
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
     });
+
+    let (blocknum_tx, blocknum_rx) = watch::channel(0);
+    let (finalized_tx, finalized_rx) = watch::channel(0);
+
+    let finalized_rx_arc = Arc::new(finalized_rx);
+    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {
@@ -183,6 +162,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await;
     });
+
+    // Spawn a thread for the health check
+    //
+    // Also handle the finalized block tracking in this thread
+    let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+
+    if health_check_clone {
+        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_health = Arc::clone(&rpc_poverty_list);
+        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let config_health = Arc::clone(&config);
+        let health_check_ttl = config.read().unwrap().health_check_ttl;
+
+        tokio::task::spawn(async move {
+            subscribe_to_new_heads(
+                &rpc_list_health,
+                &named_blocknumbers_health,
+                health_check_ttl,
+            )
+            .await;
+        });
+
+        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+
+        tokio::task::spawn(async move {
+            let _ = health_check(
+                rpc_list_health,
+                poverty_list_health,
+                &blocknum_tx,
+                finalized_tx,
+                &named_blocknumbers_health,
+                &config_health,
+            )
+            .await;
+        });
+    }
+
 
     // We start a loop to continuously accept incoming connections
     loop {
