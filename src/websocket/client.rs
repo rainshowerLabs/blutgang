@@ -5,6 +5,7 @@ use crate::{
             CacheArgs,
         },
         selection::select::pick,
+        format::replace_block_tags,
     },
     rpc::types::hex_to_decimal,
     websocket::subscription_manager::insert_and_return_subscription,
@@ -215,6 +216,9 @@ pub async fn execute_ws_call(
             Ok(None) => {}
             Err(e) => println!("Error accesssing subtree: {}", e),
         }
+    } else {
+        // Rewrite any parameters we can
+        call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
 
     // Replace call id with our user id
