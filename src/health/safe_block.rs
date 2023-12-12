@@ -1,5 +1,6 @@
+use crate::ws_conn_manager;
 use crate::{
-    rpc::error::RpcError,
+    rpc::{error::RpcError, types::hex_to_decimal},
     Rpc,
 };
 use std::sync::{
@@ -13,6 +14,8 @@ use tokio::{
         Duration,
     },
 };
+
+use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct NamedBlocknumbers {
@@ -101,4 +104,58 @@ pub async fn get_safe_block(
     nn_rwlock.finalized = safe;
 
     Ok(safe)
+}
+
+// Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
+pub async fn subscribe_to_new_heads(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
+    ttl: u64,
+) {
+    // Spawn a new instance of ws_conn_manager
+    //
+    // We want to open connections to all RPCs and get a quorum
+    let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(16);
+    let rpc_list_clone = rpc_list.read().unwrap().clone();
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    
+    tokio::task::spawn(
+        ws_conn_manager(
+            Arc::new(RwLock::new(rpc_list_clone)),
+            incoming_rx,
+            broadcast_tx,
+        )
+    );
+
+    // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
+    // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
+    // on a new node.
+    loop {
+        // Send subscription request to our local ws_conn_managerOption<
+        incoming_tx.send(serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["newHeads"],
+            "id": 1,
+        })).unwrap();
+
+        // Listen for incoming messages on a timeout
+        //
+        // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
+        match timeout(Duration::from_millis(ttl*2), broadcast_rx.recv()).await {
+            Ok(Ok(msg)) => {
+                // println!("New heads: {}", msg);
+                // Write to NamedBlocknumbers
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                let a = hex_to_decimal(msg["params"]["result"]["number"].as_str().unwrap()).unwrap();
+                nn_rwlock.latest = a;
+            }
+            Ok(Err(e)) => {
+                println!("Error in newHeads subscription: {}", e);
+            }
+            Err(_) => {
+                println!("Timeout in newHeads subscription");
+            }
+        };
+    }
 }
