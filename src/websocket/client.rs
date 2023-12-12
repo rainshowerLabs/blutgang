@@ -1,11 +1,11 @@
 use crate::{
     balancer::{
+        format::replace_block_tags,
         processing::{
             cache_querry,
             CacheArgs,
         },
         selection::select::pick,
-        format::replace_block_tags,
     },
     rpc::types::hex_to_decimal,
     websocket::subscription_manager::insert_and_return_subscription,
@@ -54,18 +54,9 @@ pub async fn ws_conn_manager(
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     broadcast_tx: broadcast::Sender<Value>,
 ) {
-    let rpc_list_clone = rpc_list.read().unwrap().clone();
-
     // We want to create a ws connection for each rpc in rpc_list
     // We also want to have a corresponding channel and put it in a Vec
-    let mut ws_handles = Vec::new();
-    for rpc in rpc_list_clone {
-        let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
-
-        ws_handles.push(Some(ws_conn_incoming_tx));
-
-        ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
-    }
+    let ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
 
     // continuously listen for incoming messages
     loop {
@@ -101,6 +92,27 @@ pub async fn ws_conn_manager(
             }
         };
     }
+}
+
+// Given a list of rpcs, create a vec of their WS connections
+pub async fn create_ws_vec(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    broadcast_tx: &broadcast::Sender<Value>,
+) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
+    let rpc_list_clone = rpc_list.read().unwrap().clone();
+
+    // We want to create a ws connection for each rpc in rpc_list
+    // We also want to have a corresponding channel and put it in a Vec
+    let mut ws_handles = Vec::new();
+    for rpc in rpc_list_clone {
+        let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
+
+        ws_handles.push(Some(ws_conn_incoming_tx));
+
+        ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
+    }
+
+    ws_handles
 }
 
 // Creates a task makes a new ws connection, listens to incoming messages and

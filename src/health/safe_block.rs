@@ -128,7 +128,7 @@ pub async fn subscribe_to_new_heads(
         broadcast_tx,
     ));
 
-    // Send subscription request to our local ws_conn_managerOption<
+    // Send subscription request to our local ws_conn_manager
     incoming_tx
         .send(serde_json::json!({
             "jsonrpc": "2.0",
@@ -168,7 +168,7 @@ pub async fn subscribe_to_new_heads(
                 // set latest to 0
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
                 nn_rwlock.latest = 0;
-                
+
                 println!("Timeout in newHeads subscription");
             }
         };
