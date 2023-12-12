@@ -121,9 +121,16 @@ pub fn replace_block_tags(
 
     // Determine the correct parameter index based on the method
     let position = match tx["method"].as_str() {
-        Some("eth_getBalance") | Some("eth_getTransactionCount") | Some("eth_getCode") | Some("eth_call") => 1,
+        Some("eth_getBalance")
+        | Some("eth_getTransactionCount")
+        | Some("eth_getCode")
+        | Some("eth_call") => 1,
         Some("eth_getStorageAt") => 2, // Corrected index for eth_getStorageAt
-        Some("eth_getBlockTransactionCountByNumber") | Some("eth_getUncleCountByBlockNumber") | Some("eth_getBlockByNumber") | Some("eth_getTransactionByBlockNumberAndIndex") | Some("eth_getUncleByBlockNumberAndIndex") => 0,
+        Some("eth_getBlockTransactionCountByNumber")
+        | Some("eth_getUncleCountByBlockNumber")
+        | Some("eth_getBlockByNumber")
+        | Some("eth_getTransactionByBlockNumberAndIndex")
+        | Some("eth_getUncleByBlockNumberAndIndex") => 0,
         _ => return tx.to_owned(),
     };
 
@@ -141,19 +148,18 @@ pub fn replace_block_tags(
                 if rwlock_guard.latest != 0 {
                     tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.latest));
                 }
-            },
+            }
             NamedNumber::Finalized => {
                 if rwlock_guard.finalized != 0 {
                     tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.finalized));
                 }
-            },
+            }
             _ => (),
         }
     }
 
     tx.to_owned()
 }
-
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
     #[cfg(feature = "debug-verbose")]
@@ -481,8 +487,14 @@ mod tests {
             "params": []
         });
 
-        assert_eq!(replace_block_tags(&mut tx_no_params, &named_blocknumbers), tx_no_params);
-        assert_eq!(replace_block_tags(&mut tx_empty_params, &named_blocknumbers), tx_empty_params);
+        assert_eq!(
+            replace_block_tags(&mut tx_no_params, &named_blocknumbers),
+            tx_no_params
+        );
+        assert_eq!(
+            replace_block_tags(&mut tx_empty_params, &named_blocknumbers),
+            tx_empty_params
+        );
     }
 
     #[test]
@@ -512,5 +524,4 @@ mod tests {
 
         assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
     }
-
 }

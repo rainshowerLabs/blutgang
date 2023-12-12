@@ -1,6 +1,9 @@
 use crate::{
     balancer::{
-        format::incoming_to_value,
+        format::{
+            incoming_to_value,
+            replace_block_tags,
+        },
         processing::{
             cache_querry,
             CacheArgs,
@@ -280,6 +283,9 @@ async fn forward_body(
 
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
+
+    // Rewrite named block parameters if possible
+    let mut tx = replace_block_tags(&mut tx, named_numbers);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(

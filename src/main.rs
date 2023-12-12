@@ -29,8 +29,8 @@ use crate::{
     websocket::{
         client::ws_conn_manager,
         subscription_manager::{
-            RequestResult,
             subscription_dispatcher,
+            RequestResult,
         },
     },
 };
@@ -113,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Map of subscriptions to users
     // TODO: I feel like this is sub optimal for performance
-    let subscribed_users = Arc::new(DashMap::<u64, DashMap::<u64, bool>>::new());
+    let subscribed_users = Arc::new(DashMap::<u64, DashMap<u64, bool>>::new());
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     let sink_map_ws = Arc::clone(&sink_map);
@@ -199,7 +199,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await;
         });
     }
-
 
     // We start a loop to continuously accept incoming connections
     loop {

@@ -95,13 +95,10 @@ pub fn subscription_dispatcher(
                         // remove the user from the subscribed_users map
                         subscribed_users.remove(&id);
                         continue;
-                    },
+                    }
                 };
 
-                println!(
-                    "\x1b[35mInfo:\x1b[0m Sending subscription to user {}",
-                    user
-                );
+                println!("\x1b[35mInfo:\x1b[0m Sending subscription to user {}", user);
                 // Send the response
                 let _ = tx.send(RequestResult::Subscription(response.clone()));
             }

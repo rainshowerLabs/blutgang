@@ -183,8 +183,8 @@ pub async fn execute_ws_call(
 
             return Ok(cached.to_string());
         }
-        Ok(None) => {},
-        
+        Ok(None) => {}
+
         Err(e) => {
             println!("Error getting cached response: {}", e);
         }

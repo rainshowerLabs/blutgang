@@ -80,7 +80,10 @@ pub async fn serve_websocket(
                         .unwrap()
                 }
                 RequestResult::Subscription(sub) => {
-                    websocket_sink.send(Message::Text(sub.to_string())).await.unwrap();
+                    websocket_sink
+                        .send(Message::Text(sub.to_string()))
+                        .await
+                        .unwrap();
                 }
             }
         }
@@ -95,7 +98,7 @@ pub async fn serve_websocket(
                     simd_json::from_str(&mut msg)?
                 }))
                 .unwrap();
-            },
+            }
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {
                     println!(
@@ -105,14 +108,14 @@ pub async fn serve_websocket(
                 } else {
                     println!("Received close message");
                 }
-            },
+            }
             Err(e) => {
                 // Remove the user from the sink map
                 sink_map.remove(&user_id);
                 println!("\x1b[35mInfo:\x1b[0m Error receiving message: {}", e);
                 break;
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
