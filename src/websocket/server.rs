@@ -87,19 +87,16 @@ pub async fn serve_websocket(
     });
 
     while let Some(message) = websocket_stream.next().await {
-        match message? {
-            Message::Text(mut msg) => {
+        match message {
+            Ok(Message::Text(mut msg)) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
                 tx.send(RequestResult::Call(unsafe {
                     simd_json::from_str(&mut msg)?
                 }))
                 .unwrap();
-            }
-            Message::Close(msg) => {
-                // Remove the user from the sink map
-                sink_map.remove(&user_id);
-
+            },
+            Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {
                     println!(
                         "\x1b[35mInfo:\x1b[0mReceived close message with code {} and message: {}",
@@ -108,8 +105,14 @@ pub async fn serve_websocket(
                 } else {
                     println!("Received close message");
                 }
-            }
-            _ => {}
+            },
+            Err(e) => {
+                // Remove the user from the sink map
+                sink_map.remove(&user_id);
+                println!("\x1b[35mInfo:\x1b[0m Error receiving message: {}", e);
+                break;
+            },
+            _ => {},
         }
     }
 
