@@ -140,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Map of subscriptions to users
     // TODO: I feel like this is sub optimal for performance
-    let subscribed_users = Arc::new(DashMap::<u64, Vec<u64>>::new());
+    let subscribed_users = Arc::new(DashMap::<u64, DashMap::<u64, bool>>::new());
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     let sink_map_ws = Arc::clone(&sink_map);

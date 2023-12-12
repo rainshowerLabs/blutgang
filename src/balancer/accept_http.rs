@@ -324,7 +324,7 @@ pub async fn accept_request(
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sink_map: &Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-    subscribed_users: &Arc<DashMap<u64, Vec<u64>>>,
+    subscribed_users: &Arc<DashMap<u64, DashMap<u64, bool>>>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {

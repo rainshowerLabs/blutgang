@@ -6,6 +6,7 @@ use blake3::Hash;
 use dashmap::DashMap;
 use serde_json::Value;
 use simd_json::to_vec;
+use std::println;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -51,7 +52,7 @@ pub fn insert_and_return_subscription(
 pub fn subscription_dispatcher(
     mut rx: broadcast::Receiver<Value>,
     sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-    subscribed_users: Arc<DashMap<u64, Vec<u64>>>,
+    subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -81,13 +82,21 @@ pub fn subscription_dispatcher(
             let users = users.unwrap();
 
             // Send the response to all the users
-            for user in users {
+            //
+            // `users` is a map of <subscription id, <user, is subscribed>>
+            //  we want to iter over the users and send them the response
+            for user in users.iter() {
+                let user = user.key();
+
                 // Get the user's channel
                 let tx = sink_map.get(user).unwrap();
 
+                println!(
+                    "\x1b[35mInfo:\x1b[0m Sending subscription to user {}",
+                    user
+                );
                 // Send the response
-                tx.send(RequestResult::Subscription(response.clone()))
-                    .unwrap();
+                let _ = tx.send(RequestResult::Subscription(response.clone()));
             }
         }
     });

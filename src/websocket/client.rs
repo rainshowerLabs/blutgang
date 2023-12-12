@@ -136,8 +136,6 @@ pub async fn ws_conn(
     tokio::spawn(async move {
         loop {
             let rax = read.next().await.unwrap();
-            println!("ws_conn: got response: {:?}", rax);
-
             match rax {
                 Ok(rax) => {
                     let rax =
@@ -182,9 +180,11 @@ pub async fn execute_ws_call(
         Ok(Some(mut rax)) => {
             let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
             cached["id"] = id;
+
             return Ok(cached.to_string());
         }
-        Ok(None) => {}
+        Ok(None) => {},
+        
         Err(e) => {
             println!("Error getting cached response: {}", e);
         }
@@ -201,6 +201,15 @@ pub async fn execute_ws_call(
             Ok(Some(mut rax)) => {
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
                 cached["id"] = id;
+                let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
+
+                if let Some(subscribed_users) = &cache_args.subscribed_users {
+                    subscribed_users
+                        .entry(subscription_id)
+                        .or_default()
+                        .insert(user_id, true);
+                }
+
                 return Ok(cached.to_string());
             }
             Ok(None) => {}
@@ -233,7 +242,7 @@ pub async fn execute_ws_call(
             subscribed_users
                 .entry(subscription_id)
                 .or_default()
-                .push(user_id);
+                .insert(user_id, true);
         }
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
