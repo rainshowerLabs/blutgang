@@ -108,6 +108,45 @@ pub fn get_block_number_from_request(
     Some(block_number)
 }
 
+// Replaces block tags with a hex number and return the request
+pub fn replace_block_tags(
+    tx: &mut Value,
+    named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
+) -> Value {
+    // Return if `params` is not a thing
+    let params = tx["params"].as_array();
+    if params.map_or(true, |p| p.is_empty()) {
+        return tx.to_owned();
+    }
+
+    // Determine the correct parameter index based on the method
+    let position = match tx["method"].as_str() {
+        Some("eth_getBalance") | Some("eth_getTransactionCount") | Some("eth_getCode") | Some("eth_call") => 1,
+        Some("eth_getStorageAt") => 2, // Corrected index for eth_getStorageAt
+        Some("eth_getBlockTransactionCountByNumber") | Some("eth_getUncleCountByBlockNumber") | Some("eth_getBlockByNumber") | Some("eth_getTransactionByBlockNumberAndIndex") | Some("eth_getUncleByBlockNumberAndIndex") => 0,
+        _ => return tx.to_owned(),
+    };
+
+    // Extract the block number parameter
+    let block_number = tx["params"][position].to_string().replace('\"', "");
+
+    // Check if the block number is a named tag
+    let nn = has_named_number(&block_number);
+    if nn != NamedNumber::Null {
+        let rwlock_guard = named_blocknumbers.read().unwrap();
+
+        // Replace the named block tag with its corresponding hex value
+        match nn {
+            NamedNumber::Latest => tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.latest)),
+            NamedNumber::Finalized => tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.finalized)),
+            _ => (),
+        }
+    }
+
+    tx.to_owned()
+}
+
+
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
     #[cfg(feature = "debug-verbose")]
     println!("Incoming request: {:?}", tx);
@@ -140,6 +179,18 @@ mod tests {
     use std::sync::Arc;
     use std::sync::RwLock;
 
+    // Dummy NamedBlocknumbers for testing
+    fn dummy_named_blocknumbers() -> Arc<RwLock<NamedBlocknumbers>> {
+        Arc::new(RwLock::new(NamedBlocknumbers {
+            latest: 10,
+            earliest: 2,
+            safe: 3,
+            finalized: 4,
+            pending: 5,
+            number: 6,
+        }))
+    }
+
     #[test]
     fn has_named_number_test() {
         assert_eq!(has_named_number("latest"), NamedNumber::Latest);
@@ -155,14 +206,7 @@ mod tests {
     #[test]
     fn get_block_number_from_request_test() {
         // Set up a fake NamedBlocknumbers
-        let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers {
-            latest: 1,
-            earliest: 2,
-            safe: 3,
-            finalized: 4,
-            pending: 5,
-            number: 6,
-        }));
+        let named_blocknumbers = dummy_named_blocknumbers();
 
         let request = json!({
             "id":1,
@@ -173,7 +217,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -221,7 +265,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -257,7 +301,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -329,7 +373,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -356,4 +400,92 @@ mod tests {
             None
         );
     }
+
+    #[test]
+    fn replace_named_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
+
+        let expected = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0xa"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), expected);
+    }
+
+    #[test]
+    fn keep_hex_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
+    }
+
+    #[test]
+    fn handle_invalid_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "invalid"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
+    }
+
+    #[test]
+    fn replace_block_number_different_methods_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let methods = vec!["eth_getBalance", "eth_getTransactionCount"];
+
+        for method in methods {
+            let mut tx = json!({
+                "method": method,
+                "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+            });
+
+            let expected = json!({
+                "method": method,
+                "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0xa"]
+            });
+
+            let a = replace_block_tags(&mut tx, &named_blocknumbers);
+            
+            assert_eq!(a, expected);
+        }
+    }
+
+    #[test]
+    fn handle_missing_or_empty_params_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx_no_params = json!({
+            "method": "eth_getBalance"
+        });
+
+        let mut tx_empty_params = json!({
+            "method": "eth_getBalance",
+            "params": []
+        });
+
+        assert_eq!(replace_block_tags(&mut tx_no_params, &named_blocknumbers), tx_no_params);
+        assert_eq!(replace_block_tags(&mut tx_empty_params, &named_blocknumbers), tx_empty_params);
+    }
+
+    #[test]
+    fn handle_non_string_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", 100]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
+    }
+
 }
