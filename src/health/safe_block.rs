@@ -135,6 +135,9 @@ pub async fn subscribe_to_new_heads(
         "id": 1,
     })).unwrap();
 
+    // Very hacky, but wait until we receive a response subscribing us
+    let _ =  broadcast_rx.recv().await;
+
     // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
     // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
     // on a new node.
@@ -144,10 +147,10 @@ pub async fn subscribe_to_new_heads(
         // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
         match timeout(Duration::from_millis(ttl*2), broadcast_rx.recv()).await {
             Ok(Ok(msg)) => {
-                // println!("New heads: {}", msg);
                 // Write to NamedBlocknumbers
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
                 let a = hex_to_decimal(msg["params"]["result"]["number"].as_str().unwrap()).unwrap();
+                println!("New head: {}", a);
                 nn_rwlock.latest = a;
             }
             Ok(Err(e)) => {
