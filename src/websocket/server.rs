@@ -37,7 +37,6 @@ pub async fn serve_websocket(
     incoming_tx: mpsc::UnboundedSender<Value>,
     outgoing_rx: broadcast::Receiver<Value>,
     sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-
     cache_args: CacheArgs,
 ) -> Result<(), Error> {
     let websocket = websocket.await?;

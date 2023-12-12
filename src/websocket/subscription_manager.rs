@@ -89,7 +89,14 @@ pub fn subscription_dispatcher(
                 let user = user.key();
 
                 // Get the user's channel
-                let tx = sink_map.get(user).unwrap();
+                let tx = match sink_map.get(user) {
+                    Some(tx) => tx,
+                    None => {
+                        // remove the user from the subscribed_users map
+                        subscribed_users.remove(&id);
+                        continue;
+                    },
+                };
 
                 println!(
                     "\x1b[35mInfo:\x1b[0m Sending subscription to user {}",
