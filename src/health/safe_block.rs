@@ -127,18 +127,18 @@ pub async fn subscribe_to_new_heads(
         )
     );
 
+    // Send subscription request to our local ws_conn_managerOption<
+    incoming_tx.send(serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "eth_subscribe",
+        "params": ["newHeads"],
+        "id": 1,
+    })).unwrap();
+
     // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
     // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
     // on a new node.
     loop {
-        // Send subscription request to our local ws_conn_managerOption<
-        incoming_tx.send(serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "eth_subscribe",
-            "params": ["newHeads"],
-            "id": 1,
-        })).unwrap();
-
         // Listen for incoming messages on a timeout
         //
         // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
