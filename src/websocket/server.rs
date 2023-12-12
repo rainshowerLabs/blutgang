@@ -61,20 +61,29 @@ pub async fn serve_websocket(
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             // Forward the message to the best available RPC
-            let resp = execute_ws_call(
-                msg.into(),
-                user_id,
-                incoming_tx.clone(),
-                outgoing_rx.resubscribe(),
-                &cache_args,
-            )
-            .await
-            .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
+            //
+            // If we received a subscription, just send it to the client
+            match msg {
+                RequestResult::Call(call) => {
+                    let resp = execute_ws_call(
+                        call.into(),
+                        user_id,
+                        incoming_tx.clone(),
+                        outgoing_rx.resubscribe(),
+                        &cache_args,
+                    )
+                    .await
+                    .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
 
-            websocket_sink
-                .send(Message::text::<String>(resp))
-                .await
-                .unwrap()
+                    websocket_sink
+                        .send(Message::text::<String>(resp))
+                        .await
+                        .unwrap()
+                }
+                RequestResult::Subscription(sub) => {
+                    websocket_sink.send(Message::Text(sub.to_string())).await.unwrap();
+                }
+            }
         }
     });
 
