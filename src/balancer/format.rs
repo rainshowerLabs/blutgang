@@ -137,8 +137,16 @@ pub fn replace_block_tags(
 
         // Replace the named block tag with its corresponding hex value
         match nn {
-            NamedNumber::Latest => tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.latest)),
-            NamedNumber::Finalized => tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.finalized)),
+            NamedNumber::Latest => {
+                if rwlock_guard.latest != 0 {
+                    tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.latest));
+                }
+            },
+            NamedNumber::Finalized => {
+                if rwlock_guard.finalized != 0 {
+                    tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.finalized));
+                }
+            },
             _ => (),
         }
     }
@@ -456,7 +464,7 @@ mod tests {
             });
 
             let a = replace_block_tags(&mut tx, &named_blocknumbers);
-            
+
             assert_eq!(a, expected);
         }
     }
@@ -475,6 +483,23 @@ mod tests {
 
         assert_eq!(replace_block_tags(&mut tx_no_params, &named_blocknumbers), tx_no_params);
         assert_eq!(replace_block_tags(&mut tx_empty_params, &named_blocknumbers), tx_empty_params);
+    }
+
+    #[test]
+    fn handle_zero_blocknumber() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        named_blocknumbers.write().unwrap().latest = 0;
+        let mut tx = json!({
+            "method": "eth_getTransactionCount",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
+
+        let expected = json!({
+            "method": "eth_getTransactionCount",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), expected);
     }
 
     #[test]
