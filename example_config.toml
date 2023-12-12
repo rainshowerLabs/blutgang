@@ -33,7 +33,7 @@ readonly = true
 # Should be on if exposing to the internet
 jwt = false
 # jwt token
-token = ""
+key = ""
 
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
