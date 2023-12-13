@@ -6,7 +6,10 @@ use crate::{
             NamedBlocknumbers,
         },
     },
-    websocket::types::WsChannelErr,
+    websocket::types::{
+        WsChannelErr,
+        WsconnMessage,
+    },
     Rpc,
     Settings,
 };
@@ -259,6 +262,7 @@ pub async fn dropped_listener(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     mut ws_err_rx: mpsc::UnboundedReceiver<WsChannelErr>,
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
 ) -> Result<(), HealthError> {
     loop {
         let ws_err = ws_err_rx.recv().await;
@@ -266,7 +270,8 @@ pub async fn dropped_listener(
         // TODO: crazy error handling
         match ws_err {
             Some(WsChannelErr::Closed(index)) => {
-                send_dropped_to_poverty(&rpc_list, &poverty_list, index).await.unwrap_or(())
+                send_dropped_to_poverty(&rpc_list, &poverty_list, index).await.unwrap_or(());
+                incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
             }
             None => todo!(),
         };

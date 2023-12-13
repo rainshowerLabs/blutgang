@@ -141,7 +141,7 @@ pub async fn create_ws_vec(
 // returns them via a channel
 pub async fn ws_conn(
     rpc: Rpc,
-    mut incoming_tx: mpsc::UnboundedReceiver<Value>,
+    mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     outgoing_rx: broadcast::Sender<Value>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
@@ -155,7 +155,7 @@ pub async fn ws_conn(
     tokio::spawn(async move {
         // continuously listen for incoming messages
         loop {
-            let incoming = incoming_tx.recv().await.unwrap();
+            let incoming = incoming_rx.recv().await.unwrap();
 
             // add close connection functionality
             // TODO: this type should be an enum

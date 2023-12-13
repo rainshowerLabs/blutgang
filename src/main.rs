@@ -187,8 +187,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let dropped_rpc = rpc_list_health.clone();
         let dropped_povrty = poverty_list_health.clone();
+        let dropped_inc = incoming_tx.clone();
         tokio::task::spawn(async move {
-            dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx).await
+            dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
         });
 
         tokio::task::spawn(async move {
