@@ -18,7 +18,6 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use futures_util::TryFutureExt;
 use tokio::{
     sync::mpsc,
     time::{
@@ -265,9 +264,9 @@ pub async fn dropped_listener(
         let ws_err = ws_err_rx.recv().await;
 
         // TODO: crazy error handling
-        let _ = match ws_err {
+        match ws_err {
             Some(WsChannelErr::Closed(index)) => {
-                send_dropped_to_poverty(&rpc_list, &poverty_list, index).unwrap_or_else(|_| {})
+                send_dropped_to_poverty(&rpc_list, &poverty_list, index).await.unwrap_or(())
             }
             None => todo!(),
         };
