@@ -270,7 +270,9 @@ pub async fn dropped_listener(
         // TODO: crazy error handling
         match ws_err {
             Some(WsChannelErr::Closed(index)) => {
-                send_dropped_to_poverty(&rpc_list, &poverty_list, index).await.unwrap_or(());
+                send_dropped_to_poverty(&rpc_list, &poverty_list, index)
+                    .await
+                    .unwrap_or(());
                 incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
             }
             None => todo!(),

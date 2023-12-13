@@ -69,6 +69,7 @@ pub async fn ws_conn_manager(
     loop {
         let incoming: Value = match incoming_rx.recv().await.unwrap() {
             WsconnMessage::Message(incoming) => incoming,
+            // TODO: this might make things even worse because it will drop all connections we have
             WsconnMessage::Reconnect() => {
                 // Clear everything in ws_handles and reconnect
                 ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
