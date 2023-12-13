@@ -27,8 +27,9 @@ def websocket_client(client_id):
     for i in range(num_messages):
         json_rpc_message = {
             "jsonrpc": "2.0",
+            "method": "eth_getBlockByNumber",
+            "params": [hex(random.randint(5000000, 5000000+30)), False],
             "id": generate_random_id(),
-            "method": "eth_gasPrice"
         }
         message = json.dumps(json_rpc_message)
         ws.send(message)

@@ -117,7 +117,7 @@ pub async fn serve_websocket(
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {
                     println!(
-                        "\x1b[35mInfo:\x1b[0mReceived close message with code {} and message: {}",
+                        "\x1b[35mInfo:\x1b[0m Received close message with code {} and message: {}",
                         msg.code, msg.reason
                     );
                 } else {
