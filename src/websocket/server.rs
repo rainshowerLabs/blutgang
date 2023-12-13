@@ -60,7 +60,7 @@ pub async fn serve_websocket(
     sink_map.insert(user_id, tx.clone());
 
     let sink_map_clone = sink_map.clone();
-    
+
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -84,7 +84,7 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sink_map_clone.remove(&user_id);
-                            println!("\x1b[35mInfo:\x1b[0m Error sending call: {}", e);
+                            println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
                     }
@@ -95,7 +95,7 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sink_map_clone.remove(&user_id);
-                            println!("\x1b[35mInfo:\x1b[0m Error sending call: {}", e);
+                            println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
                     }
@@ -127,7 +127,7 @@ pub async fn serve_websocket(
             Err(e) => {
                 // Remove the user from the sink map
                 sink_map.remove(&user_id);
-                println!("\x1b[35mInfo:\x1b[0m Error receiving message: {}", e);
+                println!("\x1b[93mWrn:\x1b[0m Error receiving message: {}", e);
                 break;
             }
             _ => {}
