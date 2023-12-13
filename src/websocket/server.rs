@@ -68,7 +68,7 @@ pub async fn serve_websocket(
             match msg {
                 RequestResult::Call(call) => {
                     let resp = execute_ws_call(
-                        call.into(),
+                        call,
                         user_id,
                         incoming_tx.clone(),
                         outgoing_rx.resubscribe(),

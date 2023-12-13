@@ -64,7 +64,7 @@ pub async fn ws_conn_manager(
     // continuously listen for incoming messages
     loop {
         let incoming: Value = match incoming_rx.recv().await.unwrap() {
-            WsconnMessage::Message(incoming) => incoming.into(),
+            WsconnMessage::Message(incoming) => incoming,
             WsconnMessage::Reconnect() => Value::Null,
         };
 
