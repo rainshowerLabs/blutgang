@@ -3,9 +3,12 @@ use crate::{
         error::RpcError,
         types::hex_to_decimal,
     },
+    websocket::types::{
+        WsChannelErr,
+        WsconnMessage,
+    },
     ws_conn_manager,
     Rpc,
-    WsconnMessage,
 };
 use std::sync::{
     Arc,
@@ -112,12 +115,13 @@ pub async fn get_safe_block(
 pub async fn subscribe_to_new_heads(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     ttl: u64,
 ) {
     // Spawn a new instance of ws_conn_manager
     //
     // We want to open connections to all RPCs and get a quorum
-    let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(16);
+    let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(128);
     let rpc_list_clone = rpc_list.read().unwrap().clone();
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
 
@@ -125,20 +129,17 @@ pub async fn subscribe_to_new_heads(
         Arc::new(RwLock::new(rpc_list_clone)),
         incoming_rx,
         broadcast_tx,
+        ws_error_tx,
     ));
 
     // Send subscription request to our local ws_conn_manager
     incoming_tx
-        .send(
-            WsconnMessage::Message(
-                serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "method": "eth_subscribe",
-                    "params": ["newHeads"],
-                    "id": 1,
-                })
-            )
-        )
+        .send(WsconnMessage::Message(serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["newHeads"],
+            "id": 1,
+        })))
         .unwrap();
 
     // Very hacky, but wait until we receive a response subscribing us

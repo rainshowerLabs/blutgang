@@ -80,7 +80,7 @@ pub async fn serve_websocket(
                     .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
 
                     match websocket_sink.send(Message::text::<String>(resp)).await {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
                             sink_map_clone.remove(&user_id);
@@ -90,8 +90,11 @@ pub async fn serve_websocket(
                     }
                 }
                 RequestResult::Subscription(sub) => {
-                    match websocket_sink.send(Message::text::<String>(sub.to_string())).await {
-                        Ok(_) => {},
+                    match websocket_sink
+                        .send(Message::text::<String>(sub.to_string()))
+                        .await
+                    {
+                        Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
                             sink_map_clone.remove(&user_id);

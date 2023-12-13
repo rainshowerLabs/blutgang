@@ -30,6 +30,7 @@ impl From<WsconnMessage> for Value {
     }
 }
 
-pub enum WsconnError {
-    Disconnected(),
+#[derive(Debug)]
+pub enum WsChannelErr {
+    Closed(usize),
 }

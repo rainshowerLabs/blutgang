@@ -5,9 +5,6 @@ mod health;
 mod rpc;
 mod websocket;
 
-use dashmap::DashMap;
-use serde_json::Value;
-
 use crate::{
     admin::listener::listen_for_admin_requests,
     balancer::accept_http::{
@@ -20,7 +17,10 @@ use crate::{
         types::Settings,
     },
     health::{
-        check::health_check,
+        check::{
+            dropped_listener,
+            health_check,
+        },
         head_cache::manage_cache,
         safe_block::{
             subscribe_to_new_heads,
@@ -31,8 +31,11 @@ use crate::{
     websocket::{
         client::ws_conn_manager,
         subscription_manager::subscription_dispatcher,
-        types::RequestResult,
-        types::WsconnMessage,
+        types::{
+            RequestResult,
+            WsChannelErr,
+            WsconnMessage,
+        },
     },
 };
 
@@ -44,6 +47,8 @@ use std::{
         RwLock,
     },
 };
+
+use serde_json::Value;
 
 use tokio::{
     net::TcpListener,
@@ -59,6 +64,8 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util_blutgang::rt::TokioIo;
+
+use dashmap::DashMap;
 
 // jeemalloc offers faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
@@ -108,6 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
+    let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
 
     // Map of user ids to channels
     let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
@@ -120,10 +128,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sink_map_ws = Arc::clone(&sink_map);
     let subscribed_users_ws = Arc::clone(&subscribed_users);
     let outgoing_rx_ws = outgoing_rx.resubscribe();
+    let ws_error_tx_ws = ws_error_tx.clone();
 
     tokio::task::spawn(async move {
         subscription_dispatcher(outgoing_rx_ws, sink_map_ws, subscribed_users_ws);
-        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx).await;
+        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx, ws_error_tx_ws).await;
     });
 
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
@@ -176,10 +185,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let config_health = Arc::clone(&config);
         let health_check_ttl = config.read().unwrap().health_check_ttl;
 
+        let dropped_rpc = rpc_list_health.clone();
+        let dropped_povrty = poverty_list_health.clone();
+        tokio::task::spawn(
+            async move { dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx) },
+        );
+
         tokio::task::spawn(async move {
             subscribe_to_new_heads(
                 &rpc_list_health,
                 &named_blocknumbers_health,
+                ws_error_tx,
                 health_check_ttl,
             )
             .await;

@@ -10,7 +10,10 @@ use crate::{
     rpc::types::hex_to_decimal,
     websocket::{
         subscription_manager::insert_and_return_subscription,
-        types::WsconnMessage,
+        types::{
+            WsChannelErr,
+            WsconnMessage,
+        },
     },
     Rpc,
 };
@@ -56,10 +59,11 @@ pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
     broadcast_tx: broadcast::Sender<Value>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
     // We want to create a ws connection for each rpc in rpc_list
     // We also want to have a corresponding channel and put it in a Vec
-    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
+    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
 
     // continuously listen for incoming messages
     loop {
@@ -67,9 +71,9 @@ pub async fn ws_conn_manager(
             WsconnMessage::Message(incoming) => incoming,
             WsconnMessage::Reconnect() => {
                 // Clear everything in ws_handles and reconnect
-                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
+                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
                 continue;
-            },
+            }
         };
 
         // Get the index of the fastest node from rpc_list
@@ -108,6 +112,7 @@ pub async fn ws_conn_manager(
 pub async fn create_ws_vec(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     broadcast_tx: &broadcast::Sender<Value>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
 
@@ -119,7 +124,14 @@ pub async fn create_ws_vec(
 
         ws_handles.push(Some(ws_conn_incoming_tx));
 
-        ws_conn(rpc.clone(), ws_conn_incoming_rx, broadcast_tx.clone(), i).await;
+        ws_conn(
+            rpc.clone(),
+            ws_conn_incoming_rx,
+            broadcast_tx.clone(),
+            ws_error_tx.clone(),
+            i,
+        )
+        .await;
     }
 
     ws_handles
@@ -131,6 +143,7 @@ pub async fn ws_conn(
     rpc: Rpc,
     mut incoming_tx: mpsc::UnboundedReceiver<Value>,
     outgoing_rx: broadcast::Sender<Value>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
@@ -161,15 +174,18 @@ pub async fn ws_conn(
         loop {
             // TODO: if read is dropped that means that this connection shat itself.
             // We should then be alerting our health checker that it died.
-            let rax = read.next().await.unwrap();
+            let rax = read.next().await;
             match rax {
-                Ok(rax) => {
+                Some(Ok(rax)) => {
                     let rax =
                         unsafe { simd_json::from_str(&mut rax.into_text().unwrap()).unwrap() };
                     outgoing_rx.send(rax).unwrap();
                 }
-                Err(e) => {
+                Some(Err(e)) => {
                     println!("ws_conn error: couldnt get response!: {}", e);
+                }
+                None => {
+                    let _ = ws_error_tx.send(WsChannelErr::Closed(index));
                 }
             }
         }

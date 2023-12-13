@@ -6,6 +6,7 @@ use crate::{
             NamedBlocknumbers,
         },
     },
+    websocket::types::WsChannelErr,
     Rpc,
     Settings,
 };
@@ -17,6 +18,7 @@ use std::sync::{
 };
 use std::time::Duration;
 
+use futures_util::TryFutureExt;
 use tokio::{
     sync::mpsc,
     time::{
@@ -230,6 +232,46 @@ fn escape_poverty(
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
     Ok(())
+}
+
+// Remove the RPC that dropped out ws_conn and add it to the poverty list
+pub async fn send_dropped_to_poverty(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    ws_conn_index: usize,
+) -> Result<(), HealthError> {
+    let mut rpc_list_guard = rpc_list.write().unwrap();
+    let mut poverty_list_guard = poverty_list.write().unwrap();
+
+    // Check if the RPC is in the rpc_list
+    if let Some(rpc) = rpc_list_guard.get(ws_conn_index) {
+        // Add the RPC to the poverty list
+        poverty_list_guard.push(rpc.clone());
+
+        // Remove the RPC from the rpc_list
+        rpc_list_guard.remove(ws_conn_index);
+    }
+
+    Ok(())
+}
+
+// Listen for
+pub async fn dropped_listener(
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: Arc<RwLock<Vec<Rpc>>>,
+    mut ws_err_rx: mpsc::UnboundedReceiver<WsChannelErr>,
+) -> Result<(), HealthError> {
+    loop {
+        let ws_err = ws_err_rx.recv().await;
+
+        // TODO: crazy error handling
+        let _ = match ws_err {
+            Some(WsChannelErr::Closed(index)) => {
+                send_dropped_to_poverty(&rpc_list, &poverty_list, index).unwrap_or_else(|_| {})
+            }
+            None => todo!(),
+        };
+    }
 }
 
 /*
