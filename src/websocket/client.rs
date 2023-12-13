@@ -114,12 +114,12 @@ pub async fn create_ws_vec(
     // We want to create a ws connection for each rpc in rpc_list
     // We also want to have a corresponding channel and put it in a Vec
     let mut ws_handles = Vec::new();
-    for rpc in rpc_list_clone {
+    for (i, rpc) in rpc_list_clone.iter().enumerate() {
         let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
 
         ws_handles.push(Some(ws_conn_incoming_tx));
 
-        ws_conn(rpc, ws_conn_incoming_rx, broadcast_tx.clone()).await;
+        ws_conn(rpc.clone(), ws_conn_incoming_rx, broadcast_tx.clone(), i).await;
     }
 
     ws_handles
@@ -131,6 +131,7 @@ pub async fn ws_conn(
     rpc: Rpc,
     mut incoming_tx: mpsc::UnboundedReceiver<Value>,
     outgoing_rx: broadcast::Sender<Value>,
+    index: usize,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).unwrap();
     let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
@@ -158,6 +159,8 @@ pub async fn ws_conn(
     // Create task for continously reading responses we got from our node and broadcasting them
     tokio::spawn(async move {
         loop {
+            // TODO: if read is dropped that means that this connection shat itself.
+            // We should then be alerting our health checker that it died.
             let rax = read.next().await.unwrap();
             match rax {
                 Ok(rax) => {

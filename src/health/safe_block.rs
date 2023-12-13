@@ -129,12 +129,16 @@ pub async fn subscribe_to_new_heads(
 
     // Send subscription request to our local ws_conn_manager
     incoming_tx
-        .send(WsconnMessage::Message(serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "eth_subscribe",
-            "params": ["newHeads"],
-            "id": 1,
-        })))
+        .send(
+            WsconnMessage::Message(
+                serde_json::json!({
+                    "jsonrpc": "2.0",
+                    "method": "eth_subscribe",
+                    "params": ["newHeads"],
+                    "id": 1,
+                })
+            )
+        )
         .unwrap();
 
     // Very hacky, but wait until we receive a response subscribing us

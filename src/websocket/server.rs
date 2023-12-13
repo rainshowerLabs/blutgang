@@ -59,6 +59,8 @@ pub async fn serve_websocket(
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
     sink_map.insert(user_id, tx.clone());
 
+    let sink_map_clone = sink_map.clone();
+    
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
@@ -77,16 +79,26 @@ pub async fn serve_websocket(
                     .await
                     .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
 
-                    websocket_sink
-                        .send(Message::text::<String>(resp))
-                        .await
-                        .unwrap()
+                    match websocket_sink.send(Message::text::<String>(resp)).await {
+                        Ok(_) => {},
+                        Err(e) => {
+                            // Remove the user from the sink map
+                            sink_map_clone.remove(&user_id);
+                            println!("\x1b[35mInfo:\x1b[0m Error sending call: {}", e);
+                            break;
+                        }
+                    }
                 }
                 RequestResult::Subscription(sub) => {
-                    websocket_sink
-                        .send(Message::Text(sub.to_string()))
-                        .await
-                        .unwrap();
+                    match websocket_sink.send(Message::text::<String>(sub.to_string())).await {
+                        Ok(_) => {},
+                        Err(e) => {
+                            // Remove the user from the sink map
+                            sink_map_clone.remove(&user_id);
+                            println!("\x1b[35mInfo:\x1b[0m Error sending call: {}", e);
+                            break;
+                        }
+                    }
                 }
             }
         }

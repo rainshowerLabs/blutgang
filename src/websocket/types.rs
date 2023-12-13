@@ -29,3 +29,7 @@ impl From<WsconnMessage> for Value {
         }
     }
 }
+
+pub enum WsconnError {
+    Disconnected(),
+}
