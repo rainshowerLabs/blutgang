@@ -59,13 +59,17 @@ pub async fn ws_conn_manager(
 ) {
     // We want to create a ws connection for each rpc in rpc_list
     // We also want to have a corresponding channel and put it in a Vec
-    let ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
+    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
 
     // continuously listen for incoming messages
     loop {
         let incoming: Value = match incoming_rx.recv().await.unwrap() {
             WsconnMessage::Message(incoming) => incoming,
-            WsconnMessage::Reconnect() => Value::Null,
+            WsconnMessage::Reconnect() => {
+                // Clear everything in ws_handles and reconnect
+                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx).await;
+                continue;
+            },
         };
 
         // Get the index of the fastest node from rpc_list
