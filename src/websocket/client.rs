@@ -8,7 +8,10 @@ use crate::{
         selection::select::pick,
     },
     rpc::types::hex_to_decimal,
-    websocket::subscription_manager::insert_and_return_subscription,
+    websocket::{
+        subscription_manager::insert_and_return_subscription,
+        types::WsconnMessage,
+    },
     Rpc,
 };
 
@@ -51,7 +54,7 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 // whenever we receive something from incoming_rx
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    mut incoming_rx: mpsc::UnboundedReceiver<Value>,
+    mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
     broadcast_tx: broadcast::Sender<Value>,
 ) {
     // We want to create a ws connection for each rpc in rpc_list
@@ -60,7 +63,10 @@ pub async fn ws_conn_manager(
 
     // continuously listen for incoming messages
     loop {
-        let incoming = incoming_rx.recv().await.unwrap();
+        let incoming: Value = match incoming_rx.recv().await.unwrap() {
+            WsconnMessage::Message(incoming) => incoming.into(),
+            WsconnMessage::Reconnect() => Value::Null,
+        };
 
         // Get the index of the fastest node from rpc_list
         let rpc_position;
@@ -167,7 +173,7 @@ pub async fn ws_conn(
 pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
-    incoming_tx: mpsc::UnboundedSender<Value>,
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
@@ -237,7 +243,7 @@ pub async fn execute_ws_call(
     call["id"] = user_id.into();
 
     // Send call to ws_conn_manager
-    match incoming_tx.send(call.clone()) {
+    match incoming_tx.send(WsconnMessage::Message(call.clone())) {
         Ok(_) => {}
         Err(e) => {
             println!("ws_conn_manager error: {}", e);

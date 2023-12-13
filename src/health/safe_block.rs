@@ -1,10 +1,11 @@
-use crate::ws_conn_manager;
 use crate::{
     rpc::{
         error::RpcError,
         types::hex_to_decimal,
     },
+    ws_conn_manager,
     Rpc,
+    WsconnMessage,
 };
 use std::sync::{
     Arc,
@@ -17,8 +18,6 @@ use tokio::{
         Duration,
     },
 };
-
-use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct NamedBlocknumbers {
@@ -120,7 +119,7 @@ pub async fn subscribe_to_new_heads(
     // We want to open connections to all RPCs and get a quorum
     let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(16);
     let rpc_list_clone = rpc_list.read().unwrap().clone();
-    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
 
     tokio::task::spawn(ws_conn_manager(
         Arc::new(RwLock::new(rpc_list_clone)),
@@ -130,12 +129,12 @@ pub async fn subscribe_to_new_heads(
 
     // Send subscription request to our local ws_conn_manager
     incoming_tx
-        .send(serde_json::json!({
+        .send(WsconnMessage::Message(serde_json::json!({
             "jsonrpc": "2.0",
             "method": "eth_subscribe",
             "params": ["newHeads"],
             "id": 1,
-        }))
+        })))
         .unwrap();
 
     // Very hacky, but wait until we receive a response subscribing us

@@ -5,7 +5,10 @@ use crate::{
     balancer::processing::CacheArgs,
     websocket::{
         client::execute_ws_call,
-        subscription_manager::RequestResult,
+        types::{
+            RequestResult,
+            WsconnMessage,
+        },
     },
 };
 
@@ -34,7 +37,7 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 /// Handle a websocket connection.
 pub async fn serve_websocket(
     websocket: HyperWebsocket,
-    incoming_tx: mpsc::UnboundedSender<Value>,
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<Value>,
     sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
     cache_args: CacheArgs,

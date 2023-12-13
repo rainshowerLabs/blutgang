@@ -5,7 +5,6 @@ mod health;
 mod rpc;
 mod websocket;
 
-use crate::health::safe_block::subscribe_to_new_heads;
 use dashmap::DashMap;
 use serde_json::Value;
 
@@ -23,15 +22,17 @@ use crate::{
     health::{
         check::health_check,
         head_cache::manage_cache,
-        safe_block::NamedBlocknumbers,
+        safe_block::{
+            subscribe_to_new_heads,
+            NamedBlocknumbers,
+        },
     },
     rpc::types::Rpc,
     websocket::{
         client::ws_conn_manager,
-        subscription_manager::{
-            subscription_dispatcher,
-            RequestResult,
-        },
+        subscription_manager::subscription_dispatcher,
+        types::RequestResult,
+        types::WsconnMessage,
     },
 };
 
@@ -105,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr_clone);
 
     // websocket connections
-    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<Value>();
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
 
     // Map of user ids to channels

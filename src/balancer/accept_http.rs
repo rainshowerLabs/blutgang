@@ -18,10 +18,11 @@ use crate::{
     timed_out,
     websocket::{
         server::serve_websocket,
-        subscription_manager::RequestResult,
+        types::RequestResult,
     },
     NamedBlocknumbers,
     Settings,
+    WsconnMessage,
 };
 
 use tokio::sync::{
@@ -81,7 +82,7 @@ struct RequestParams {
 #[derive(Debug)]
 pub struct RequestChannels {
     pub finalized_rx: Arc<watch::Receiver<u64>>,
-    pub incoming_tx: mpsc::UnboundedSender<Value>,
+    pub incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     pub outgoing_rx: broadcast::Receiver<Value>,
 }
 
