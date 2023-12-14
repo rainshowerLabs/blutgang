@@ -1,5 +1,6 @@
 use serde_json::Value;
 
+// Used to either specify if its an incoming call or a subscription
 #[derive(Debug)]
 pub enum RequestResult {
     Call(Value),
@@ -15,6 +16,7 @@ impl From<RequestResult> for Value {
     }
 }
 
+// Internal messages for the websocket manager
 #[derive(Debug)]
 pub enum WsconnMessage {
     Message(Value),
@@ -30,6 +32,7 @@ impl From<WsconnMessage> for Value {
     }
 }
 
+// Errors to send to the health check when a WsConn fails
 #[derive(Debug)]
 pub enum WsChannelErr {
     Closed(usize),
