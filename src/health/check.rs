@@ -257,7 +257,7 @@ pub async fn send_dropped_to_poverty(
     Ok(())
 }
 
-// Listen for
+// Listen for dropped ws connections and handle them
 pub async fn dropped_listener(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
