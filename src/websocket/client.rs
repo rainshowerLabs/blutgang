@@ -11,9 +11,9 @@ use crate::{
     websocket::{
         subscription_manager::insert_and_return_subscription,
         types::{
+            SubscriptionData,
             WsChannelErr,
             WsconnMessage,
-            SubscriptionData,
         },
     },
     Rpc,
@@ -200,7 +200,7 @@ pub async fn execute_ws_call(
     user_id: u64,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
-    sub_data: SubscriptionData,
+    sub_data: Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     // Store id of call and set random id we'll actually forward to the node
@@ -240,6 +240,7 @@ pub async fn execute_ws_call(
 
     if is_subscription {
         // Check if our tx_hash exists in the sled "subscriptions" subtree
+        // TODO: I dont think we need this
         let subscriptions = cache_args.cache.open_tree("subscriptions")?;
 
         match subscriptions.get(tx_hash.as_bytes()) {
@@ -248,7 +249,7 @@ pub async fn execute_ws_call(
                 cached["id"] = id;
                 let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
 
-                if let Some(subscribed_users) = &cache_args.subscribed_users {
+                if let subscribed_users = &sub_data.subscribed_users {
                     subscribed_users
                         .entry(subscription_id)
                         .or_default()
@@ -286,7 +287,7 @@ pub async fn execute_ws_call(
         // Register the subscription id with the user
         //
         // We'll have to append or create the vec
-        if let Some(subscribed_users) = &cache_args.subscribed_users {
+        if let subscribed_users = &sub_data.subscribed_users {
             subscribed_users
                 .entry(subscription_id)
                 .or_default()

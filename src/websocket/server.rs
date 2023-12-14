@@ -1,4 +1,3 @@
-use dashmap::DashMap;
 use std::sync::Arc;
 
 use crate::{
@@ -31,6 +30,8 @@ use hyper_tungstenite::{
 };
 use tungstenite::Message;
 
+use super::types::SubscriptionData;
+
 // Recommended way to deal with this, idk either
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -39,7 +40,7 @@ pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<Value>,
-    sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+    sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
 ) -> Result<(), Error> {
     let websocket = websocket.await?;
@@ -57,9 +58,9 @@ pub async fn serve_websocket(
 
     // Add the user to the sink map
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
-    sink_map.insert(user_id, tx.clone());
+    sub_data.sink_map.insert(user_id, tx.clone());
 
-    let sink_map_clone = sink_map.clone();
+    let sub_data_clone = sub_data.clone();
 
     // Spawn taks for sending messages to the client
     tokio::spawn(async move {
@@ -74,6 +75,7 @@ pub async fn serve_websocket(
                         user_id,
                         incoming_tx.clone(),
                         outgoing_rx.resubscribe(),
+                        sub_data_clone.clone(),
                         &cache_args,
                     )
                     .await
@@ -83,7 +85,7 @@ pub async fn serve_websocket(
                         Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
-                            sink_map_clone.remove(&user_id);
+                            sub_data_clone.sink_map.remove(&user_id);
                             println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
@@ -97,7 +99,7 @@ pub async fn serve_websocket(
                         Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
-                            sink_map_clone.remove(&user_id);
+                            sub_data_clone.sink_map.remove(&user_id);
                             println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
@@ -129,7 +131,7 @@ pub async fn serve_websocket(
             }
             Err(e) => {
                 // Remove the user from the sink map
-                sink_map.remove(&user_id);
+                sub_data.sink_map.remove(&user_id);
                 println!("\x1b[93mWrn:\x1b[0m Error receiving message: {}", e);
                 break;
             }

@@ -18,9 +18,7 @@ use crate::{
     timed_out,
     websocket::{
         server::serve_websocket,
-        types::{
-            SubscriptionData,
-        },
+        types::SubscriptionData,
     },
     NamedBlocknumbers,
     Settings,
@@ -327,7 +325,7 @@ pub async fn accept_request(
     channels: RequestChannels,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    sub_data: &Arc<SubscriptionData>,
+    sub_data: Arc<SubscriptionData>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -354,13 +352,12 @@ pub async fn accept_request(
         };
 
         // Spawn a task to handle the websocket connection.
-        let sink_clone = sub_data.sink_map.clone();
         tokio::task::spawn(async move {
             if let Err(e) = serve_websocket(
                 websocket,
                 channels.incoming_tx,
                 channels.outgoing_rx,
-                sink_clone,
+                sub_data.clone(),
                 cache_args,
             )
             .await

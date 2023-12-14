@@ -256,7 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
-                &sub_data_clone,
+                sub_data_clone.clone(),
                 &config_clone
             );
         });
