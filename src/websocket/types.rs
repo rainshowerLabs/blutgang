@@ -45,5 +45,5 @@ pub enum WsChannelErr {
 pub struct SubscriptionData {
     pub sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
     pub subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
-    pub node_subscriptions: Arc<DashMap<>>,
+    //pub node_subscriptions: Arc<DashMap<u64, Vec<u64>>>,
 }
