@@ -211,7 +211,6 @@ macro_rules! get_response {
                     named_numbers: $named_numbers,
                     cache: $cache,
                     head_cache: $head_cache,
-                    subscribed_users: None,
                 };
 
                 // Don't cache responses that contain errors or missing trie nodes
@@ -352,7 +351,6 @@ pub async fn accept_request(
             named_numbers: named_numbers.clone(),
             cache,
             head_cache: head_cache.clone(),
-            subscribed_users: Some(sub_data.subscribed_users.clone()),
         };
 
         // Spawn a task to handle the websocket connection.

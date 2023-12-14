@@ -13,6 +13,7 @@ use crate::{
         types::{
             WsChannelErr,
             WsconnMessage,
+            SubscriptionData,
         },
     },
     Rpc,
@@ -199,6 +200,7 @@ pub async fn execute_ws_call(
     user_id: u64,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
+    sub_data: SubscriptionData,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     // Store id of call and set random id we'll actually forward to the node

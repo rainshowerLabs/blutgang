@@ -1,4 +1,3 @@
-use dashmap::DashMap;
 use std::{
     collections::BTreeMap,
     sync::{
@@ -30,7 +29,6 @@ pub struct CacheArgs {
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub cache: Arc<Db>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    pub subscribed_users: Option<Arc<DashMap<u64, DashMap<u64, bool>>>>,
 }
 
 // TODO: we should find a way to check values directly and not convert Value to str
