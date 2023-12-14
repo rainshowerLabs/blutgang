@@ -1,4 +1,7 @@
+use dashmap::DashMap;
 use serde_json::Value;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 // Used to either specify if its an incoming call or a subscription
 #[derive(Debug)]
@@ -36,4 +39,10 @@ impl From<WsconnMessage> for Value {
 #[derive(Debug)]
 pub enum WsChannelErr {
     Closed(usize),
+}
+
+// Holds data in regards to wsconns/subscriptions/users
+pub struct SubscriptionData {
+    pub sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
+    pub subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
 }

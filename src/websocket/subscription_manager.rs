@@ -1,16 +1,17 @@
 use crate::{
     balancer::processing::CacheArgs,
     rpc::types::hex_to_decimal,
-    websocket::types::RequestResult,
+    websocket::types::{
+        RequestResult,
+        SubscriptionData,
+    },
 };
 use blake3::Hash;
-use dashmap::DashMap;
+
 use serde_json::Value;
 use simd_json::to_vec;
-use std::println;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -37,8 +38,7 @@ pub fn insert_and_return_subscription(
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
     mut rx: broadcast::Receiver<Value>,
-    sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-    subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
+    subscriptions: Arc<SubscriptionData>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -55,7 +55,7 @@ pub fn subscription_dispatcher(
             let id = hex_to_decimal(id).unwrap();
 
             // Get all the users that are subscribed to this subscription
-            let a = subscribed_users.clone();
+            let a = subscriptions.subscribed_users.clone();
             let users = a.get(&id);
             let users = users.as_deref();
 
@@ -75,11 +75,11 @@ pub fn subscription_dispatcher(
                 let user = user.key();
 
                 // Get the user's channel
-                let tx = match sink_map.get(user) {
+                let tx = match subscriptions.sink_map.get(user) {
                     Some(tx) => tx,
                     None => {
                         // remove the user from the subscribed_users map
-                        subscribed_users.remove(&id);
+                        subscriptions.subscribed_users.remove(&id);
                         continue;
                     }
                 };

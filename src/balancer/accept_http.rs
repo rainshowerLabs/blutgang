@@ -18,7 +18,9 @@ use crate::{
     timed_out,
     websocket::{
         server::serve_websocket,
-        types::RequestResult,
+        types::{
+            SubscriptionData,
+        },
     },
     NamedBlocknumbers,
     Settings,
@@ -30,8 +32,6 @@ use tokio::sync::{
     mpsc,
     watch,
 };
-
-use dashmap::DashMap;
 
 use serde_json::Value;
 use simd_json;
@@ -106,8 +106,7 @@ macro_rules! accept {
         $channels:expr,
         $named_numbers:expr,
         $head_cache:expr,
-        $sink_map:expr,
-        $subscribed_users:expr,
+        $sub_data:expr,
         $config:expr
     ) => {
         // Bind the incoming connection to our service
@@ -122,8 +121,7 @@ macro_rules! accept {
                         $channels,
                         $named_numbers,
                         $head_cache,
-                        $sink_map,
-                        $subscribed_users,
+                        $sub_data,
                         Arc::clone($cache),
                         $config,
                     );
@@ -330,8 +328,7 @@ pub async fn accept_request(
     channels: RequestChannels,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    sink_map: &Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-    subscribed_users: &Arc<DashMap<u64, DashMap<u64, bool>>>,
+    sub_data: &Arc<SubscriptionData>,
     cache: Arc<Db>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -355,11 +352,11 @@ pub async fn accept_request(
             named_numbers: named_numbers.clone(),
             cache,
             head_cache: head_cache.clone(),
-            subscribed_users: Some(subscribed_users.clone()),
+            subscribed_users: Some(sub_data.subscribed_users.clone()),
         };
 
         // Spawn a task to handle the websocket connection.
-        let sink_clone = sink_map.clone();
+        let sink_clone = sub_data.sink_map.clone();
         tokio::task::spawn(async move {
             if let Err(e) = serve_websocket(
                 websocket,

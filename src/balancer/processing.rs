@@ -23,6 +23,7 @@ use serde_json::Value;
 use simd_json::to_vec;
 use sled::Db;
 
+// TODO: refactor this, we dont need subscribed users here
 #[derive(Clone)]
 pub struct CacheArgs {
     pub finalized_rx: watch::Receiver<u64>,

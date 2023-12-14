@@ -33,6 +33,7 @@ use crate::{
         subscription_manager::subscription_dispatcher,
         types::{
             RequestResult,
+            SubscriptionData,
             WsChannelErr,
             WsconnMessage,
         },
@@ -125,13 +126,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscribed_users = Arc::new(DashMap::<u64, DashMap<u64, bool>>::new());
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
-    let sink_map_ws = Arc::clone(&sink_map);
-    let subscribed_users_ws = Arc::clone(&subscribed_users);
     let outgoing_rx_ws = outgoing_rx.resubscribe();
     let ws_error_tx_ws = ws_error_tx.clone();
 
+    let sub_data = Arc::new(SubscriptionData {
+        sink_map: Arc::clone(&sink_map),
+        subscribed_users: Arc::clone(&subscribed_users),
+    });
+    let sub_dispatcher = Arc::clone(&sub_data);
+
     tokio::task::spawn(async move {
-        subscription_dispatcher(outgoing_rx_ws, sink_map_ws, subscribed_users_ws);
+        subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
         let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx, ws_error_tx_ws).await;
     });
 
@@ -234,8 +239,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
-        let sink_map_clone = Arc::clone(&sink_map);
-        let subscribed_users_clone = Arc::clone(&subscribed_users);
+        let sub_data_clone = Arc::clone(&sub_data);
 
         let channels = RequestChannels {
             finalized_rx: finalized_rx_clone,
@@ -252,8 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
-                &sink_map_clone,
-                &subscribed_users_clone,
+                &sub_data_clone,
                 &config_clone
             );
         });
