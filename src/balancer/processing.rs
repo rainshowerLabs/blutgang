@@ -1,12 +1,3 @@
-use std::{
-    collections::BTreeMap,
-    sync::{
-        Arc,
-        RwLock,
-    },
-};
-use tokio::sync::watch;
-
 use crate::{
     balancer::{
         format::get_block_number_from_request,
@@ -17,6 +8,17 @@ use crate::{
     },
     health::safe_block::NamedBlocknumbers,
 };
+
+use std::{
+    collections::BTreeMap,
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
+
+use tokio::sync::watch;
+
 use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
