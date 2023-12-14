@@ -21,15 +21,17 @@ use crate::{
     },
 };
 
+use std::sync::{
+    Arc,
+    RwLock,
+};
+
 use futures_util::{
     SinkExt,
     StreamExt,
 };
 use serde_json::Value;
-use std::sync::{
-    Arc,
-    RwLock,
-};
+use simd_json::from_slice;
 use tokio::sync::{
     broadcast,
     mpsc,
@@ -163,7 +165,7 @@ pub async fn execute_ws_call(
     };
 
     if let Ok(Some(mut rax)) = cache_args.cache.get(tx_hash.as_bytes()) {
-        let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+        let mut cached: Value = from_slice(&mut rax).unwrap();
         cached["id"] = id;
         return Ok(cached.to_string());
     }
@@ -175,7 +177,7 @@ pub async fn execute_ws_call(
             .open_tree("subscriptions")?
             .get(tx_hash.as_bytes())
         {
-            let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+            let mut cached: Value = from_slice(&mut rax).unwrap();
             cached["id"] = id;
             let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
             sub_data
