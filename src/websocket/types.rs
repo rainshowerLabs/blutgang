@@ -42,6 +42,7 @@ pub enum WsChannelErr {
 }
 
 // Holds data in regards to wsconns/subscriptions/users
+// TODO: this probably needs refactoring to something more sane
 pub struct SubscriptionData {
     pub sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
     pub subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
