@@ -1,10 +1,15 @@
 use dashmap::DashMap;
 use serde_json::Value;
-use std::sync::Arc;
 use tokio::sync::mpsc;
 
+use std::sync::{Arc, RwLock};
+use std::collections::{HashMap, HashSet};
+use futures::SinkExt;
+
+type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
 // Used to either specify if its an incoming call or a subscription
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RequestResult {
     Call(Value),
     Subscription(Value),
@@ -41,10 +46,74 @@ pub enum WsChannelErr {
     Closed(usize),
 }
 
-// Holds data in regards to wsconns/subscriptions/users
-// TODO: this probably needs refactoring to something more sane
-pub struct SubscriptionData {
-    pub sink_map: Arc<DashMap<u64, mpsc::UnboundedSender<RequestResult>>>,
-    pub subscribed_users: Arc<DashMap<u64, DashMap<u64, bool>>>,
-    //pub node_subscriptions: Arc<DashMap<u64, Vec<u64>>>,
+pub struct UserData {
+    pub message_channel: mpsc::UnboundedSender<RequestResult>,
 }
+
+pub struct SubscriptionData {
+    pub users: Arc<RwLock<HashMap<u64, UserData>>>,
+    // Mapping from subscription ID to a set of user IDs
+    pub subscriptions: Arc<RwLock<HashMap<u64, HashSet<u64>>>>,
+}
+
+impl SubscriptionData {
+    pub fn new() -> Self {
+        SubscriptionData {
+            users: Arc::new(RwLock::new(HashMap::new())),
+            subscriptions: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    // Add or update a user
+    pub fn add_user(&self, user_id: u64, user_data: UserData) {
+        let mut users = self.users.write().unwrap();
+        users.insert(user_id, user_data);
+    }
+
+    // Remove a user and clean up their subscriptions
+    pub fn remove_user(&self, user_id: u64) {
+        let mut users = self.users.write().unwrap();
+        if users.remove(&user_id).is_some() {
+            let mut subscriptions = self.subscriptions.write().unwrap();
+            for user_subscriptions in subscriptions.values_mut() {
+                user_subscriptions.remove(&user_id);
+            }
+        }
+    }
+
+    // Subscribe a user to a subscription
+    pub fn subscribe_user(&self, user_id: u64, subscription_id: u64) {
+        let mut subscriptions = self.subscriptions.write().unwrap();
+        subscriptions.entry(subscription_id).or_default().insert(user_id);
+    }
+
+    // Unsubscribe a user from a subscription
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: u64) {
+        if let Some(subscribers) = self.subscriptions.write().unwrap().get_mut(&subscription_id) {
+            subscribers.remove(&user_id);
+        }
+    }
+
+    // Dispatch a message to all users subscribed to a subscription
+    pub async fn dispatch_to_subscribers(&self, subscription_id: u64, message: &RequestResult) -> Result<(), Error> {
+        // TODO: We can remove this later
+        match message {
+            RequestResult::Call(_) => println!("\x1b[31mErr:\x1b[0m Trying to send Call as subscription!!!"),
+            &RequestResult::Subscription(_) => {},
+        }
+
+        let users = self.users.read().unwrap();
+        if let Some(subscribers) = self.subscriptions.read().unwrap().get(&subscription_id) {
+            for &user_id in subscribers {
+                if let Some(user) = users.get(&user_id) {
+                    user.message_channel.send(message.clone()).unwrap_or_else(|e| {
+                        println!("Error sending message to user {}: {}", user_id, e);
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+}
+

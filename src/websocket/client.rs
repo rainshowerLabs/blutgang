@@ -172,21 +172,9 @@ pub async fn execute_ws_call(
 
     let is_subscription = call["method"] == "eth_subscribe";
     if is_subscription {
-        if let Ok(Some(mut rax)) = cache_args
-            .cache
-            .open_tree("subscriptions")?
-            .get(tx_hash.as_bytes())
-        {
-            let mut cached: Value = from_slice(&mut rax).unwrap();
-            cached["id"] = id;
-            let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
-            sub_data
-                .subscribed_users
-                .entry(subscription_id)
-                .or_default()
-                .insert(user_id, true);
-            return Ok(cached.to_string());
-        }
+        // Check if we're already subscribed to this
+        // if so return the subscription id and add this user to the dispatch
+        // if not continue
     } else {
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
@@ -198,14 +186,7 @@ pub async fn execute_ws_call(
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
-        insert_and_return_subscription(tx_hash, response.clone(), cache_args)
-            .expect("Failed to insert subscription");
-        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
-        sub_data
-            .subscribed_users
-            .entry(subscription_id)
-            .or_default()
-            .insert(user_id, true);
+        // add the subscription id and add this user to the dispatch
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }

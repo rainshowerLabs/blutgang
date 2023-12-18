@@ -10,10 +10,30 @@ use blake3::Hash;
 
 use serde_json::Value;
 use simd_json::to_vec;
-use std::sync::Arc;
-use tokio::sync::broadcast;
+use std::{sync::Arc, collections::HashMap};
+use tokio::sync::{
+    broadcast,
+    mpsc
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
+
+enum AuthorityMessage {
+    CheckExists(Value, u64),
+    AddSubscription(Value, u64),
+}
+
+// Returns subscription IDs and subscribes users to the dispatch
+pub fn subscription_authority(
+    subscription_rx: mpsc::UnboundedReceiver<AuthorityMessage>,
+    subscription_tx: broadcast::Sender<Value>,
+    sub_data: Arc<SubscriptionData>,
+) -> Result<(), Error> {
+    let subscription_id_map: HashMap<Vec<u8>, String>;
+    let 
+
+    Ok(())
+}
 
 // We want to return the subscription id and insert it into a subtree
 //
@@ -38,7 +58,7 @@ pub fn insert_and_return_subscription(
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
     mut rx: broadcast::Receiver<Value>,
-    subscriptions: Arc<SubscriptionData>,
+    sub_data: Arc<SubscriptionData>,
 ) {
     tokio::spawn(async move {
         loop {
@@ -52,10 +72,11 @@ pub fn subscription_dispatcher(
 
             // Get the subscription id
             let id = response["params"]["subscription"].as_str().unwrap();
+            // TODO: this can be a string
             let id = hex_to_decimal(id).unwrap();
 
             // Get all the users that are subscribed to this subscription
-            let a = subscriptions.subscribed_users.clone();
+            let a = sub_data.subscribed_users.clone();
             let users = a.get(&id);
             let users = users.as_deref();
 
@@ -75,11 +96,11 @@ pub fn subscription_dispatcher(
                 let user = user.key();
 
                 // Get the user's channel
-                let tx = match subscriptions.sink_map.get(user) {
+                let tx = match sub_data.sink_map.get(user) {
                     Some(tx) => tx,
                     None => {
                         // remove the user from the subscribed_users map
-                        subscriptions.subscribed_users.remove(&id);
+                        sub_data.subscribed_users.remove(&id);
                         continue;
                     }
                 };
