@@ -6,7 +6,7 @@ use crate::{
         client::execute_ws_call,
         types::{
             RequestResult,
-            WsconnMessage,
+            WsconnMessage, UserData,
         },
     },
 };
@@ -58,7 +58,10 @@ pub async fn serve_websocket(
 
     // Add the user to the sink map
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
-    sub_data.sink_map.insert(user_id, tx.clone());
+    let user_data = UserData {
+        message_channel: tx,
+    };
+    sub_data.add_user(user_id, user_data);
 
     let sub_data_clone = sub_data.clone();
 
@@ -85,7 +88,7 @@ pub async fn serve_websocket(
                         Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
-                            sub_data_clone.sink_map.remove(&user_id);
+                            sub_data_clone.remove_user(user_id);
                             println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
@@ -99,7 +102,7 @@ pub async fn serve_websocket(
                         Ok(_) => {}
                         Err(e) => {
                             // Remove the user from the sink map
-                            sub_data_clone.sink_map.remove(&user_id);
+                            sub_data_clone.remove_user(user_id);
                             println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
                             break;
                         }
