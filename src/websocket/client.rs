@@ -175,7 +175,20 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
+        if let Ok(Some(mut rax)) = cache_args
+            .cache
+            .open_tree("subscriptions")?
+            .get(tx_hash.as_bytes())
+        {
+            let mut cached: Value = from_slice(&mut rax).unwrap();
+            cached["id"] = id;
+            let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
+
+            sub_data.subscribe_user(user_id, subscription_id);
+            return Ok(cached.to_string());
+        }
     } else {
+        // Replace block tags if applicable
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
 
@@ -187,6 +200,11 @@ pub async fn execute_ws_call(
 
     if is_subscription {
         // add the subscription id and add this user to the dispatch
+        insert_and_return_subscription(tx_hash, response.clone(), cache_args)
+            .expect("Failed to insert subscription");
+        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
+
+        sub_data.subscribe_user(user_id, subscription_id);
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }

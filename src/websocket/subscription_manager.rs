@@ -11,12 +11,10 @@ use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
 use std::{
-    collections::HashMap,
     sync::Arc,
 };
 use tokio::sync::{
     broadcast,
-    mpsc,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -66,40 +64,8 @@ pub fn subscription_dispatcher(
             // TODO: this can be a string
             let id = hex_to_decimal(id).unwrap();
 
-            // Get all the users that are subscribed to this subscription
-            let a = sub_data.subscribed_users.clone();
-            let users = a.get(&id);
-            let users = users.as_deref();
-
-            // If there are no users, we can skip this
-            // TODO: UNSUBSCRIBE!!!
-            if users.is_none() || users.unwrap().is_empty() {
-                continue;
-            }
-
-            let users = users.unwrap();
-
             // Send the response to all the users
-            //
-            // `users` is a map of <subscription id, <user, is subscribed>>
-            //  we want to iter over the users and send them the response
-            for user in users.iter() {
-                let user = user.key();
-
-                // Get the user's channel
-                let tx = match sub_data.sink_map.get(user) {
-                    Some(tx) => tx,
-                    None => {
-                        // remove the user from the subscribed_users map
-                        sub_data.subscribed_users.remove(&id);
-                        continue;
-                    }
-                };
-
-                println!("\x1b[35mInfo:\x1b[0m Sending subscription to user {}", user);
-                // Send the response
-                let _ = tx.send(RequestResult::Subscription(response.clone()));
-            }
+            sub_data.dispatch_to_subscribers(id, &RequestResult::Subscription(response));
         }
     });
 }

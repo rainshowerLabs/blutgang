@@ -59,7 +59,7 @@ pub async fn serve_websocket(
     // Add the user to the sink map
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
     let user_data = UserData {
-        message_channel: tx,
+        message_channel: tx.clone(),
     };
     sub_data.add_user(user_id, user_data);
 
@@ -134,7 +134,7 @@ pub async fn serve_websocket(
             }
             Err(e) => {
                 // Remove the user from the sink map
-                sub_data.sink_map.remove(&user_id);
+                sub_data.remove_user(user_id);
                 println!("\x1b[93mWrn:\x1b[0m Error receiving message: {}", e);
                 break;
             }

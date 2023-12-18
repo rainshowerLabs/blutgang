@@ -118,21 +118,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
     let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
 
-    // Map of user ids to channels
-    let sink_map = Arc::new(DashMap::<u64, mpsc::UnboundedSender<RequestResult>>::new());
-
-    // Map of subscriptions to users
-    // TODO: I feel like this is sub optimal for performance
-    let subscribed_users = Arc::new(DashMap::<u64, DashMap<u64, bool>>::new());
-
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
     let outgoing_rx_ws = outgoing_rx.resubscribe();
     let ws_error_tx_ws = ws_error_tx.clone();
 
-    let sub_data = Arc::new(SubscriptionData {
-        sink_map: Arc::clone(&sink_map),
-        subscribed_users: Arc::clone(&subscribed_users),
-    });
+    let sub_data = Arc::new(SubscriptionData::new());
     let sub_dispatcher = Arc::clone(&sub_data);
 
     tokio::task::spawn(async move {

@@ -105,6 +105,11 @@ impl SubscriptionData {
             .get_mut(&subscription_id)
         {
             subscribers.remove(&user_id);
+            // Check length, and if 0 send unsubscribe message to node
+            // TODO: Implement the logic for this
+            if subscribers.is_empty() {
+                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", {subscription_id})
+            }
         }
     }
 
