@@ -2,9 +2,15 @@ use dashmap::DashMap;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-use std::sync::{Arc, RwLock};
-use std::collections::{HashMap, HashSet};
 use futures::SinkExt;
+use std::collections::{
+    HashMap,
+    HashSet,
+};
+use std::sync::{
+    Arc,
+    RwLock,
+};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -84,36 +90,49 @@ impl SubscriptionData {
     // Subscribe a user to a subscription
     pub fn subscribe_user(&self, user_id: u64, subscription_id: u64) {
         let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions.entry(subscription_id).or_default().insert(user_id);
+        subscriptions
+            .entry(subscription_id)
+            .or_default()
+            .insert(user_id);
     }
 
     // Unsubscribe a user from a subscription
     pub fn unsubscribe_user(&self, user_id: u64, subscription_id: u64) {
-        if let Some(subscribers) = self.subscriptions.write().unwrap().get_mut(&subscription_id) {
+        if let Some(subscribers) = self
+            .subscriptions
+            .write()
+            .unwrap()
+            .get_mut(&subscription_id)
+        {
             subscribers.remove(&user_id);
         }
     }
 
     // Dispatch a message to all users subscribed to a subscription
-    pub async fn dispatch_to_subscribers(&self, subscription_id: u64, message: &RequestResult) -> Result<(), Error> {
+    pub async fn dispatch_to_subscribers(
+        &self,
+        subscription_id: u64,
+        message: &RequestResult,
+    ) -> Result<(), Error> {
         // TODO: We can remove this later
         match message {
-            RequestResult::Call(_) => println!("\x1b[31mErr:\x1b[0m Trying to send Call as subscription!!!"),
-            &RequestResult::Subscription(_) => {},
-        }
+            RequestResult::Call(_) => return Err("Trying to send a call as a subscription!".into()),
+            RequestResult::Subscription(_) => {}
+        };
 
         let users = self.users.read().unwrap();
         if let Some(subscribers) = self.subscriptions.read().unwrap().get(&subscription_id) {
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
-                    user.message_channel.send(message.clone()).unwrap_or_else(|e| {
-                        println!("Error sending message to user {}: {}", user_id, e);
-                    });
+                    user.message_channel
+                        .send(message.clone())
+                        .unwrap_or_else(|e| {
+                            println!("Error sending message to user {}: {}", user_id, e);
+                        });
                 }
             }
         }
+
         Ok(())
     }
-
 }
-

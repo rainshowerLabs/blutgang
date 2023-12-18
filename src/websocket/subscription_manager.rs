@@ -10,10 +10,13 @@ use blake3::Hash;
 
 use serde_json::Value;
 use simd_json::to_vec;
-use std::{sync::Arc, collections::HashMap};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+};
 use tokio::sync::{
     broadcast,
-    mpsc
+    mpsc,
 };
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -21,18 +24,6 @@ type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 enum AuthorityMessage {
     CheckExists(Value, u64),
     AddSubscription(Value, u64),
-}
-
-// Returns subscription IDs and subscribes users to the dispatch
-pub fn subscription_authority(
-    subscription_rx: mpsc::UnboundedReceiver<AuthorityMessage>,
-    subscription_tx: broadcast::Sender<Value>,
-    sub_data: Arc<SubscriptionData>,
-) -> Result<(), Error> {
-    let subscription_id_map: HashMap<Vec<u8>, String>;
-    let 
-
-    Ok(())
 }
 
 // We want to return the subscription id and insert it into a subtree
