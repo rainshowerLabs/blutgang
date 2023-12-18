@@ -17,6 +17,7 @@ use crate::{
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
+            Error,
         },
     },
 };
@@ -46,8 +47,6 @@ use blake3::hash;
 
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
-
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,

@@ -8,6 +8,7 @@ use crate::{
             RequestResult,
             UserData,
             WsconnMessage,
+            Error,
         },
     },
 };
@@ -32,9 +33,6 @@ use hyper_tungstenite::{
 use tungstenite::Message;
 
 use super::types::SubscriptionData;
-
-// Recommended way to deal with this, idk either
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 /// Handle a websocket connection.
 pub async fn serve_websocket(

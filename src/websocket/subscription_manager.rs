@@ -4,6 +4,7 @@ use crate::{
     websocket::types::{
         RequestResult,
         SubscriptionData,
+        Error,
     },
 };
 use blake3::Hash;
@@ -12,8 +13,6 @@ use serde_json::Value;
 use simd_json::to_vec;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // We want to return the subscription id and insert it into a subtree
 //
