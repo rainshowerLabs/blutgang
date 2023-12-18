@@ -1,16 +1,16 @@
-use dashmap::DashMap;
+use std::{
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
+
 use serde_json::Value;
 use tokio::sync::mpsc;
-
-use futures::SinkExt;
-use std::collections::{
-    HashMap,
-    HashSet,
-};
-use std::sync::{
-    Arc,
-    RwLock,
-};
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -108,7 +108,9 @@ impl SubscriptionData {
             // Check length, and if 0 send unsubscribe message to node
             // TODO: Implement the logic for this
             if subscribers.is_empty() {
-                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", {subscription_id})
+                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", {
+                    subscription_id
+                })
             }
         }
     }

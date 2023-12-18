@@ -6,7 +6,8 @@ use crate::{
         client::execute_ws_call,
         types::{
             RequestResult,
-            WsconnMessage, UserData,
+            UserData,
+            WsconnMessage,
         },
     },
 };

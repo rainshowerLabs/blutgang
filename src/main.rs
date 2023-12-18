@@ -32,7 +32,6 @@ use crate::{
         client::ws_conn_manager,
         subscription_manager::subscription_dispatcher,
         types::{
-            RequestResult,
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
@@ -65,8 +64,6 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util_blutgang::rt::TokioIo;
-
-use dashmap::DashMap;
 
 // jeemalloc offers faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]

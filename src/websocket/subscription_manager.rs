@@ -10,19 +10,10 @@ use blake3::Hash;
 
 use serde_json::Value;
 use simd_json::to_vec;
-use std::{
-    sync::Arc,
-};
-use tokio::sync::{
-    broadcast,
-};
+use std::sync::Arc;
+use tokio::sync::broadcast;
 
 type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
-enum AuthorityMessage {
-    CheckExists(Value, u64),
-    AddSubscription(Value, u64),
-}
 
 // We want to return the subscription id and insert it into a subtree
 //
@@ -65,7 +56,18 @@ pub fn subscription_dispatcher(
             let id = hex_to_decimal(id).unwrap();
 
             // Send the response to all the users
-            sub_data.dispatch_to_subscribers(id, &RequestResult::Subscription(response));
+            match sub_data
+                .dispatch_to_subscribers(id, &RequestResult::Subscription(response))
+                .await
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    println!(
+                        "\x1b[31mErr:\x1b[0m Fatal error while trying to send subscriptions: {}",
+                        e
+                    )
+                }
+            };
         }
     });
 }
