@@ -9,11 +9,10 @@ use std::{
     },
 };
 
+use crate::websocket::error::Error;
+
 use serde_json::Value;
 use tokio::sync::mpsc;
-
-// Recommended way to deal with this, idk either
-pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 // Used to either specify if its an incoming call or a subscription
 #[derive(Debug, Clone)]

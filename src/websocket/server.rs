@@ -4,11 +4,11 @@ use crate::{
     balancer::processing::CacheArgs,
     websocket::{
         client::execute_ws_call,
+        error::Error,
         types::{
             RequestResult,
             UserData,
             WsconnMessage,
-            Error,
         },
     },
 };

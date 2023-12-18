@@ -1,10 +1,12 @@
 use crate::{
     balancer::processing::CacheArgs,
     rpc::types::hex_to_decimal,
-    websocket::types::{
-        RequestResult,
-        SubscriptionData,
-        Error,
+    websocket::{
+        error::Error,
+        types::{
+            RequestResult,
+            SubscriptionData,
+        },
     },
 };
 use blake3::Hash;
