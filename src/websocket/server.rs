@@ -3,7 +3,10 @@ use std::sync::Arc;
 use crate::{
     balancer::processing::CacheArgs,
     websocket::{
-        client::execute_ws_call,
+        client::{
+            execute_ws_call,
+            process_unsubscription,
+        },
         error::Error,
         types::{
             RequestResult,
@@ -72,12 +75,24 @@ pub async fn serve_websocket(
             // If we received a subscription, just send it to the client
             match msg {
                 RequestResult::Call(call) => {
+                    // If `incoming` is an `eth_unsubscribe` we don't need to get a node
+                    if call["method"] == "eth_unsubscribe" {
+                        process_unsubscription(user_id, call, &sub_data_clone)
+                        .unwrap_or_else(|e| {
+                            println!(
+                                "\x1b[93mWrn:\x1b[0m Error processing unsubscription: {}",
+                                e
+                            )
+                        });
+                        continue;
+                    }
+
                     let resp = execute_ws_call(
                         call,
                         user_id,
-                        incoming_tx.clone(),
+                        &incoming_tx,
                         outgoing_rx.resubscribe(),
-                        sub_data_clone.clone(),
+                        &sub_data_clone,
                         &cache_args,
                     )
                     .await

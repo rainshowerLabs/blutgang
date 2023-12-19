@@ -141,13 +141,35 @@ pub async fn ws_conn(
         }
     });
 }
+    
+// Remove and unsubscribe user
+pub fn process_unsubscription(
+    user_id: u64,
+    incoming: Value,
+    sub_data: &Arc<SubscriptionData>,
+) -> Result<(), Error> {
+    // subscription_id is ["params"][0]
+    let subscription_id = incoming["params"][0].as_str();
+    let subscription_id = match subscription_id {
+        Some(subscription_id) => subscription_id,
+        None => {
+            return Err(
+                "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
+                    .to_string().into(),
+            );
+        }
+    };
+    sub_data.unsubscribe_user(user_id, subscription_id.to_string());
+
+    Ok(())
+}
 
 pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
-    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
-    sub_data: Arc<SubscriptionData>,
+    sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     let id = call["id"].take();
@@ -166,22 +188,6 @@ pub async fn execute_ws_call(
         let mut cached: Value = from_slice(&mut rax).unwrap();
         cached["id"] = id;
         return Ok(cached.to_string());
-    }
-
-    // Remove and unsubscribe user is "eth_unsubscribe"
-    if call["method"] == "eth_unsubscribe" {
-        // subscription_id is ["params"][0]
-        let subscription_id = call["params"][0].as_str();
-        let subscription_id = match subscription_id {
-            Some(subscription_id) => subscription_id,
-            None => {
-                return Ok(
-                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
-                        .to_string(),
-                );
-            }
-        };
-        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
