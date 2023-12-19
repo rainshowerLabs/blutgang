@@ -143,3 +143,145 @@ impl SubscriptionData {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::mpsc;
+
+    fn setup_user_and_subscription_data() -> (
+        SubscriptionData,
+        u64,
+        mpsc::UnboundedReceiver<RequestResult>,
+    ) {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let user_data = UserData {
+            message_channel: tx,
+        };
+        let user_id = 100;
+        let subscription_data = SubscriptionData::new();
+        subscription_data.add_user(user_id, user_data);
+        (subscription_data, user_id, rx)
+    }
+
+    #[tokio::test]
+    async fn test_add_and_remove_user() {
+        let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+
+        assert!(subscription_data
+            .users
+            .read()
+            .unwrap()
+            .contains_key(&user_id));
+        subscription_data.remove_user(user_id);
+        assert!(!subscription_data
+            .users
+            .read()
+            .unwrap()
+            .contains_key(&user_id));
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_and_unsubscribe_user() {
+        let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+        let subscription_id = 200;
+
+        subscription_data.subscribe_user(user_id, subscription_id);
+        assert!(subscription_data
+            .subscriptions
+            .read()
+            .unwrap()
+            .get(&subscription_id)
+            .unwrap()
+            .contains(&user_id));
+
+        subscription_data.unsubscribe_user(user_id, subscription_id);
+        assert!(!subscription_data
+            .subscriptions
+            .read()
+            .unwrap()
+            .get(&subscription_id)
+            .unwrap()
+            .contains(&user_id));
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_to_subscribers() {
+        let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
+        let subscription_id = 300;
+        let message =
+            RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
+
+        subscription_data.subscribe_user(user_id, subscription_id);
+        subscription_data
+            .dispatch_to_subscribers(subscription_id, &message)
+            .await
+            .unwrap();
+
+        match rx.recv().await {
+            Some(RequestResult::Subscription(msg)) => assert_eq!(msg, "test message"),
+            _ => panic!("Expected to receive a subscription message"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_remove_nonexistent_user() {
+        let (subscription_data, _, _) = setup_user_and_subscription_data();
+        let non_existent_user_id = 999;
+
+        assert!(!subscription_data
+            .users
+            .read()
+            .unwrap()
+            .contains_key(&non_existent_user_id));
+        subscription_data.remove_user(non_existent_user_id);
+        assert!(!subscription_data
+            .users
+            .read()
+            .unwrap()
+            .contains_key(&non_existent_user_id));
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_nonexistent_subscription() {
+        let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+        let nonexistent_subscription_id = 400;
+
+        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id);
+        assert!(subscription_data
+            .subscriptions
+            .read()
+            .unwrap()
+            .get(&nonexistent_subscription_id)
+            .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_to_empty_subscription_list() {
+        let subscription_data = SubscriptionData::new();
+        let empty_subscription_id = 500;
+        let message = RequestResult::Subscription(serde_json::Value::String(
+            "empty test message".to_string(),
+        ));
+
+        // No users are subscribed to this subscription
+        let dispatch_result = subscription_data
+            .dispatch_to_subscribers(empty_subscription_id, &message)
+            .await;
+        assert!(dispatch_result.is_ok()); // Should succeed even though there are no subscribers
+    }
+
+    #[tokio::test]
+    async fn test_dispatch_to_nonexistent_subscription() {
+        let subscription_data = SubscriptionData::new();
+        let nonexistent_subscription_id = 600;
+        let message = RequestResult::Subscription(serde_json::Value::String(
+            "nonexistent subscription message".to_string(),
+        ));
+
+        let dispatch_result = subscription_data
+            .dispatch_to_subscribers(nonexistent_subscription_id, &message)
+            .await;
+        assert!(dispatch_result.is_ok()); // Should succeed as it should handle subscriptions with no users gracefully
+    }
+}
