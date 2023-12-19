@@ -120,8 +120,8 @@ mod tests {
     #[tokio::test]
     async fn test_insert_and_return_subscription() {
         let (cache_args, _a) = setup_cache_args();
-        let mut strr = r#"{"result":"1", "id":"2"}"#.to_string(); 
-        let response: Value = unsafe{ simd_json::from_str(&mut strr).unwrap() };
+        let mut strr = r#"{"result":"1", "id":"2"}"#.to_string();
+        let response: Value = unsafe { simd_json::from_str(&mut strr).unwrap() };
         let tx_hash = blake3::hash(response.to_string().as_bytes());
 
         let result =
