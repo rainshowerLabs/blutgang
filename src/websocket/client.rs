@@ -53,7 +53,7 @@ pub async fn ws_conn_manager(
     broadcast_tx: broadcast::Sender<Value>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
-    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
+    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
@@ -74,7 +74,7 @@ pub async fn ws_conn_manager(
                 }
             }
             WsconnMessage::Reconnect() => {
-                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
+                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
             }
         }
     }
@@ -83,7 +83,7 @@ pub async fn ws_conn_manager(
 pub async fn create_ws_vec(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     broadcast_tx: &broadcast::Sender<Value>,
-    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
+    ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
     let mut ws_handles = Vec::new();
@@ -145,9 +145,9 @@ pub async fn ws_conn(
 pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
-    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
-    sub_data: Arc<SubscriptionData>,
+    sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     let id = call["id"].take();

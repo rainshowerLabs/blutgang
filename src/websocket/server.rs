@@ -75,9 +75,9 @@ pub async fn serve_websocket(
                     let resp = execute_ws_call(
                         call,
                         user_id,
-                        incoming_tx.clone(),
+                        &incoming_tx,
                         outgoing_rx.resubscribe(),
-                        sub_data_clone.clone(),
+                        &sub_data_clone,
                         &cache_args,
                     )
                     .await
