@@ -8,7 +8,6 @@ use crate::{
         selection::select::pick,
     },
     rpc::types::{
-        hex_to_decimal,
         Rpc,
     },
     websocket::{
@@ -174,7 +173,7 @@ pub async fn execute_ws_call(
         // subscription_id is ["params"][0]
         let subscription_id = call["params"][0].as_str();
         let subscription_id = match subscription_id {
-            Some(subscription_id) => hex_to_decimal(subscription_id)?,
+            Some(subscription_id) => subscription_id,
             None => {
                 return Ok(
                     "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
@@ -182,7 +181,7 @@ pub async fn execute_ws_call(
                 );
             }
         };
-        sub_data.unsubscribe_user(user_id, subscription_id);
+        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
@@ -197,9 +196,9 @@ pub async fn execute_ws_call(
         {
             let mut cached: Value = from_slice(&mut rax).unwrap();
             cached["id"] = id;
-            let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
+            let subscription_id = cached["result"].as_str().unwrap();
 
-            sub_data.subscribe_user(user_id, subscription_id);
+            sub_data.subscribe_user(user_id, subscription_id.to_string());
             return Ok(cached.to_string());
         }
     } else {
@@ -217,9 +216,9 @@ pub async fn execute_ws_call(
         // add the subscription id and add this user to the dispatch
         insert_and_return_subscription(tx_hash, response.clone(), cache_args)
             .expect("Failed to insert subscription");
-        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
+        let subscription_id = response["result"].as_str().unwrap();
 
-        sub_data.subscribe_user(user_id, subscription_id);
+        sub_data.subscribe_user(user_id, subscription_id.to_string());
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }

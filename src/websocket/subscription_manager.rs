@@ -1,6 +1,5 @@
 use crate::{
     balancer::processing::CacheArgs,
-    rpc::types::hex_to_decimal,
     websocket::{
         error::Error,
         types::{
@@ -52,13 +51,13 @@ pub fn subscription_dispatcher(
             }
 
             // Get the subscription id
+            // TODO: this is retarded???
+            let resp_clone = response.clone();
             let id = response["params"]["subscription"].as_str().unwrap();
-            // TODO: this can be a string
-            let id = hex_to_decimal(id).unwrap();
 
             // Send the response to all the users
             match sub_data
-                .dispatch_to_subscribers(id, &RequestResult::Subscription(response))
+                .dispatch_to_subscribers(id, &RequestResult::Subscription(resp_clone))
                 .await
             {
                 Ok(_) => {}

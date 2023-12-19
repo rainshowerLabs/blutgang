@@ -59,7 +59,7 @@ pub struct UserData {
 pub struct SubscriptionData {
     pub users: Arc<RwLock<HashMap<u64, UserData>>>,
     // Mapping from subscription ID to a set of user IDs
-    pub subscriptions: Arc<RwLock<HashMap<u64, HashSet<u64>>>>,
+    pub subscriptions: Arc<RwLock<HashMap<String, HashSet<u64>>>>,
 }
 
 impl SubscriptionData {
@@ -88,7 +88,7 @@ impl SubscriptionData {
     }
 
     // Subscribe a user to a subscription
-    pub fn subscribe_user(&self, user_id: u64, subscription_id: u64) {
+    pub fn subscribe_user(&self, user_id: u64, subscription_id: String) {
         let mut subscriptions = self.subscriptions.write().unwrap();
         subscriptions
             .entry(subscription_id)
@@ -97,7 +97,7 @@ impl SubscriptionData {
     }
 
     // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: u64) {
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
         if let Some(subscribers) = self
             .subscriptions
             .write()
@@ -118,7 +118,7 @@ impl SubscriptionData {
     // Dispatch a message to all users subscribed to a subscription
     pub async fn dispatch_to_subscribers(
         &self,
-        subscription_id: u64,
+        subscription_id: &str,
         message: &RequestResult,
     ) -> Result<(), Error> {
         // TODO: We can remove this later
@@ -128,7 +128,7 @@ impl SubscriptionData {
         };
 
         let users = self.users.read().unwrap();
-        if let Some(subscribers) = self.subscriptions.read().unwrap().get(&subscription_id) {
+        if let Some(subscribers) = self.subscriptions.read().unwrap().get(subscription_id) {
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
                     user.message_channel
@@ -184,9 +184,9 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_id = 200;
+        let subscription_id = "200".to_string();
 
-        subscription_data.subscribe_user(user_id, subscription_id);
+        subscription_data.subscribe_user(user_id, subscription_id.clone());
         assert!(subscription_data
             .subscriptions
             .read()
@@ -195,7 +195,7 @@ mod tests {
             .unwrap()
             .contains(&user_id));
 
-        subscription_data.unsubscribe_user(user_id, subscription_id);
+        subscription_data.unsubscribe_user(user_id, subscription_id.clone());
         assert!(!subscription_data
             .subscriptions
             .read()
@@ -208,13 +208,13 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
-        let subscription_id = 300;
+        let subscription_id = 300.to_string();
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
-        subscription_data.subscribe_user(user_id, subscription_id);
+        subscription_data.subscribe_user(user_id, subscription_id.clone());
         subscription_data
-            .dispatch_to_subscribers(subscription_id, &message)
+            .dispatch_to_subscribers(&subscription_id, &message)
             .await
             .unwrap();
 
@@ -245,9 +245,9 @@ mod tests {
     #[tokio::test]
     async fn test_unsubscribe_nonexistent_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let nonexistent_subscription_id = 400;
+        let nonexistent_subscription_id = 400.to_string();
 
-        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id);
+        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id.clone());
         assert!(subscription_data
             .subscriptions
             .read()
@@ -259,14 +259,14 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
-        let empty_subscription_id = 500;
+        let empty_subscription_id = 500.to_string();
         let message = RequestResult::Subscription(serde_json::Value::String(
             "empty test message".to_string(),
         ));
 
         // No users are subscribed to this subscription
         let dispatch_result = subscription_data
-            .dispatch_to_subscribers(empty_subscription_id, &message)
+            .dispatch_to_subscribers(&empty_subscription_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed even though there are no subscribers
     }
@@ -274,13 +274,13 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_nonexistent_subscription() {
         let subscription_data = SubscriptionData::new();
-        let nonexistent_subscription_id = 600;
+        let nonexistent_subscription_id = 600.to_string();
         let message = RequestResult::Subscription(serde_json::Value::String(
             "nonexistent subscription message".to_string(),
         ));
 
         let dispatch_result = subscription_data
-            .dispatch_to_subscribers(nonexistent_subscription_id, &message)
+            .dispatch_to_subscribers(&nonexistent_subscription_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed as it should handle subscriptions with no users gracefully
     }
