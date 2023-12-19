@@ -32,6 +32,20 @@ pub struct NamedBlocknumbers {
     pub number: u64,
 }
 
+impl NamedBlocknumbers {
+    #[allow(dead_code)] // allowed for tests
+    pub fn defualt() -> NamedBlocknumbers {
+        NamedBlocknumbers {
+            latest: 0,
+            earliest: 0,
+            safe: 0,
+            finalized: 0,
+            pending: 0,
+            number: 0,
+        }
+    }
+}
+
 // Get the latest finalized block
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
