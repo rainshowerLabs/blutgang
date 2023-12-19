@@ -3,10 +3,7 @@ use std::sync::Arc;
 use crate::{
     balancer::processing::CacheArgs,
     websocket::{
-        client::{
-            execute_ws_call,
-            process_unsubscription,
-        },
+        client::execute_ws_call,
         error::Error,
         types::{
             RequestResult,
@@ -75,35 +72,12 @@ pub async fn serve_websocket(
             // If we received a subscription, just send it to the client
             match msg {
                 RequestResult::Call(call) => {
-                    // If `incoming` is an `eth_unsubscribe` we don't need to get a node
-                    // TODO: add proper error handling
-                    if call["method"] == "eth_unsubscribe" {
-                        match process_unsubscription(user_id, call, &sub_data_clone) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                match websocket_sink
-                                    .send(Message::text::<String>(e.to_string()))
-                                    .await
-                                {
-                                    Ok(_) => {}
-                                    Err(_) => {
-                                        // Remove the user from the sink map
-                                        sub_data_clone.remove_user(user_id);
-                                        println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
-                                        break;
-                                    }
-                                };
-                            }
-                        }
-                        continue;
-                    }
-
                     let resp = execute_ws_call(
                         call,
                         user_id,
-                        &incoming_tx,
+                        incoming_tx.clone(),
                         outgoing_rx.resubscribe(),
-                        &sub_data_clone,
+                        sub_data_clone.clone(),
                         &cache_args,
                     )
                     .await
