@@ -31,7 +31,7 @@ use futures_util::{
     SinkExt,
     StreamExt,
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 use simd_json::from_slice;
 use tokio::sync::{
     broadcast,
@@ -176,8 +176,11 @@ pub async fn execute_ws_call(
         let subscription_id = match subscription_id {
             Some(subscription_id) => hex_to_decimal(subscription_id)?,
             None => {
-                return Ok("\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\"".to_string());
-            },
+                return Ok(
+                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
+                        .to_string(),
+                );
+            }
         };
         sub_data.unsubscribe_user(user_id, subscription_id);
     }
