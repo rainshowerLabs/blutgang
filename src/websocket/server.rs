@@ -76,14 +76,25 @@ pub async fn serve_websocket(
             match msg {
                 RequestResult::Call(call) => {
                     // If `incoming` is an `eth_unsubscribe` we don't need to get a node
+                    // TODO: add proper error handling
                     if call["method"] == "eth_unsubscribe" {
-                        process_unsubscription(user_id, call, &sub_data_clone)
-                        .unwrap_or_else(|e| {
-                            println!(
-                                "\x1b[93mWrn:\x1b[0m Error processing unsubscription: {}",
-                                e
-                            )
-                        });
+                        match process_unsubscription(user_id, call, &sub_data_clone) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                match websocket_sink
+                                    .send(Message::text::<String>(e.to_string()))
+                                    .await
+                                {
+                                    Ok(_) => {}
+                                    Err(_) => {
+                                        // Remove the user from the sink map
+                                        sub_data_clone.remove_user(user_id);
+                                        println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
+                                        break;
+                                    }
+                                };
+                            }
+                        }
                         continue;
                     }
 

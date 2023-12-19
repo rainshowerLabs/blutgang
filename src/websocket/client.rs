@@ -7,9 +7,7 @@ use crate::{
         },
         selection::select::pick,
     },
-    rpc::types::{
-        Rpc,
-    },
+    rpc::types::Rpc,
     websocket::{
         error::Error,
         subscription_manager::insert_and_return_subscription,
@@ -141,7 +139,7 @@ pub async fn ws_conn(
         }
     });
 }
-    
+
 // Remove and unsubscribe user
 pub fn process_unsubscription(
     user_id: u64,
@@ -154,8 +152,9 @@ pub fn process_unsubscription(
         Some(subscription_id) => subscription_id,
         None => {
             return Err(
-                "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
-                    .to_string().into(),
+                "{\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\"}"
+                    .to_string()
+                    .into(),
             );
         }
     };
