@@ -31,7 +31,7 @@ use futures_util::{
     SinkExt,
     StreamExt,
 };
-use serde_json::Value;
+use serde_json::{Value, json};
 use simd_json::from_slice;
 use tokio::sync::{
     broadcast,
@@ -167,6 +167,19 @@ pub async fn execute_ws_call(
         let mut cached: Value = from_slice(&mut rax).unwrap();
         cached["id"] = id;
         return Ok(cached.to_string());
+    }
+
+    // Remove and unsubscribe user is "eth_unsubscribe"
+    if call["method"] == "eth_unsubscribe" {
+        // subscription_id is ["params"][0]
+        let subscription_id = call["params"][0].as_str();
+        let subscription_id = match subscription_id {
+            Some(subscription_id) => hex_to_decimal(subscription_id)?,
+            None => {
+                return Ok("\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\"".to_string());
+            },
+        };
+        sub_data.unsubscribe_user(user_id, subscription_id);
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
