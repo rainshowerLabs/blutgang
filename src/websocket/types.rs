@@ -10,6 +10,7 @@ use std::{
     },
 };
 
+
 use crate::websocket::error::Error;
 
 use serde_json::Value;
@@ -55,15 +56,13 @@ pub enum WsChannelErr {
 
 pub struct UserData {
     pub message_channel: mpsc::UnboundedSender<RequestResult>,
-    
 }
 
 pub struct SubscriptionData {
     pub users: Arc<RwLock<HashMap<u64, UserData>>>,
-    // Mapping from subscription ID to a set of user IDs
     pub subscriptions: Arc<RwLock<HashMap<String, HashSet<u64>>>>,
-    // Mapping of key(eth_subscribe), <node index, subscription id>
-    pub node_subscriptions: Arc<RwLock<BTreeMap<String, (usize, String)>>>,
+    // Mapping from user ID to a set of subscription IDs
+    pub user_subscriptions: Arc<RwLock<HashMap<u64, HashSet<String>>>>,
 }
 
 impl SubscriptionData {
@@ -71,83 +70,82 @@ impl SubscriptionData {
         SubscriptionData {
             users: Arc::new(RwLock::new(HashMap::new())),
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
-            node_subscriptions: Arc::new(RwLock::new(BTreeMap::new())),
+            user_subscriptions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    // Add or update a user
     pub fn add_user(&self, user_id: u64, user_data: UserData) {
         let mut users = self.users.write().unwrap();
         users.insert(user_id, user_data);
     }
 
-    // Remove a user and clean up their subscriptions
     pub fn remove_user(&self, user_id: u64) {
         let mut users = self.users.write().unwrap();
         if users.remove(&user_id).is_some() {
             let mut subscriptions = self.subscriptions.write().unwrap();
-            for user_subscriptions in subscriptions.values_mut() {
-                user_subscriptions.remove(&user_id);
-            }
-        }
-    }
-
-    // Subscribe a user to a subscription
-    pub fn subscribe_user(&self, user_id: u64, subscription_id: String) {
-        let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions
-            .entry(subscription_id)
-            .or_default()
-            .insert(user_id);
-    }
-
-    // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
-        if let Some(subscribers) = self
-            .subscriptions
-            .write()
-            .unwrap()
-            .get_mut(&subscription_id)
-        {
-            subscribers.remove(&user_id);
-            // Check length, and if 0 send unsubscribe message to node
-            // TODO: Implement the logic for this
-            if subscribers.is_empty() {
-                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", {
-                    subscription_id
-                })
-            }
-        }
-    }
-
-    // Dispatch a message to all users subscribed to a subscription
-    pub async fn dispatch_to_subscribers(
-        &self,
-        subscription_id: &str,
-        message: &RequestResult,
-    ) -> Result<(), Error> {
-        // TODO: We can remove this later
-        match message {
-            RequestResult::Call(_) => return Err("Trying to send a call as a subscription!".into()),
-            RequestResult::Subscription(_) => {}
-        };
-
-        let users = self.users.read().unwrap();
-        if let Some(subscribers) = self.subscriptions.read().unwrap().get(subscription_id) {
-            for &user_id in subscribers {
-                if let Some(user) = users.get(&user_id) {
-                    user.message_channel
-                        .send(message.clone())
-                        .unwrap_or_else(|e| {
-                            println!("Error sending message to user {}: {}", user_id, e);
-                        });
+            let mut user_subscriptions = self.user_subscriptions.write().unwrap();
+            if let Some(sub_ids) = user_subscriptions.remove(&user_id) {
+                for sub_id in sub_ids {
+                    if let Some(subscribers) = subscriptions.get_mut(&sub_id) {
+                        subscribers.remove(&user_id);
+                    }
                 }
             }
         }
-
-        Ok(())
     }
+
+    pub fn subscribe_user(&self, user_id: u64, subscription_id: String) {
+        let mut subscriptions = self.subscriptions.write().unwrap();
+        let mut user_subscriptions = self.user_subscriptions.write().unwrap();
+
+        subscriptions
+            .entry(subscription_id.clone())
+            .or_default()
+            .insert(user_id);
+
+        user_subscriptions
+            .entry(user_id)
+            .or_default()
+            .insert(subscription_id);
+    }
+
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
+        let mut subscriptions = self.subscriptions.write().unwrap();
+        let mut user_subscriptions = self.user_subscriptions.write().unwrap();
+
+        if let Some(subscribers) = subscriptions.get_mut(&subscription_id) {
+            subscribers.remove(&user_id);
+            if subscribers.is_empty() {
+                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", subscription_id);
+            }
+        }
+
+        if let Some(sub_ids) = user_subscriptions.get_mut(&user_id) {
+            sub_ids.remove(&subscription_id);
+        }
+    }
+
+    // Method to check if a subscription already exists and return the node and subscription id
+    pub fn check_subscription(&self, subscription_id: &str) -> Option<Vec<u64>> {
+        self.subscriptions
+            .read()
+            .unwrap()
+            .get(subscription_id)
+            .map(|subscribers| subscribers.iter().copied().collect())
+    }
+
+    // Method to get all subscriptions for a user
+    pub fn get_user_subscriptions(&self, user_id: u64) -> Option<HashSet<String>> {
+        self.user_subscriptions
+            .read()
+            .unwrap()
+            .get(&user_id)
+            .cloned()
+    }
+
+    // Existing dispatch_to_subscribers method...
 }
+
 
 #[cfg(test)]
 mod tests {
