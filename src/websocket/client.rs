@@ -4,6 +4,7 @@ use crate::{
         processing::{
             cache_querry,
             CacheArgs,
+            update_rpc_latency,
         },
         selection::select::pick,
     },
@@ -21,9 +22,12 @@ use crate::{
     },
 };
 
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    sync::{
+        Arc,
+        RwLock,
+    },
+time::Instant,
 };
 
 use futures_util::{
@@ -98,6 +102,7 @@ pub async fn create_ws_vec(
         ws_handles.push(Some(ws_conn_incoming_tx));
         ws_conn(
             rpc.clone(),
+            rpc_list.clone(),
             ws_conn_incoming_rx,
             broadcast_tx.clone(),
             ws_error_tx.clone(),
@@ -111,6 +116,7 @@ pub async fn create_ws_vec(
 
 pub async fn ws_conn(
     rpc: Rpc,
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     broadcast_tx: broadcast::Sender<Value>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
@@ -123,7 +129,8 @@ pub async fn ws_conn(
         while let Some(incoming) = incoming_rx.recv().await {
             #[cfg(feature = "debug-verbose")]
             println!("ws_conn[{}], result: {:?}", index, incoming);
-
+            
+            let time = Instant::now();
             match ws_stream.send(Message::Text(incoming.to_string())).await {
                 Ok(_) => {},
                 Err(_) => {
@@ -134,9 +141,11 @@ pub async fn ws_conn(
 
             match ws_stream.next().await.unwrap() {
                 Ok(message) => {
+                    let time = time.elapsed();
                     let rax =
                         unsafe { simd_json::from_str(&mut message.into_text().unwrap()).unwrap() };
                     let _ = broadcast_tx.send(rax);
+                    update_rpc_latency(&rpc_list, index, time);
                 }
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));

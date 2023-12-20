@@ -7,6 +7,7 @@ use crate::{
         processing::{
             cache_querry,
             CacheArgs,
+            update_rpc_latency,
         },
         selection::select::pick,
     },
@@ -407,24 +408,7 @@ pub async fn accept_request(
     // Here, we update the latency of the RPC that was used to process the request
     // if `rpc_position` is Some.
     if let Some(rpc_position) = rpc_position {
-        let mut rpc_list_guard = rpc_list_rwlock.write().unwrap_or_else(|e| {
-            // Handle the case where the RwLock is poisoned
-            e.into_inner()
-        });
-
-        // Handle weird edge cases ¯\_(ツ)_/¯
-        if rpc_list_guard.is_empty() {
-            println!("LA {}", rpc_list_guard[rpc_position].status.latency);
-        } else {
-            let index = if rpc_position >= rpc_list_guard.len() {
-                rpc_list_guard.len() - 1
-            } else {
-                rpc_position
-            };
-            rpc_list_guard[index].update_latency(time.as_nanos() as f64);
-            rpc_list_guard[index].last_used = time.as_micros();
-            println!("LA {}", rpc_list_guard[index].status.latency);
-        }
+        update_rpc_latency(&rpc_list_rwlock, rpc_position, time);
     }
 
     response

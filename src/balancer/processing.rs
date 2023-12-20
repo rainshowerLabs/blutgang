@@ -1,4 +1,5 @@
 use crate::{
+    Rpc,
     balancer::{
         format::get_block_number_from_request,
         selection::cache_rules::{
@@ -15,6 +16,7 @@ use std::{
         Arc,
         RwLock,
     },
+    time::Duration,
 };
 
 use tokio::sync::watch;
@@ -69,5 +71,27 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
         }
     }
 }
+
+pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize, time: Duration) {
+    let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
+        // Handle the case where the RwLock is poisoned
+        e.into_inner()
+    });
+
+    // Handle weird edge cases ¯\_(ツ)_/¯
+    if rpc_list_guard.is_empty() {
+        println!("LA {}", rpc_list_guard[rpc_position].status.latency);
+    } else {
+        let index = if rpc_position >= rpc_list_guard.len() {
+            rpc_list_guard.len() - 1
+        } else {
+            rpc_position
+        };
+        rpc_list_guard[index].update_latency(time.as_nanos() as f64);
+        rpc_list_guard[index].last_used = time.as_micros();
+        println!("LA {}", rpc_list_guard[index].status.latency);
+    }
+}
+
 
 // TODO: write tests
