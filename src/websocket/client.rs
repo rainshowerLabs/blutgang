@@ -8,10 +8,10 @@ use crate::{
         selection::select::pick,
     },
     rpc::types::{
-        hex_to_decimal,
         Rpc,
     },
     websocket::{
+        error::Error,
         subscription_manager::insert_and_return_subscription,
         types::{
             SubscriptionData,
@@ -47,15 +47,13 @@ use blake3::hash;
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
 
-type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
-
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
     broadcast_tx: broadcast::Sender<Value>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
-    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
+    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
@@ -76,7 +74,7 @@ pub async fn ws_conn_manager(
                 }
             }
             WsconnMessage::Reconnect() => {
-                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, ws_error_tx.clone()).await;
+                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
             }
         }
     }
@@ -85,7 +83,7 @@ pub async fn ws_conn_manager(
 pub async fn create_ws_vec(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     broadcast_tx: &broadcast::Sender<Value>,
-    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
+    ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
     let mut ws_handles = Vec::new();
@@ -147,9 +145,9 @@ pub async fn ws_conn(
 pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
-    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<Value>,
-    sub_data: Arc<SubscriptionData>,
+    sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     let id = call["id"].take();
@@ -170,8 +168,27 @@ pub async fn execute_ws_call(
         return Ok(cached.to_string());
     }
 
+    // Remove and unsubscribe user is "eth_unsubscribe"
+    if call["method"] == "eth_unsubscribe" {
+        // subscription_id is ["params"][0]
+        let subscription_id = call["params"][0].as_str();
+        let subscription_id = match subscription_id {
+            Some(subscription_id) => subscription_id,
+            None => {
+                return Ok(
+                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
+                        .to_string(),
+                );
+            }
+        };
+        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
+    }
+
     let is_subscription = call["method"] == "eth_subscribe";
     if is_subscription {
+        // Check if we're already subscribed to this
+        // if so return the subscription id and add this user to the dispatch
+        // if not continue
         if let Ok(Some(mut rax)) = cache_args
             .cache
             .open_tree("subscriptions")?
@@ -179,15 +196,13 @@ pub async fn execute_ws_call(
         {
             let mut cached: Value = from_slice(&mut rax).unwrap();
             cached["id"] = id;
-            let subscription_id = hex_to_decimal(cached["result"].as_str().unwrap())?;
-            sub_data
-                .subscribed_users
-                .entry(subscription_id)
-                .or_default()
-                .insert(user_id, true);
+            let subscription_id = cached["result"].as_str().unwrap();
+
+            sub_data.subscribe_user(user_id, subscription_id.to_string());
             return Ok(cached.to_string());
         }
     } else {
+        // Replace block tags if applicable
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
 
@@ -198,14 +213,12 @@ pub async fn execute_ws_call(
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
+        // add the subscription id and add this user to the dispatch
         insert_and_return_subscription(tx_hash, response.clone(), cache_args)
             .expect("Failed to insert subscription");
-        let subscription_id = hex_to_decimal(response["result"].as_str().unwrap())?;
-        sub_data
-            .subscribed_users
-            .entry(subscription_id)
-            .or_default()
-            .insert(user_id, true);
+        let subscription_id = response["result"].as_str().unwrap();
+
+        sub_data.subscribe_user(user_id, subscription_id.to_string());
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }
