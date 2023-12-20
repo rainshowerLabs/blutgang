@@ -122,16 +122,15 @@ pub async fn ws_conn(
 
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
-            if incoming["method"] == "close" {
-                let _ = write.close().await;
-                break;
-            }
             let _ = write.send(Message::Text(incoming.to_string())).await;
         }
     });
 
     tokio::spawn(async move {
         while let Some(result) = read.next().await {
+            #[cfg(feature = "debug-verbose")]
+            println!("ws_conn[{}], result: {:?}", index, result);
+
             match result {
                 Ok(message) => {
                     let rax =

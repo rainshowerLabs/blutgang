@@ -1,6 +1,7 @@
 use std::{
     collections::{
         HashMap,
+        BTreeMap,
         HashSet,
     },
     sync::{
@@ -54,12 +55,15 @@ pub enum WsChannelErr {
 
 pub struct UserData {
     pub message_channel: mpsc::UnboundedSender<RequestResult>,
+    
 }
 
 pub struct SubscriptionData {
     pub users: Arc<RwLock<HashMap<u64, UserData>>>,
     // Mapping from subscription ID to a set of user IDs
     pub subscriptions: Arc<RwLock<HashMap<String, HashSet<u64>>>>,
+    // Mapping of key(eth_subscribe), <node index, subscription id>
+    pub node_subscriptions: Arc<RwLock<BTreeMap<String, (usize, String)>>>,
 }
 
 impl SubscriptionData {
@@ -67,6 +71,7 @@ impl SubscriptionData {
         SubscriptionData {
             users: Arc::new(RwLock::new(HashMap::new())),
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            node_subscriptions: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 

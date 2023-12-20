@@ -50,6 +50,9 @@ pub fn subscription_dispatcher(
                 continue;
             }
 
+            #[cfg(feature = "debug-verbose")]
+            println!("subscription_dispatcher: received subscription: {}", response);
+
             // Get the subscription id
             // TODO: this is retarded???
             let resp_clone = response.clone();
