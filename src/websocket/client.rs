@@ -117,21 +117,22 @@ pub async fn ws_conn(
     index: usize,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).expect("Failed to parse URL");
-    let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
-    let (mut write, mut read) = ws_stream.split();
+    let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
 
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
-            let _ = write.send(Message::Text(incoming.to_string())).await;
-        }
-    });
-
-    tokio::spawn(async move {
-        while let Some(result) = read.next().await {
             #[cfg(feature = "debug-verbose")]
             println!("ws_conn[{}], result: {:?}", index, result);
 
-            match result {
+            match ws_stream.send(Message::Text(incoming.to_string())).await {
+                Ok(_) => {},
+                Err(_) => {
+                    let _ = ws_error_tx.send(WsChannelErr::Closed(index));
+                    break;
+                },
+            }
+
+            match ws_stream.next().await.unwrap() {
                 Ok(message) => {
                     let rax =
                         unsafe { simd_json::from_str(&mut message.into_text().unwrap()).unwrap() };
