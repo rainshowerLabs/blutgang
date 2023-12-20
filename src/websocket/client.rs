@@ -122,7 +122,7 @@ pub async fn ws_conn(
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
             #[cfg(feature = "debug-verbose")]
-            println!("ws_conn[{}], result: {:?}", index, result);
+            println!("ws_conn[{}], result: {:?}", index, incoming);
 
             match ws_stream.send(Message::Text(incoming.to_string())).await {
                 Ok(_) => {},
