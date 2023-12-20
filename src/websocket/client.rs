@@ -62,6 +62,11 @@ pub async fn ws_conn_manager(
                     let mut rpc_list_guard = rpc_list.write().unwrap();
                     pick(&mut rpc_list_guard).1
                 } {
+                    if rpc_position >= ws_handles.len() {
+                        println!("ws_conn_manager error: rpc_position out of bounds");
+                        continue;
+                    }
+
                     if let Some(ws) = &ws_handles[rpc_position] {
                         if ws.send(incoming).is_err() {
                             println!("ws_conn_manager error: failed to send message");
