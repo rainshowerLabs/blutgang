@@ -1,7 +1,5 @@
 use crate::{
-    balancer::processing::CacheArgs,
     websocket::{
-        error::Error,
         types::{
             IncomingResponse,
             RequestResult,
@@ -9,32 +7,9 @@ use crate::{
         },
     },
 };
-use blake3::Hash;
 
-use serde_json::Value;
-use simd_json::to_vec;
 use std::sync::Arc;
 use tokio::sync::broadcast;
-
-// We want to return the subscription id and insert it into a subtree
-//
-// If multiple nodes have made the same subscription request, we can just return
-// the same subscription id to all of them.
-// TODO: add referance counting !!!!!!!!!!!!!!!!!!!
-pub fn insert_and_return_subscription(
-    tx_hash: Hash,
-    mut response: Value,
-    cache_args: &CacheArgs,
-) -> Result<Value, Error> {
-    response["id"] = Value::Null;
-
-    let tree = cache_args.cache.open_tree("subscriptions")?;
-
-    // Insert the subscription for this tx_hash into the subtree
-    let _ = tree.insert(tx_hash.as_bytes(), to_vec(&response).unwrap().as_slice());
-
-    Ok(response)
-}
 
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
@@ -82,14 +57,14 @@ pub fn subscription_dispatcher(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::{
-        health::safe_block::NamedBlocknumbers,
-        // websocket::types::UserData,
-    };
-    use std::collections::BTreeMap;
-    use std::sync::RwLock;
-    use tokio::sync::watch;
+    // use super::*;
+    // use crate::{
+    //     health::safe_block::NamedBlocknumbers,
+    //     // websocket::types::UserData,
+    // };
+    // use std::collections::BTreeMap;
+    // use std::sync::RwLock;
+    // use tokio::sync::watch;
 
     // use std::str::FromStr;
     // use tokio::sync::{
@@ -107,48 +82,22 @@ mod tests {
     //     (sub_data, tx, rx)
     // }
 
-    fn setup_cache_args() -> (CacheArgs, watch::Sender<u64>) {
-        let config = sled::Config::default();
-        let (finalized_tx, finalized_rx) = watch::channel(0);
-        config.clone().temporary(true);
-        let b = NamedBlocknumbers::default();
-        let mut map = BTreeMap::new();
-        map.insert(u64::MAX, vec!["a".to_string()]); //retarded
-        let a = CacheArgs {
-            cache: Arc::new(config.open().unwrap()),
-            named_numbers: Arc::new(RwLock::new(b)),
-            finalized_rx: finalized_rx.clone(),
-            head_cache: Arc::new(RwLock::new(map)),
-        };
+    // fn setup_cache_args() -> (CacheArgs, watch::Sender<u64>) {
+    //     let config = sled::Config::default();
+    //     let (finalized_tx, finalized_rx) = watch::channel(0);
+    //     config.clone().temporary(true);
+    //     let b = NamedBlocknumbers::default();
+    //     let mut map = BTreeMap::new();
+    //     map.insert(u64::MAX, vec!["a".to_string()]); //retarded
+    //     let a = CacheArgs {
+    //         cache: Arc::new(config.open().unwrap()),
+    //         named_numbers: Arc::new(RwLock::new(b)),
+    //         finalized_rx: finalized_rx.clone(),
+    //         head_cache: Arc::new(RwLock::new(map)),
+    //     };
 
-        return (a, finalized_tx);
-    }
-
-    #[tokio::test]
-    async fn test_insert_and_return_subscription() {
-        let (cache_args, _a) = setup_cache_args();
-        let mut strr = r#"{"result":"1", "id":"2"}"#.to_string();
-        let response: Value = unsafe { simd_json::from_str(&mut strr).unwrap() };
-        let tx_hash = blake3::hash(response.to_string().as_bytes());
-
-        let result =
-            insert_and_return_subscription(tx_hash, response.clone(), &cache_args).unwrap();
-
-        assert!(result["id"].is_null());
-        let mut stored_value = cache_args
-            .cache
-            .open_tree("subscriptions")
-            .unwrap()
-            .get(tx_hash.as_bytes())
-            .unwrap()
-            .unwrap();
-        let mut stored_value: Value = simd_json::from_slice(&mut stored_value).unwrap();
-        assert!(stored_value["id"].is_null());
-
-        stored_value["id"] = response["id"].clone();
-
-        assert_eq!(stored_value, response);
-    }
+    //     return (a, finalized_tx);
+    // }
 
     // TODO: fix tests
 

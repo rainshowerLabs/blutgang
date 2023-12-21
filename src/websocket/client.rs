@@ -11,7 +11,6 @@ use crate::{
     rpc::types::Rpc,
     websocket::{
         error::Error,
-        subscription_manager::insert_and_return_subscription,
         types::{
             SubscriptionData,
             WsChannelErr,
