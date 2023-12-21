@@ -1,7 +1,6 @@
 use std::{
     collections::{
         HashMap,
-        BTreeMap,
         HashSet,
     },
     sync::{
@@ -48,22 +47,31 @@ impl From<WsconnMessage> for Value {
 }
 
 // Errors to send to the health check when a WsConn fails
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum WsChannelErr {
     Closed(usize),
 }
 
+#[derive(Debug, Clone)]
 pub struct UserData {
     pub message_channel: mpsc::UnboundedSender<RequestResult>,
-    
+}
+
+// Because nodes can have the same subscription IDs, we pair together
+// the node id(or index) and the subscription id. When we subscribe
+// we need to note down what node the subscription is for. When
+// dispatching we only send the subscription to users that are subscribed for that
+// event from that node.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct NodeSubInfo {
+    pub node_id: u64,
+    pub subscription_id: String,
 }
 
 pub struct SubscriptionData {
     pub users: Arc<RwLock<HashMap<u64, UserData>>>,
     // Mapping from subscription ID to a set of user IDs
-    pub subscriptions: Arc<RwLock<HashMap<String, HashSet<u64>>>>,
-    // Mapping of key(eth_subscribe), <node index, subscription id>
-    pub node_subscriptions: Arc<RwLock<BTreeMap<String, (usize, String)>>>,
+    pub subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u64>>>>,
 }
 
 impl SubscriptionData {
@@ -71,7 +79,6 @@ impl SubscriptionData {
         SubscriptionData {
             users: Arc::new(RwLock::new(HashMap::new())),
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
-            node_subscriptions: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
@@ -93,22 +100,27 @@ impl SubscriptionData {
     }
 
     // Subscribe a user to a subscription
-    pub fn subscribe_user(&self, user_id: u64, subscription_id: String) {
+    pub fn subscribe_user(&self, user_id: u64, subscription_id: String, node_id: u64) {
+        let node_sub_info = NodeSubInfo {
+            node_id,
+            subscription_id: subscription_id,
+        };
+
         let mut subscriptions = self.subscriptions.write().unwrap();
         subscriptions
-            .entry(subscription_id)
+            .entry(node_sub_info)
             .or_default()
             .insert(user_id);
     }
 
     // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
-        if let Some(subscribers) = self
-            .subscriptions
-            .write()
-            .unwrap()
-            .get_mut(&subscription_id)
-        {
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String, node_id: u64) {
+        let node_sub_info = NodeSubInfo {
+            node_id,
+            subscription_id: subscription_id.clone(),
+        };
+
+        if let Some(subscribers) = self.subscriptions.write().unwrap().get_mut(&node_sub_info) {
             subscribers.remove(&user_id);
             // Check length, and if 0 send unsubscribe message to node
             // TODO: Implement the logic for this
@@ -124,6 +136,7 @@ impl SubscriptionData {
     pub async fn dispatch_to_subscribers(
         &self,
         subscription_id: &str,
+        node_id: u64,
         message: &RequestResult,
     ) -> Result<(), Error> {
         // TODO: We can remove this later
@@ -132,8 +145,13 @@ impl SubscriptionData {
             RequestResult::Subscription(_) => {}
         };
 
+        let node_sub_info = NodeSubInfo {
+            node_id,
+            subscription_id: subscription_id.to_string(),
+        };
+
         let users = self.users.read().unwrap();
-        if let Some(subscribers) = self.subscriptions.read().unwrap().get(subscription_id) {
+        if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
                     user.message_channel
@@ -190,22 +208,28 @@ mod tests {
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
         let subscription_id = "200".to_string();
+        let node_id = 1;
 
-        subscription_data.subscribe_user(user_id, subscription_id.clone());
+        let node_sub_info = NodeSubInfo {
+            node_id,
+            subscription_id: subscription_id.clone(),
+        };
+
+        subscription_data.subscribe_user(user_id, subscription_id.clone(), node_id);
         assert!(subscription_data
             .subscriptions
             .read()
             .unwrap()
-            .get(&subscription_id)
+            .get(&node_sub_info)
             .unwrap()
             .contains(&user_id));
 
-        subscription_data.unsubscribe_user(user_id, subscription_id.clone());
+        subscription_data.unsubscribe_user(user_id, subscription_id.clone(), node_id);
         assert!(!subscription_data
             .subscriptions
             .read()
             .unwrap()
-            .get(&subscription_id)
+            .get(&node_sub_info)
             .unwrap()
             .contains(&user_id));
     }
@@ -214,12 +238,14 @@ mod tests {
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
         let subscription_id = 300.to_string();
+        let node_id = 1;
+
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
-        subscription_data.subscribe_user(user_id, subscription_id.clone());
+        subscription_data.subscribe_user(user_id, subscription_id.clone(), node_id);
         subscription_data
-            .dispatch_to_subscribers(&subscription_id, &message)
+            .dispatch_to_subscribers(&subscription_id, node_id, &message)
             .await
             .unwrap();
 
@@ -251,13 +277,19 @@ mod tests {
     async fn test_unsubscribe_nonexistent_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
         let nonexistent_subscription_id = 400.to_string();
+        let nonexistent_node_id = 10000;
 
-        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id.clone());
+        let nonexistent_node_sub_info = NodeSubInfo {
+            node_id: nonexistent_node_id,
+            subscription_id: nonexistent_subscription_id.clone(),
+        };
+
+        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id.clone(), nonexistent_node_id);
         assert!(subscription_data
             .subscriptions
             .read()
             .unwrap()
-            .get(&nonexistent_subscription_id)
+            .get(&nonexistent_node_sub_info)
             .is_none());
     }
 
@@ -265,13 +297,14 @@ mod tests {
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
         let empty_subscription_id = 500.to_string();
+        let empty_node_id = 10000;
         let message = RequestResult::Subscription(serde_json::Value::String(
             "empty test message".to_string(),
         ));
 
         // No users are subscribed to this subscription
         let dispatch_result = subscription_data
-            .dispatch_to_subscribers(&empty_subscription_id, &message)
+            .dispatch_to_subscribers(&empty_subscription_id, empty_node_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed even though there are no subscribers
     }
@@ -280,12 +313,14 @@ mod tests {
     async fn test_dispatch_to_nonexistent_subscription() {
         let subscription_data = SubscriptionData::new();
         let nonexistent_subscription_id = 600.to_string();
+        let nonexistent_node_id = 10000;
+
         let message = RequestResult::Subscription(serde_json::Value::String(
             "nonexistent subscription message".to_string(),
         ));
 
         let dispatch_result = subscription_data
-            .dispatch_to_subscribers(&nonexistent_subscription_id, &message)
+            .dispatch_to_subscribers(&nonexistent_subscription_id, nonexistent_node_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed as it should handle subscriptions with no users gracefully
     }

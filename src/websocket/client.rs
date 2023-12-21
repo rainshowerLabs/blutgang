@@ -3,14 +3,12 @@ use crate::{
         format::replace_block_tags,
         processing::{
             cache_querry,
-            CacheArgs,
             update_rpc_latency,
+            CacheArgs,
         },
         selection::select::pick,
     },
-    rpc::types::{
-        Rpc,
-    },
+    rpc::types::Rpc,
     websocket::{
         error::Error,
         subscription_manager::insert_and_return_subscription,
@@ -27,7 +25,7 @@ use std::{
         Arc,
         RwLock,
     },
-time::Instant,
+    time::Instant,
 };
 
 use futures_util::{
@@ -129,14 +127,14 @@ pub async fn ws_conn(
         while let Some(incoming) = incoming_rx.recv().await {
             #[cfg(feature = "debug-verbose")]
             println!("ws_conn[{}], result: {:?}", index, incoming);
-            
+
             let time = Instant::now();
             match ws_stream.send(Message::Text(incoming.to_string())).await {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));
                     break;
-                },
+                }
             }
 
             match ws_stream.next().await.unwrap() {
@@ -195,7 +193,9 @@ pub async fn execute_ws_call(
                 );
             }
         };
-        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
+
+        // TODO: nodeid is temp
+        sub_data.unsubscribe_user(user_id, subscription_id.to_string(), 0);
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
@@ -212,7 +212,8 @@ pub async fn execute_ws_call(
             cached["id"] = id;
             let subscription_id = cached["result"].as_str().unwrap();
 
-            sub_data.subscribe_user(user_id, subscription_id.to_string());
+            // TODO: nodeid is temp
+            sub_data.subscribe_user(user_id, subscription_id.to_string(), 0);
             return Ok(cached.to_string());
         }
     } else {
@@ -232,7 +233,8 @@ pub async fn execute_ws_call(
             .expect("Failed to insert subscription");
         let subscription_id = response["result"].as_str().unwrap();
 
-        sub_data.subscribe_user(user_id, subscription_id.to_string());
+        // TODO: nodeid is temp
+        sub_data.subscribe_user(user_id, subscription_id.to_string(), 0);
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }

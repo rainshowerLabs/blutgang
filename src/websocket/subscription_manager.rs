@@ -52,7 +52,10 @@ pub fn subscription_dispatcher(
             }
 
             #[cfg(feature = "debug-verbose")]
-            println!("subscription_dispatcher: received subscription: {}", response);
+            println!(
+                "subscription_dispatcher: received subscription: {}",
+                response
+            );
 
             // Get the subscription id
             // TODO: this is retarded???
@@ -60,8 +63,9 @@ pub fn subscription_dispatcher(
             let id = response["params"]["subscription"].as_str().unwrap();
 
             // Send the response to all the users
+            // TODO: nodeid is temp
             match sub_data
-                .dispatch_to_subscribers(id, &RequestResult::Subscription(resp_clone))
+                .dispatch_to_subscribers(id, 0, &RequestResult::Subscription(resp_clone))
                 .await
             {
                 Ok(_) => {}
@@ -81,27 +85,27 @@ mod tests {
     use super::*;
     use crate::{
         health::safe_block::NamedBlocknumbers,
-        websocket::types::UserData,
+        // websocket::types::UserData,
     };
     use std::collections::BTreeMap;
     use std::sync::RwLock;
     use tokio::sync::watch;
 
-    use std::str::FromStr;
-    use tokio::sync::{
-        broadcast,
-        mpsc,
-    };
+    // use std::str::FromStr;
+    // use tokio::sync::{
+    //     broadcast,
+    //     mpsc,
+    // };
 
-    fn setup_subscription_data() -> (
-        Arc<SubscriptionData>,
-        broadcast::Sender<Value>,
-        broadcast::Receiver<Value>,
-    ) {
-        let (tx, rx) = broadcast::channel(10);
-        let sub_data = Arc::new(SubscriptionData::new());
-        (sub_data, tx, rx)
-    }
+    // fn setup_subscription_data() -> (
+    //     Arc<SubscriptionData>,
+    //     broadcast::Sender<Value>,
+    //     broadcast::Receiver<Value>,
+    // ) {
+    //     let (tx, rx) = broadcast::channel(10);
+    //     let sub_data = Arc::new(SubscriptionData::new());
+    //     (sub_data, tx, rx)
+    // }
 
     fn setup_cache_args() -> (CacheArgs, watch::Sender<u64>) {
         let config = sled::Config::default();

@@ -1,5 +1,4 @@
 use crate::{
-    Rpc,
     balancer::{
         format::get_block_number_from_request,
         selection::cache_rules::{
@@ -8,6 +7,7 @@ use crate::{
         },
     },
     health::safe_block::NamedBlocknumbers,
+    Rpc,
 };
 
 use std::{
@@ -92,6 +92,5 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
         println!("LA {}", rpc_list_guard[index].status.latency);
     }
 }
-
 
 // TODO: write tests
