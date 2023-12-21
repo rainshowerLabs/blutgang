@@ -195,14 +195,16 @@ pub async fn execute_ws_call(
             Some(subscription_id) => subscription_id,
             None => {
                 return Ok(
+                    // TODO: change id
                     "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
                         .to_string(),
                 );
             }
         };
 
-        // TODO: nodeid is temp
         sub_data.unsubscribe_user(user_id, subscription_id.to_string());
+        // TODO: change id
+        return Ok("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":true}".to_string());
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
@@ -210,19 +212,12 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
-        if let Ok(Some(mut rax)) = cache_args
-            .cache
-            .open_tree("subscriptions")?
-            .get(tx_hash.as_bytes())
-        {
-            let mut cached: Value = from_slice(&mut rax).unwrap();
-            cached["id"] = id;
-            let subscription_id = cached["result"].as_str().unwrap();
-
-            // TODO: nodeid is temp
-            sub_data.subscribe_user(user_id, subscription_id.to_string());
-            return Ok(cached.to_string());
+        match sub_data.subscribe_user(user_id, call.to_string()) {
+            // TODO: change id
+            Ok(id) => return Ok(format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}}", id)),
+            Err(_) => todo!(),
         }
+
     } else {
         // Replace block tags if applicable
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
@@ -236,11 +231,7 @@ pub async fn execute_ws_call(
 
     if is_subscription {
         // add the subscription id and add this user to the dispatch
-        insert_and_return_subscription(tx_hash, response.clone(), cache_args)
-            .expect("Failed to insert subscription");
-        let subscription_id = response["result"].as_str().unwrap();
-
-        // TODO: nodeid is temp
+        sub_data.register_subscription(call.to_string(), response["result"].as_str().unwrap().to_string(), node_id);
         sub_data.subscribe_user(user_id, subscription_id.to_string());
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
