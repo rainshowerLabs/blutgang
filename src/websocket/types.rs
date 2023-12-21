@@ -1,20 +1,13 @@
 use std::{
-    collections::{
-        HashMap,
-        HashSet,
-    },
-    sync::{
-        Arc,
-        RwLock,
-    },
+    collections::{HashMap, HashSet},
+    sync::{Arc, RwLock},
 };
 
 use crate::websocket::error::Error;
-
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-// Used to either specify if its an incoming call or a subscription
+// RequestResult enum
 #[derive(Debug, Clone)]
 pub enum RequestResult {
     Call(Value),
@@ -30,7 +23,7 @@ impl From<RequestResult> for Value {
     }
 }
 
-// Internal messages for the websocket manager
+// WsconnMessage enum
 #[derive(Debug)]
 pub enum WsconnMessage {
     Message(Value),
@@ -46,7 +39,7 @@ impl From<WsconnMessage> for Value {
     }
 }
 
-// Errors to send to the health check when a WsConn fails
+// WsChannelErr enum
 #[derive(Debug, Clone)]
 pub enum WsChannelErr {
     Closed(usize),
@@ -57,18 +50,12 @@ pub struct UserData {
     pub message_channel: mpsc::UnboundedSender<RequestResult>,
 }
 
-// Because nodes can have the same subscription IDs, we pair together
-// the node id(or index) and the subscription id. When we subscribe
-// we need to note down what node the subscription is for. When
-// dispatching we only send the subscription to users that are subscribed for that
-// event from that node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeSubInfo {
     pub node_id: usize,
     pub subscription_id: String,
 }
 
-// Corresponding struct for incoming subscriptions and the node it came from
 #[derive(Debug, Clone)]
 pub struct IncomingResponse {
     pub content: Value,
@@ -77,8 +64,8 @@ pub struct IncomingResponse {
 
 pub struct SubscriptionData {
     pub users: Arc<RwLock<HashMap<u64, UserData>>>,
-    // Mapping from subscription ID to a set of user IDs
     pub subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u64>>>>,
+    pub incoming_subscriptions: Arc<RwLock<HashMap<String, NodeSubInfo>>>,
 }
 
 impl SubscriptionData {
@@ -86,16 +73,15 @@ impl SubscriptionData {
         SubscriptionData {
             users: Arc::new(RwLock::new(HashMap::new())),
             subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            incoming_subscriptions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    // Add or update a user
     pub fn add_user(&self, user_id: u64, user_data: UserData) {
         let mut users = self.users.write().unwrap();
         users.insert(user_id, user_data);
     }
 
-    // Remove a user and clean up their subscriptions
     pub fn remove_user(&self, user_id: u64) {
         let mut users = self.users.write().unwrap();
         if users.remove(&user_id).is_some() {
@@ -106,51 +92,58 @@ impl SubscriptionData {
         }
     }
 
-    // Subscribe a user to a subscription
-    pub fn subscribe_user(&self, user_id: u64, subscription_id: String, node_id: usize) {
-        let node_sub_info = NodeSubInfo {
-            node_id,
-            subscription_id: subscription_id,
-        };
+    pub fn register_subscription(&self, subscription: String, subscription_id: String, node_id: usize) {
+        let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
+        incoming_subscriptions.insert(
+            subscription,
+            NodeSubInfo {
+                node_id,
+                subscription_id,
+            },
+        );
+    }
 
+    pub fn unregister_subscription(&self, subscription: String) {
+        let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
+        incoming_subscriptions.remove(&subscription);
+    }
+
+    pub fn subscribe_user(&self, user_id: u64, subscription: String) {
+        let node_sub_info = self.incoming_subscriptions.read().unwrap().get(&subscription).unwrap().clone();
         let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions
-            .entry(node_sub_info)
-            .or_default()
-            .insert(user_id);
+        subscriptions.entry(node_sub_info).or_default().insert(user_id);
     }
 
     // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String, node_id: usize) {
-        let node_sub_info = NodeSubInfo {
-            node_id,
-            subscription_id: subscription_id.clone(),
-        };
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
+        let subscriptions = self.subscriptions.read().unwrap();
+        let mut subscriptions_to_update = Vec::new();
 
-        if let Some(subscribers) = self.subscriptions.write().unwrap().get_mut(&node_sub_info) {
-            subscribers.remove(&user_id);
-            // Check length, and if 0 send unsubscribe message to node
-            // TODO: Implement the logic for this
-            if subscribers.is_empty() {
-                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", {
-                    subscription_id
-                })
+        // Finding all subscriptions matching the subscription_id and user_id
+        for (&ref node_sub_info, subscribers) in subscriptions.iter() {
+            if node_sub_info.subscription_id == subscription_id && subscribers.contains(&user_id) {
+                subscriptions_to_update.push(node_sub_info);
+            }
+        }
+
+        // Unsubscribing the user from the found subscriptions
+        let mut subscriptions = self.subscriptions.write().unwrap();
+        for node_sub_info in subscriptions_to_update {
+            if let Some(subscribers) = subscriptions.get_mut(&node_sub_info) {
+                subscribers.remove(&user_id);
             }
         }
     }
 
-    // Dispatch a message to all users subscribed to a subscription
     pub async fn dispatch_to_subscribers(
         &self,
         subscription_id: &str,
         node_id: usize,
         message: &RequestResult,
     ) -> Result<(), Error> {
-        // TODO: We can remove this later
-        match message {
-            RequestResult::Call(_) => return Err("Trying to send a call as a subscription!".into()),
-            RequestResult::Subscription(_) => {}
-        };
+        if let RequestResult::Call(_) = message {
+            return Err("Trying to send a call as a subscription!".into());
+        }
 
         let node_sub_info = NodeSubInfo {
             node_id,
@@ -173,6 +166,7 @@ impl SubscriptionData {
         Ok(())
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -222,7 +216,7 @@ mod tests {
             subscription_id: subscription_id.clone(),
         };
 
-        subscription_data.subscribe_user(user_id, subscription_id.clone(), node_id);
+        subscription_data.subscribe_user(user_id, subscription_id.clone());
         assert!(subscription_data
             .subscriptions
             .read()
@@ -231,7 +225,7 @@ mod tests {
             .unwrap()
             .contains(&user_id));
 
-        subscription_data.unsubscribe_user(user_id, subscription_id.clone(), node_id);
+        subscription_data.unsubscribe_user(user_id, subscription_id.clone());
         assert!(!subscription_data
             .subscriptions
             .read()
@@ -250,7 +244,7 @@ mod tests {
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
-        subscription_data.subscribe_user(user_id, subscription_id.clone(), node_id);
+        subscription_data.subscribe_user(user_id, subscription_id.clone());
         subscription_data
             .dispatch_to_subscribers(&subscription_id, node_id, &message)
             .await
@@ -291,7 +285,7 @@ mod tests {
             subscription_id: nonexistent_subscription_id.clone(),
         };
 
-        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id.clone(), nonexistent_node_id);
+        subscription_data.unsubscribe_user(user_id, nonexistent_subscription_id.clone());
         assert!(subscription_data
             .subscriptions
             .read()

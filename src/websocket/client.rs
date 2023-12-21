@@ -202,7 +202,7 @@ pub async fn execute_ws_call(
         };
 
         // TODO: nodeid is temp
-        sub_data.unsubscribe_user(user_id, subscription_id.to_string(), 0);
+        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
@@ -220,7 +220,7 @@ pub async fn execute_ws_call(
             let subscription_id = cached["result"].as_str().unwrap();
 
             // TODO: nodeid is temp
-            sub_data.subscribe_user(user_id, subscription_id.to_string(), 0);
+            sub_data.subscribe_user(user_id, subscription_id.to_string());
             return Ok(cached.to_string());
         }
     } else {
@@ -241,7 +241,7 @@ pub async fn execute_ws_call(
         let subscription_id = response["result"].as_str().unwrap();
 
         // TODO: nodeid is temp
-        sub_data.subscribe_user(user_id, subscription_id.to_string(), 0);
+        sub_data.subscribe_user(user_id, subscription_id.to_string());
     } else {
         cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
     }

@@ -64,7 +64,6 @@ pub fn subscription_dispatcher(
             let id = response.content["params"]["subscription"].as_str().unwrap();
 
             // Send the response to all the users
-            // TODO: nodeid is temp
             match sub_data
                 .dispatch_to_subscribers(id, response.node_id, &RequestResult::Subscription(resp_clone.content))
                 .await
