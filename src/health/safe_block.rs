@@ -171,7 +171,7 @@ pub async fn subscribe_to_new_heads(
                 // Write to NamedBlocknumbers
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
                 let a =
-                    hex_to_decimal(msg["params"]["result"]["number"].as_str().unwrap()).unwrap();
+                    hex_to_decimal(msg.content["params"]["result"]["number"].as_str().unwrap()).unwrap();
                 println!("New head: {}", a);
                 nn_rwlock.latest = a;
             }

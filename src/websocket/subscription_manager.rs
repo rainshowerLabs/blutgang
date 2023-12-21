@@ -3,6 +3,7 @@ use crate::{
     websocket::{
         error::Error,
         types::{
+            IncomingResponse,
             RequestResult,
             SubscriptionData,
         },
@@ -37,7 +38,7 @@ pub fn insert_and_return_subscription(
 
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
-    mut rx: broadcast::Receiver<Value>,
+    mut rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
 ) {
     tokio::spawn(async move {
@@ -47,25 +48,25 @@ pub fn subscription_dispatcher(
             // println!("subscription_dispatcher: received response: {}", response);
 
             // Check if its a subscription
-            if response["method"] != "eth_subscription" {
+            if response.content["method"] != "eth_subscription" {
                 continue;
             }
 
             #[cfg(feature = "debug-verbose")]
             println!(
                 "subscription_dispatcher: received subscription: {}",
-                response
+                response.content
             );
 
             // Get the subscription id
             // TODO: this is retarded???
             let resp_clone = response.clone();
-            let id = response["params"]["subscription"].as_str().unwrap();
+            let id = response.content["params"]["subscription"].as_str().unwrap();
 
             // Send the response to all the users
             // TODO: nodeid is temp
             match sub_data
-                .dispatch_to_subscribers(id, 0, &RequestResult::Subscription(resp_clone))
+                .dispatch_to_subscribers(id, response.node_id, &RequestResult::Subscription(resp_clone.content))
                 .await
             {
                 Ok(_) => {}

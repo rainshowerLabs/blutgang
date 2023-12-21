@@ -16,6 +16,7 @@ use crate::{
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
+            IncomingResponse,
         },
     },
 };
@@ -52,7 +53,7 @@ use xxhash_rust::xxh3::xxh3_64;
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
-    broadcast_tx: broadcast::Sender<Value>,
+    broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
     let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
@@ -89,7 +90,7 @@ pub async fn ws_conn_manager(
 
 pub async fn create_ws_vec(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    broadcast_tx: &broadcast::Sender<Value>,
+    broadcast_tx: &broadcast::Sender<IncomingResponse>,
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
     let rpc_list_clone = rpc_list.read().unwrap().clone();
@@ -116,7 +117,7 @@ pub async fn ws_conn(
     rpc: Rpc,
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
-    broadcast_tx: broadcast::Sender<Value>,
+    broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
 ) {
@@ -142,7 +143,13 @@ pub async fn ws_conn(
                     let time = time.elapsed();
                     let rax =
                         unsafe { simd_json::from_str(&mut message.into_text().unwrap()).unwrap() };
-                    let _ = broadcast_tx.send(rax);
+
+                    let incoming = IncomingResponse {
+                        node_id: index,
+                        content: rax,
+                    };
+
+                    let _ = broadcast_tx.send(incoming);
                     update_rpc_latency(&rpc_list, index, time);
                 }
                 Err(_) => {
@@ -158,7 +165,7 @@ pub async fn execute_ws_call(
     mut call: Value,
     user_id: u64,
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
-    broadcast_rx: broadcast::Receiver<Value>,
+    broadcast_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
@@ -245,11 +252,11 @@ pub async fn execute_ws_call(
 
 async fn listen_for_response(
     user_id: u64,
-    mut broadcast_rx: broadcast::Receiver<Value>,
+    mut broadcast_rx: broadcast::Receiver<IncomingResponse>,
 ) -> Result<Value, Error> {
     while let Ok(response) = broadcast_rx.recv().await {
-        if response["id"] == user_id {
-            return Ok(response);
+        if response.content["id"] == user_id {
+            return Ok(response.content);
         }
     }
     Err("Failed to receive response from WS".into())

@@ -35,6 +35,7 @@ use crate::{
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
+            IncomingResponse,
         },
     },
 };
@@ -47,8 +48,6 @@ use std::{
         RwLock,
     },
 };
-
-use serde_json::Value;
 
 use tokio::{
     net::TcpListener,
@@ -112,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
-    let (outgoing_tx, outgoing_rx) = broadcast::channel::<Value>(256);
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(256);
     let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);

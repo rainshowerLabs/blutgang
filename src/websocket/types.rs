@@ -64,8 +64,15 @@ pub struct UserData {
 // event from that node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeSubInfo {
-    pub node_id: u64,
+    pub node_id: usize,
     pub subscription_id: String,
+}
+
+// Corresponding struct for incoming subscriptions and the node it came from
+#[derive(Debug, Clone)]
+pub struct IncomingResponse {
+    pub content: Value,
+    pub node_id: usize,
 }
 
 pub struct SubscriptionData {
@@ -100,7 +107,7 @@ impl SubscriptionData {
     }
 
     // Subscribe a user to a subscription
-    pub fn subscribe_user(&self, user_id: u64, subscription_id: String, node_id: u64) {
+    pub fn subscribe_user(&self, user_id: u64, subscription_id: String, node_id: usize) {
         let node_sub_info = NodeSubInfo {
             node_id,
             subscription_id: subscription_id,
@@ -114,7 +121,7 @@ impl SubscriptionData {
     }
 
     // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String, node_id: u64) {
+    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String, node_id: usize) {
         let node_sub_info = NodeSubInfo {
             node_id,
             subscription_id: subscription_id.clone(),
@@ -136,7 +143,7 @@ impl SubscriptionData {
     pub async fn dispatch_to_subscribers(
         &self,
         subscription_id: &str,
-        node_id: u64,
+        node_id: usize,
         message: &RequestResult,
     ) -> Result<(), Error> {
         // TODO: We can remove this later

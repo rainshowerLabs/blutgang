@@ -19,7 +19,10 @@ use crate::{
     timed_out,
     websocket::{
         server::serve_websocket,
-        types::SubscriptionData,
+        types::{
+            SubscriptionData,
+            IncomingResponse,
+        },
     },
     NamedBlocknumbers,
     Settings,
@@ -82,7 +85,7 @@ struct RequestParams {
 pub struct RequestChannels {
     pub finalized_rx: Arc<watch::Receiver<u64>>,
     pub incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
-    pub outgoing_rx: broadcast::Receiver<Value>,
+    pub outgoing_rx: broadcast::Receiver<IncomingResponse>,
 }
 
 impl Clone for RequestChannels {

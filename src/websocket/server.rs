@@ -9,12 +9,12 @@ use crate::{
             RequestResult,
             UserData,
             WsconnMessage,
+            IncomingResponse,
         },
     },
 };
 
 use rand::random;
-use serde_json::Value;
 
 use tokio::sync::{
     broadcast,
@@ -38,7 +38,7 @@ use super::types::SubscriptionData;
 pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
-    outgoing_rx: broadcast::Receiver<Value>,
+    outgoing_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
 ) -> Result<(), Error> {
