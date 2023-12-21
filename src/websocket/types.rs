@@ -92,10 +92,11 @@ impl SubscriptionData {
         }
     }
 
-    pub fn register_subscription(&self, subscription: String, subscription_id: String, node_id: usize) {
+    // Used to add a new subscription to the active subscription list
+    pub fn register_subscription(&self, subscription_request: String, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         incoming_subscriptions.insert(
-            subscription,
+            subscription_request,
             NodeSubInfo {
                 node_id,
                 subscription_id,
@@ -103,9 +104,9 @@ impl SubscriptionData {
         );
     }
 
-    pub fn unregister_subscription(&self, subscription: String) {
+    pub fn unregister_subscription(&self, subscription_request: String) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
-        incoming_subscriptions.remove(&subscription);
+        incoming_subscriptions.remove(&subscription_request);
     }
 
     // Subscribe user to existing subscription and return the subscription id
@@ -221,43 +222,39 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+        let subscription_request = "sub200".to_string();
         let subscription_id = "200".to_string();
         let node_id = 1;
 
-        let node_sub_info = NodeSubInfo {
-            node_id,
-            subscription_id: subscription_id.clone(),
-        };
-
-        subscription_data.subscribe_user(user_id, subscription_id.clone());
+        subscription_data.register_subscription(subscription_request.clone(), subscription_id.clone(), node_id);
+        subscription_data.subscribe_user(user_id, subscription_request.clone()).unwrap();
         assert!(subscription_data
             .subscriptions
             .read()
             .unwrap()
-            .get(&node_sub_info)
-            .unwrap()
-            .contains(&user_id));
+            .iter()
+            .any(|(k, v)| k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)));
 
         subscription_data.unsubscribe_user(user_id, subscription_id.clone());
         assert!(!subscription_data
             .subscriptions
             .read()
             .unwrap()
-            .get(&node_sub_info)
-            .unwrap()
-            .contains(&user_id));
+            .iter()
+            .any(|(k, v)| k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)));
     }
 
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
-        let subscription_id = 300.to_string();
+        let subscription_request = "sub300".to_string();
+        let subscription_id = "300".to_string();
         let node_id = 1;
-
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
-        subscription_data.subscribe_user(user_id, subscription_id.clone());
+        subscription_data.register_subscription(subscription_request.clone(), subscription_id.clone(), node_id);
+        subscription_data.subscribe_user(user_id, subscription_request).unwrap();
         subscription_data
             .dispatch_to_subscribers(&subscription_id, node_id, &message)
             .await
@@ -290,7 +287,7 @@ mod tests {
     #[tokio::test]
     async fn test_unsubscribe_nonexistent_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let nonexistent_subscription_id = 400.to_string();
+        let nonexistent_subscription_id = "sub400".to_string();
         let nonexistent_node_id = 10000;
 
         let nonexistent_node_sub_info = NodeSubInfo {
@@ -310,13 +307,15 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
-        let empty_subscription_id = 500.to_string();
+        let empty_subscription_request = "sub500".to_string();
+        let empty_subscription_id = "500".to_string();
         let empty_node_id = 10000;
         let message = RequestResult::Subscription(serde_json::Value::String(
             "empty test message".to_string(),
         ));
 
         // No users are subscribed to this subscription
+        subscription_data.register_subscription(empty_subscription_request, empty_subscription_id.clone(), empty_node_id);
         let dispatch_result = subscription_data
             .dispatch_to_subscribers(&empty_subscription_id, empty_node_id, &message)
             .await;
@@ -326,7 +325,8 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_nonexistent_subscription() {
         let subscription_data = SubscriptionData::new();
-        let nonexistent_subscription_id = 600.to_string();
+        let nonexistent_subscription_request = "sub600".to_string();
+        let nonexistent_subscription_id = "600".to_string();
         let nonexistent_node_id = 10000;
 
         let message = RequestResult::Subscription(serde_json::Value::String(
