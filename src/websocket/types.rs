@@ -108,10 +108,19 @@ impl SubscriptionData {
         incoming_subscriptions.remove(&subscription);
     }
 
-    pub fn subscribe_user(&self, user_id: u64, subscription: String) {
-        let node_sub_info = self.incoming_subscriptions.read().unwrap().get(&subscription).unwrap().clone();
+    // Subscribe user to existing subscription and return the subscription id
+    //
+    // If the subscription does not exist, return error
+    pub fn subscribe_user(&self, user_id: u64, subscription: String) -> Result<String, Error> {
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+        let node_sub_info = incoming_subscriptions.get(&subscription).ok_or_else(|| {
+            return Err::<(), String>(format!("Subscription {} does not exist!", subscription));
+        }).unwrap();
+
         let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions.entry(node_sub_info).or_default().insert(user_id);
+        subscriptions.entry(node_sub_info.clone()).or_default().insert(user_id);
+
+        Ok(node_sub_info.subscription_id.clone())
     }
 
     // Unsubscribe a user from a subscription
@@ -152,6 +161,10 @@ impl SubscriptionData {
 
         let users = self.users.read().unwrap();
         if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
+            if subscribers.is_empty() {
+                self.unregister_subscription(subscription_id.to_string());
+                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", subscription_id);
+            }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
                     user.message_channel
