@@ -126,19 +126,17 @@ impl SubscriptionData {
 
     // Unsubscribe a user from a subscription
     pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
-        let subscriptions = self.subscriptions.read().unwrap();
+        let mut subscriptions = self.subscriptions.write().unwrap();
         let mut subscriptions_to_update = Vec::new();
 
         // Finding all subscriptions matching the subscription_id and user_id
-        for (node_sub_info, subscribers) in subscriptions.clone().into_iter() {
+        for (node_sub_info, subscribers) in subscriptions.iter() {
             if node_sub_info.subscription_id == subscription_id && subscribers.contains(&user_id) {
-                subscriptions_to_update.push(node_sub_info);
+                subscriptions_to_update.push(node_sub_info.clone());
             }
         }
 
-        drop(subscriptions);
         // Unsubscribing the user from the found subscriptions
-        let mut subscriptions = self.subscriptions.write().unwrap();
         for node_sub_info in subscriptions_to_update {
             if let Some(subscribers) = subscriptions.get_mut(&node_sub_info) {
                 subscribers.remove(&user_id);
