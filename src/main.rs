@@ -32,10 +32,10 @@ use crate::{
         client::ws_conn_manager,
         subscription_manager::subscription_dispatcher,
         types::{
+            IncomingResponse,
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
-            IncomingResponse,
         },
     },
 };

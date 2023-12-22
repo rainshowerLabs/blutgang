@@ -1,11 +1,7 @@
-use crate::{
-    websocket::{
-        types::{
-            IncomingResponse,
-            RequestResult,
-            SubscriptionData,
-        },
-    },
+use crate::websocket::types::{
+    IncomingResponse,
+    RequestResult,
+    SubscriptionData,
 };
 
 use std::sync::Arc;
@@ -40,7 +36,11 @@ pub fn subscription_dispatcher(
 
             // Send the response to all the users
             match sub_data
-                .dispatch_to_subscribers(id, response.node_id, &RequestResult::Subscription(resp_clone.content))
+                .dispatch_to_subscribers(
+                    id,
+                    response.node_id,
+                    &RequestResult::Subscription(resp_clone.content),
+                )
                 .await
             {
                 Ok(_) => {}

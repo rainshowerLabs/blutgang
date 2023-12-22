@@ -12,10 +12,10 @@ use crate::{
     websocket::{
         error::Error,
         types::{
+            IncomingResponse,
             SubscriptionData,
             WsChannelErr,
             WsconnMessage,
-            IncomingResponse,
         },
     },
 };
@@ -213,10 +213,14 @@ pub async fn execute_ws_call(
         // if not continue
         match sub_data.subscribe_user(user_id, call.to_string()) {
             // TODO: change id
-            Ok(id) => return Ok(format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}}", id)),
+            Ok(id) => {
+                return Ok(format!(
+                    "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}}",
+                    id
+                ))
+            }
             Err(_) => todo!(),
         }
-
     } else {
         // Replace block tags if applicable
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
@@ -233,8 +237,11 @@ pub async fn execute_ws_call(
         let sub_id = match response.content["result"].as_str() {
             Some(sub_id) => sub_id.to_string(),
             None => {
-                return Ok("\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\"".to_string())
-            },
+                return Ok(
+                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
+                        .to_string(),
+                )
+            }
         };
 
         sub_data.register_subscription(call.to_string(), sub_id.clone(), response.node_id);
@@ -264,11 +271,20 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::time::Duration;
-    use tokio::sync::{broadcast, mpsc};
+    use tokio::sync::{
+        broadcast,
+        mpsc,
+    };
 
     // Helper function to create a mock Rpc object
     fn mock_rpc(ws_url: &str) -> Rpc {
-        Rpc::new("http:://test.com".to_string(), Some(ws_url.to_string()), 10000, 1, 10.0)
+        Rpc::new(
+            "http:://test.com".to_string(),
+            Some(ws_url.to_string()),
+            10000,
+            1,
+            10.0,
+        )
     }
 
     // Helper function to setup the environment for ws_conn_manager tests
@@ -313,7 +329,9 @@ mod tests {
 
         // Sending a message that should cause an error
         let invalid_message = json!({"invalid": "message"});
-        incoming_tx.send(WsconnMessage::Message(invalid_message)).unwrap();
+        incoming_tx
+            .send(WsconnMessage::Message(invalid_message))
+            .unwrap();
 
         // Expecting an error response
         if let Some(WsconnMessage::Message(_)) = incoming_rx.recv().await {
@@ -348,15 +366,8 @@ mod tests {
             broadcast_tx.send(response).unwrap();
         });
 
-        let result = execute_ws_call(
-            call,
-            1,
-            &incoming_tx,
-            broadcast_rx,
-            &sub_data,
-            &cache_args,
-        )
-        .await;
+        let result =
+            execute_ws_call(call, 1, &incoming_tx, broadcast_rx, &sub_data, &cache_args).await;
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
@@ -394,4 +405,3 @@ mod tests {
         );
     }
 }
-

@@ -6,10 +6,10 @@ use crate::{
         client::execute_ws_call,
         error::Error,
         types::{
+            IncomingResponse,
             RequestResult,
             UserData,
             WsconnMessage,
-            IncomingResponse,
         },
     },
 };

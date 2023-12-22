@@ -1,6 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
-    sync::{Arc, RwLock},
+    collections::{
+        HashMap,
+        HashSet,
+    },
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 
 use crate::websocket::error::Error;
@@ -93,7 +99,12 @@ impl SubscriptionData {
     }
 
     // Used to add a new subscription to the active subscription list
-    pub fn register_subscription(&self, subscription_request: String, subscription_id: String, node_id: usize) {
+    pub fn register_subscription(
+        &self,
+        subscription_request: String,
+        subscription_id: String,
+        node_id: usize,
+    ) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         incoming_subscriptions.insert(
             subscription_request,
@@ -114,12 +125,18 @@ impl SubscriptionData {
     // If the subscription does not exist, return error
     pub fn subscribe_user(&self, user_id: u64, subscription: String) -> Result<String, Error> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        let node_sub_info = incoming_subscriptions.get(&subscription).ok_or_else(|| {
-            return Err::<(), String>(format!("Subscription {} does not exist!", subscription));
-        }).unwrap();
+        let node_sub_info = incoming_subscriptions
+            .get(&subscription)
+            .ok_or_else(|| {
+                return Err::<(), String>(format!("Subscription {} does not exist!", subscription));
+            })
+            .unwrap();
 
         let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions.entry(node_sub_info.clone()).or_default().insert(user_id);
+        subscriptions
+            .entry(node_sub_info.clone())
+            .or_default()
+            .insert(user_id);
 
         Ok(node_sub_info.subscription_id.clone())
     }
@@ -163,7 +180,10 @@ impl SubscriptionData {
         if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
             if subscribers.is_empty() {
                 self.unregister_subscription(subscription_id.to_string());
-                println!("NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}", subscription_id);
+                println!(
+                    "NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}",
+                    subscription_id
+                );
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
@@ -179,7 +199,6 @@ impl SubscriptionData {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -225,14 +244,22 @@ mod tests {
         let subscription_id = "200".to_string();
         let node_id = 1;
 
-        subscription_data.register_subscription(subscription_request.clone(), subscription_id.clone(), node_id);
-        subscription_data.subscribe_user(user_id, subscription_request.clone()).unwrap();
+        subscription_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.clone(),
+            node_id,
+        );
+        subscription_data
+            .subscribe_user(user_id, subscription_request.clone())
+            .unwrap();
         assert!(subscription_data
             .subscriptions
             .read()
             .unwrap()
             .iter()
-            .any(|(k, v)| k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)));
+            .any(|(k, v)| {
+                k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
+            }));
 
         subscription_data.unsubscribe_user(user_id, subscription_id.clone());
         assert!(!subscription_data
@@ -240,7 +267,9 @@ mod tests {
             .read()
             .unwrap()
             .iter()
-            .any(|(k, v)| k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)));
+            .any(|(k, v)| {
+                k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
+            }));
     }
 
     #[tokio::test]
@@ -252,8 +281,14 @@ mod tests {
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
-        subscription_data.register_subscription(subscription_request.clone(), subscription_id.clone(), node_id);
-        subscription_data.subscribe_user(user_id, subscription_request).unwrap();
+        subscription_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.clone(),
+            node_id,
+        );
+        subscription_data
+            .subscribe_user(user_id, subscription_request)
+            .unwrap();
         subscription_data
             .dispatch_to_subscribers(&subscription_id, node_id, &message)
             .await
@@ -314,7 +349,11 @@ mod tests {
         ));
 
         // No users are subscribed to this subscription
-        subscription_data.register_subscription(empty_subscription_request, empty_subscription_id.clone(), empty_node_id);
+        subscription_data.register_subscription(
+            empty_subscription_request,
+            empty_subscription_id.clone(),
+            empty_node_id,
+        );
         let dispatch_result = subscription_data
             .dispatch_to_subscribers(&empty_subscription_id, empty_node_id, &message)
             .await;

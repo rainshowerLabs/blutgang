@@ -20,8 +20,8 @@ use crate::{
     websocket::{
         server::serve_websocket,
         types::{
-            SubscriptionData,
             IncomingResponse,
+            SubscriptionData,
         },
     },
     NamedBlocknumbers,
