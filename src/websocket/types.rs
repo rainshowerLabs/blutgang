@@ -130,12 +130,13 @@ impl SubscriptionData {
         let mut subscriptions_to_update = Vec::new();
 
         // Finding all subscriptions matching the subscription_id and user_id
-        for (&ref node_sub_info, subscribers) in subscriptions.iter() {
+        for (node_sub_info, subscribers) in subscriptions.clone().into_iter() {
             if node_sub_info.subscription_id == subscription_id && subscribers.contains(&user_id) {
                 subscriptions_to_update.push(node_sub_info);
             }
         }
 
+        drop(subscriptions);
         // Unsubscribing the user from the found subscriptions
         let mut subscriptions = self.subscriptions.write().unwrap();
         for node_sub_info in subscriptions_to_update {
@@ -325,7 +326,7 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_nonexistent_subscription() {
         let subscription_data = SubscriptionData::new();
-        let nonexistent_subscription_request = "sub600".to_string();
+        let _nonexistent_subscription_request = "sub600".to_string();
         let nonexistent_subscription_id = "600".to_string();
         let nonexistent_node_id = 10000;
 
