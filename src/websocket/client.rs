@@ -195,9 +195,10 @@ pub async fn execute_ws_call(
         let subscription_id = match subscription_id {
             Some(subscription_id) => subscription_id,
             None => {
-                return Ok(
-                    format!("\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"", id),
-                );
+                return Ok(format!(
+                    "\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"",
+                    id
+                ));
             }
         };
 
@@ -211,14 +212,11 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
-        match sub_data.subscribe_user(user_id, call.to_string()) {
-            Ok(rax) => {
-                return Ok(format!(
-                    "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
-                    id, rax
-                ))
-            }
-            Err(_) => {},
+        if let Ok(rax) = sub_data.subscribe_user(user_id, call.to_string()) {
+            return Ok(format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
+                id, rax
+            ));
         }
     } else {
         // Replace block tags if applicable
