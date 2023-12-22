@@ -180,6 +180,8 @@ pub async fn execute_ws_call(
         }
     };
 
+    println!("CALL: {:#?}", call);
+
     if let Ok(Some(mut rax)) = cache_args.cache.get(tx_hash.as_bytes()) {
         let mut cached: Value = from_slice(&mut rax).unwrap();
         cached["id"] = id;
@@ -194,9 +196,7 @@ pub async fn execute_ws_call(
             Some(subscription_id) => subscription_id,
             None => {
                 return Ok(
-                    // TODO: change id
-                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
-                        .to_string(),
+                    format!("\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"", id),
                 );
             }
         };
@@ -212,14 +212,13 @@ pub async fn execute_ws_call(
         // if so return the subscription id and add this user to the dispatch
         // if not continue
         match sub_data.subscribe_user(user_id, call.to_string()) {
-            // TODO: change id
-            Ok(id) => {
+            Ok(rax) => {
                 return Ok(format!(
-                    "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}}",
-                    id
+                    "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
+                    id, rax
                 ))
             }
-            Err(_) => todo!(),
+            Err(_) => {},
         }
     } else {
         // Replace block tags if applicable
@@ -349,7 +348,7 @@ mod tests {
         let call = json!({
             "jsonrpc": "2.0",
             "method": "eth_subscribe",
-            "params": ["newHeads", {}]
+            "params": ["newHeads"]
         });
 
         // Simulate a response

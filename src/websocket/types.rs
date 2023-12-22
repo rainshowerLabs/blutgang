@@ -125,12 +125,10 @@ impl SubscriptionData {
     // If the subscription does not exist, return error
     pub fn subscribe_user(&self, user_id: u64, subscription: String) -> Result<String, Error> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        let node_sub_info = incoming_subscriptions
-            .get(&subscription)
-            .ok_or_else(|| {
-                return Err::<(), String>(format!("Subscription {} does not exist!", subscription));
-            })
-            .unwrap();
+        let node_sub_info = match incoming_subscriptions.get(&subscription) {
+            Some(rax) => rax,
+            None => return Err(format!("Subscription {} does not exist!", subscription).into()),
+        };
 
         let mut subscriptions = self.subscriptions.write().unwrap();
         subscriptions
