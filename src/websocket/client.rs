@@ -191,9 +191,8 @@ pub async fn execute_ws_call(
     // Remove and unsubscribe user is "eth_unsubscribe"
     if call["method"] == "eth_unsubscribe" {
         // subscription_id is ["params"][0]
-        let subscription_id = call["params"][0].as_str();
-        let subscription_id = match subscription_id {
-            Some(subscription_id) => subscription_id,
+        let subscription_id = match call["params"][0].as_str() {
+            Some(subscription_id) => subscription_id.to_string(),
             None => {
                 return Ok(format!(
                     "\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"",
@@ -202,7 +201,7 @@ pub async fn execute_ws_call(
             }
         };
 
-        sub_data.unsubscribe_user(user_id, subscription_id.to_string());
+        sub_data.unsubscribe_user(user_id, subscription_id);
         // TODO: change id
         return Ok("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":true}".to_string());
     }
@@ -274,10 +273,10 @@ mod tests {
     };
 
     // Helper function to create a mock Rpc object
-    fn mock_rpc(ws_url: &str) -> Rpc {
+    fn mock_rpc(url: &str) -> Rpc {
         Rpc::new(
-            "http:://test.com".to_string(),
-            Some(ws_url.to_string()),
+            format!("http://{}", url),
+            Some(format!("ws://{}", url)),
             10000,
             1,
             10.0,
@@ -293,8 +292,8 @@ mod tests {
         mpsc::UnboundedSender<WsChannelErr>,
     ) {
         let rpc_list = Arc::new(RwLock::new(vec![
-            mock_rpc("wss://node1.example.com"),
-            mock_rpc("wss://node2.example.com"),
+            mock_rpc("node1.example.com"),
+            mock_rpc("node2.example.com"),
         ]));
         let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
         let (broadcast_tx, _) = broadcast::channel(10);
