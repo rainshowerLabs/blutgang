@@ -230,23 +230,30 @@ pub async fn execute_ws_call(
 
     if is_subscription {
         // add the subscription id and add this user to the dispatch
-        sub_data.register_subscription(call.to_string(), response["result"].as_str().unwrap().to_string(), node_id);
-        sub_data.subscribe_user(user_id, subscription_id.to_string());
+        let sub_id = match response.content["result"].as_str() {
+            Some(sub_id) => sub_id.to_string(),
+            None => {
+                return Ok("\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\"".to_string())
+            },
+        };
+
+        sub_data.register_subscription(call.to_string(), sub_id.clone(), response.node_id);
+        let _ = sub_data.subscribe_user(user_id, sub_id);
     } else {
-        cache_querry(&mut response.to_string(), call, tx_hash, cache_args);
+        cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
     }
 
-    response["id"] = id;
-    Ok(response.to_string())
+    response.content["id"] = id;
+    Ok(response.content.to_string())
 }
 
 async fn listen_for_response(
     user_id: u64,
     mut broadcast_rx: broadcast::Receiver<IncomingResponse>,
-) -> Result<Value, Error> {
+) -> Result<IncomingResponse, Error> {
     while let Ok(response) = broadcast_rx.recv().await {
         if response.content["id"] == user_id {
-            return Ok(response.content);
+            return Ok(response);
         }
     }
     Err("Failed to receive response from WS".into())
