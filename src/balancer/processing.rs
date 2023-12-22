@@ -35,6 +35,18 @@ pub struct CacheArgs {
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
 }
 
+impl CacheArgs {
+    #[allow(dead_code)]
+    pub fn default() -> Self {
+        CacheArgs {
+            finalized_rx: watch::channel(0).1,
+            named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
+            cache: Arc::new(sled::Config::default().open().unwrap()),
+            head_cache: Arc::new(RwLock::new(BTreeMap::new())),
+        }
+    }
+}
+
 // TODO: we should find a way to check values directly and not convert Value to str
 pub fn can_cache(method: &str, result: &str) -> bool {
     if cache_method(method) && cache_result(result) {

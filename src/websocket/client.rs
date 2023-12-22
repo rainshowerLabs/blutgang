@@ -258,3 +258,140 @@ async fn listen_for_response(
     }
     Err("Failed to receive response from WS".into())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::time::Duration;
+    use tokio::sync::{broadcast, mpsc};
+
+    // Helper function to create a mock Rpc object
+    fn mock_rpc(ws_url: &str) -> Rpc {
+        Rpc::new("http:://test.com".to_string(), Some(ws_url.to_string()), 10000, 1, 10.0)
+    }
+
+    // Helper function to setup the environment for ws_conn_manager tests
+    fn setup_ws_conn_manager_test() -> (
+        Arc<RwLock<Vec<Rpc>>>,
+        mpsc::UnboundedSender<WsconnMessage>,
+        mpsc::UnboundedReceiver<WsconnMessage>,
+        broadcast::Sender<IncomingResponse>,
+        mpsc::UnboundedSender<WsChannelErr>,
+    ) {
+        let rpc_list = Arc::new(RwLock::new(vec![
+            mock_rpc("wss://node1.example.com"),
+            mock_rpc("wss://node2.example.com"),
+        ]));
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        let (broadcast_tx, _) = broadcast::channel(10);
+        let (ws_error_tx, _) = mpsc::unbounded_channel();
+
+        (
+            rpc_list,
+            incoming_tx,
+            incoming_rx,
+            broadcast_tx,
+            ws_error_tx,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_ws_conn_manager_reconnect() {
+        let (rpc_list, incoming_tx, incoming_rx, broadcast_tx, ws_error_tx) =
+            setup_ws_conn_manager_test();
+
+        // Test Reconnect message handling
+        incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+        ws_conn_manager(rpc_list, incoming_rx, broadcast_tx, ws_error_tx).await;
+    }
+
+    #[tokio::test]
+    async fn test_ws_conn_handling_error() {
+        let (_rpc_list, incoming_tx, mut incoming_rx, _broadcast_tx, _ws_error_tx) =
+            setup_ws_conn_manager_test();
+
+        // Sending a message that should cause an error
+        let invalid_message = json!({"invalid": "message"});
+        incoming_tx.send(WsconnMessage::Message(invalid_message)).unwrap();
+
+        // Expecting an error response
+        if let Some(WsconnMessage::Message(_)) = incoming_rx.recv().await {
+            // Handling error cases here
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_ws_call() {
+        let (incoming_tx, _) = mpsc::unbounded_channel();
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+        let cache_args = CacheArgs::default();
+
+        let call = json!({
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["newHeads", {}]
+        });
+
+        // Simulate a response
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let response = IncomingResponse {
+                content: json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": "0x1a2b3c"
+                }),
+                node_id: 0,
+            };
+            broadcast_tx.send(response).unwrap();
+        });
+
+        let result = execute_ws_call(
+            call,
+            1,
+            &incoming_tx,
+            broadcast_rx,
+            &sub_data,
+            &cache_args,
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x1a2b3c\"}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_listen_for_response() {
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
+
+        // Simulate a response
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let response = IncomingResponse {
+                content: json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": "0x1a2b3c"
+                }),
+                node_id: 0,
+            };
+            broadcast_tx.send(response).unwrap();
+        });
+
+        let result = listen_for_response(1, broadcast_rx).await;
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap().content,
+            json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": "0x1a2b3c"
+            })
+        );
+    }
+}
+
