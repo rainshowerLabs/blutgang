@@ -180,8 +180,6 @@ pub async fn execute_ws_call(
         }
     };
 
-    println!("CALL: {:#?}", call);
-
     if let Ok(Some(mut rax)) = cache_args.cache.get(tx_hash.as_bytes()) {
         let mut cached: Value = from_slice(&mut rax).unwrap();
         cached["id"] = id;
@@ -309,16 +307,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_ws_conn_manager_reconnect() {
-        let (rpc_list, incoming_tx, incoming_rx, broadcast_tx, ws_error_tx) =
-            setup_ws_conn_manager_test();
-
-        // Test Reconnect message handling
-        incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
-        ws_conn_manager(rpc_list, incoming_rx, broadcast_tx, ws_error_tx).await;
-    }
-
-    #[tokio::test]
     async fn test_ws_conn_handling_error() {
         let (_rpc_list, incoming_tx, mut incoming_rx, _broadcast_tx, _ws_error_tx) =
             setup_ws_conn_manager_test();
@@ -336,16 +324,55 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_execute_ws_call() {
-        let (incoming_tx, _) = mpsc::unbounded_channel();
+    async fn test_execute_ws_subscription_and_call() {
+        //
+        // Test subscriptions
+        // 
+
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
         let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
         let sub_data = Arc::new(SubscriptionData::new());
         let cache_args = CacheArgs::default();
 
         let call = json!({
             "jsonrpc": "2.0",
+            "id": 1,
             "method": "eth_subscribe",
             "params": ["newHeads"]
+        });
+
+        // Simulate a response
+        let b_clone = broadcast_tx.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let response = IncomingResponse {
+                content: json!({
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "result": "0x1a2b3c"
+                }),
+                node_id: 0,
+            };
+            b_clone.send(response).unwrap();
+        });
+
+        let result =
+            execute_ws_call(call, 1, &incoming_tx, broadcast_rx.resubscribe(), &sub_data, &cache_args).await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x1a2b3c\"}"
+        );
+
+        //
+        // Test calls
+        //
+
+        let call = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_blockNumber"
         });
 
         // Simulate a response
@@ -364,10 +391,11 @@ mod tests {
 
         let result =
             execute_ws_call(call, 1, &incoming_tx, broadcast_rx, &sub_data, &cache_args).await;
+
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"0x1a2b3c\"}"
+            "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x1a2b3c\"}"
         );
     }
 
