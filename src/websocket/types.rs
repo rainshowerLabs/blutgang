@@ -69,8 +69,8 @@ pub struct IncomingResponse {
 }
 
 pub struct SubscriptionData {
-    pub users: Arc<RwLock<HashMap<u64, UserData>>>,
-    pub subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u64>>>>,
+    pub users: Arc<RwLock<HashMap<u32, UserData>>>,
+    pub subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u32>>>>,
     pub incoming_subscriptions: Arc<RwLock<HashMap<String, NodeSubInfo>>>,
 }
 
@@ -83,12 +83,12 @@ impl SubscriptionData {
         }
     }
 
-    pub fn add_user(&self, user_id: u64, user_data: UserData) {
+    pub fn add_user(&self, user_id: u32, user_data: UserData) {
         let mut users = self.users.write().unwrap();
         users.insert(user_id, user_data);
     }
 
-    pub fn remove_user(&self, user_id: u64) {
+    pub fn remove_user(&self, user_id: u32) {
         let mut users = self.users.write().unwrap();
         if users.remove(&user_id).is_some() {
             let mut subscriptions = self.subscriptions.write().unwrap();
@@ -123,7 +123,7 @@ impl SubscriptionData {
     // Subscribe user to existing subscription and return the subscription id
     //
     // If the subscription does not exist, return error
-    pub fn subscribe_user(&self, user_id: u64, subscription: String) -> Result<String, Error> {
+    pub fn subscribe_user(&self, user_id: u32, subscription: String) -> Result<String, Error> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
         let node_sub_info = match incoming_subscriptions.get(&subscription) {
             Some(rax) => rax,
@@ -140,7 +140,7 @@ impl SubscriptionData {
     }
 
     // Unsubscribe a user from a subscription
-    pub fn unsubscribe_user(&self, user_id: u64, subscription_id: String) {
+    pub fn unsubscribe_user(&self, user_id: u32, subscription_id: String) {
         let mut subscriptions = self.subscriptions.write().unwrap();
         let mut subscriptions_to_update = Vec::new();
 
@@ -205,7 +205,7 @@ mod tests {
 
     fn setup_user_and_subscription_data() -> (
         SubscriptionData,
-        u64,
+        u32,
         mpsc::UnboundedReceiver<RequestResult>,
     ) {
         let (tx, rx) = mpsc::unbounded_channel();
