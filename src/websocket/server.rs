@@ -53,7 +53,7 @@ pub async fn serve_websocket(
     // Generate an id for our user
     //
     // We use this to identify which requests are for us
-    let user_id = random::<u64>();
+    let user_id = random::<u32>() as u64;
 
     // Add the user to the sink map
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
