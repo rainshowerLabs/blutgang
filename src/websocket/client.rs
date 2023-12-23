@@ -125,7 +125,7 @@ pub async fn ws_conn(
 
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
-            //#[cfg(feature = "debug-verbose")]
+            #[cfg(feature = "debug-verbose")]
             println!("ws_conn[{}], result: {:?}", index, incoming);
 
             let time = Instant::now();
@@ -142,6 +142,7 @@ pub async fn ws_conn(
                     let time = time.elapsed();
                     let rax =
                         unsafe { simd_json::from_str(&mut message.into_text().unwrap()).unwrap() };
+                    #[cfg(feature = "debug-verbose")]
                     println!("ws_conn[{}], next: {:?}", index, rax);
 
                     let incoming = IncomingResponse {
@@ -254,12 +255,7 @@ async fn listen_for_response(
     mut broadcast_rx: broadcast::Receiver<IncomingResponse>,
 ) -> Result<IncomingResponse, Error> {
     while let Ok(response) = broadcast_rx.recv().await {
-        println!("listen_for_response: {:?}", response);
-        println!("listen_for_response: {:?}", response.content["id"].as_u64().unwrap_or(u64::MAX));
-        println!("listen_for_response: {:?}", user_id);
-
         if response.content["id"].as_u64().unwrap_or(u32::MAX.into()) as u32 == user_id {
-            println!("listen_for_response: SENT!!!!");
 
             return Ok(response);
         }
