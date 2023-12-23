@@ -16,7 +16,7 @@ pub fn subscription_dispatcher(
         loop {
             // Receive the WS response
             let response = rx.recv().await.unwrap();
-            // println!("subscription_dispatcher: received response: {}", response);
+            println!("subscription_dispatcher: received response: {:?}", response);
 
             // Check if its a subscription
             if response.content["method"] != "eth_subscription" {
@@ -57,20 +57,113 @@ pub fn subscription_dispatcher(
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
-    // use crate::{
-    //     health::safe_block::NamedBlocknumbers,
-    //     // websocket::types::UserData,
-    // };
-    // use std::collections::BTreeMap;
-    // use std::sync::RwLock;
-    // use tokio::sync::watch;
+    use super::*;
+    use crate::balancer::processing::CacheArgs;
+    use crate::websocket::client::execute_ws_call;
+    use crate::Rpc;
+    use crate::WsconnMessage;
+    use serde_json::json;
+    use std::sync::RwLock;
+    use std::{
+        sync::Arc,
+        time::Duration,
+    };
+    use tokio::sync::{
+        broadcast,
+        mpsc,
+    };
 
-    // use std::str::FromStr;
-    // use tokio::sync::{
-    //     broadcast,
-    //     mpsc,
-    // };
+    fn setup_test_environment() -> (
+        Arc<RwLock<Vec<Rpc>>>,
+        mpsc::UnboundedSender<WsconnMessage>,
+        mpsc::UnboundedReceiver<WsconnMessage>,
+        broadcast::Sender<IncomingResponse>,
+        broadcast::Receiver<IncomingResponse>,
+        Arc<SubscriptionData>,
+    ) {
+        let rpc_list = Arc::new(RwLock::new(vec![Rpc::default(), Rpc::default()]));
+        let (incoming_tx, incoming_rx) = mpsc::unbounded_channel();
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+
+        (
+            rpc_list,
+            incoming_tx,
+            incoming_rx,
+            broadcast_tx,
+            broadcast_rx,
+            sub_data,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_and_forward_incoming_subscriptions() {
+        let (_rpc_list, incoming_tx, mut incoming_rx, broadcast_tx, _broadcast_rx, sub_data) =
+            setup_test_environment();
+
+        // Mock subscription call
+        let subscription_call = json!({
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["newHeads"],
+            "id": 1
+        });
+
+        // Mock user
+        let user_id = 123;
+
+        // Execute subscription call
+        let result = execute_ws_call(
+            subscription_call.clone(),
+            user_id,
+            &incoming_tx,
+            broadcast_tx.subscribe(),
+            &sub_data,
+            &CacheArgs::default(),
+        )
+        .await;
+
+        assert!(result.is_ok());
+
+        // Simulate incoming subscription message
+        let incoming_subscription = json!({
+            "method": "eth_subscription",
+            "params": {
+                "subscription": "0x1a2b3c",
+                "result": {
+                    "blockNumber": "0x10"
+                }
+            }
+        });
+
+        // Broadcast incoming subscription message
+        broadcast_tx
+            .send(IncomingResponse {
+                node_id: 0,
+                content: incoming_subscription.clone(),
+            })
+            .unwrap();
+
+        // Simulate dispatching the incoming subscriptions
+        subscription_dispatcher(broadcast_tx.subscribe(), Arc::clone(&sub_data));
+
+        // Allow time for async operations to complete
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Check if user has received the subscription
+        //
+        // Attempt to receive a message from the user's channel
+        let received = incoming_rx.try_recv().unwrap();
+        let received = match received {
+            WsconnMessage::Message(sub) => sub == incoming_subscription,
+            _ => false,
+        };
+
+        assert!(
+            received,
+            "User did not receive the expected subscription message"
+        );
+    }
 
     // fn setup_subscription_data() -> (
     //     Arc<SubscriptionData>,
