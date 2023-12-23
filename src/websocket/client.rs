@@ -256,7 +256,6 @@ async fn listen_for_response(
 ) -> Result<IncomingResponse, Error> {
     while let Ok(response) = broadcast_rx.recv().await {
         if response.content["id"].as_u64().unwrap_or(u32::MAX.into()) as u32 == user_id {
-
             return Ok(response);
         }
     }
@@ -330,7 +329,7 @@ mod tests {
     async fn test_execute_ws_subscription_and_call() {
         //
         // Test subscriptions
-        // 
+        //
 
         let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
         let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
@@ -359,8 +358,15 @@ mod tests {
             b_clone.send(response).unwrap();
         });
 
-        let result =
-            execute_ws_call(call, 1, &incoming_tx, broadcast_rx.resubscribe(), &sub_data, &cache_args).await;
+        let result = execute_ws_call(
+            call,
+            1,
+            &incoming_tx,
+            broadcast_rx.resubscribe(),
+            &sub_data,
+            &cache_args,
+        )
+        .await;
 
         assert!(result.is_ok());
         assert_eq!(
