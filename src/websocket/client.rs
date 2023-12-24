@@ -211,6 +211,7 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
+        println!("has subscription already");
         if let Ok(rax) = sub_data.subscribe_user(user_id, call.to_string()) {
             return Ok(format!(
                 "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
@@ -229,6 +230,8 @@ pub async fn execute_ws_call(
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
+        println!("is subscription!");
+        println!("response content: {:?}", response.content);
         // add the subscription id and add this user to the dispatch
         let sub_id = match response.content["result"].as_str() {
             Some(sub_id) => sub_id.to_string(),
