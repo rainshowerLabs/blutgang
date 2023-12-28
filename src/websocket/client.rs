@@ -33,7 +33,11 @@ use futures_util::{
     StreamExt,
 };
 use serde_json::Value;
-use simd_json::from_slice;
+use simd_json::{
+    from_slice,
+    from_str
+};
+
 use tokio::sync::{
     broadcast,
     mpsc,
@@ -141,7 +145,7 @@ pub async fn ws_conn(
                 Ok(message) => {
                     let time = time.elapsed();
                     let rax =
-                        unsafe { simd_json::from_str(&mut message.into_text().unwrap()).unwrap() };
+                        unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
                     #[cfg(feature = "debug-verbose")]
                     println!("ws_conn[{}], next: {:?}", index, rax);
 
