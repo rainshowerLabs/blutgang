@@ -8,6 +8,7 @@ use crate::{
         types::{
             IncomingResponse,
             RequestResult,
+            SubscriptionData,
             UserData,
             WsconnMessage,
         },
@@ -21,6 +22,8 @@ use tokio::sync::{
     mpsc,
 };
 
+use simd_json::from_str;
+
 use futures::{
     sink::SinkExt,
     stream::StreamExt,
@@ -31,8 +34,6 @@ use hyper_tungstenite::{
     HyperWebsocket,
 };
 use tungstenite::Message;
-
-use super::types::SubscriptionData;
 
 /// Handle a websocket connection.
 pub async fn serve_websocket(
@@ -116,10 +117,12 @@ pub async fn serve_websocket(
             Ok(Message::Text(mut msg)) => {
                 println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
                 // Send message to the channel
-                tx.send(RequestResult::Call(unsafe {
-                    simd_json::from_str(&mut msg)?
-                }))
-                .unwrap();
+                let rax = match unsafe { from_str(&mut msg) } {
+                    Ok(rax) => rax,
+                    Err(_) => continue,
+                };
+
+                tx.send(RequestResult::Call(rax)).unwrap();
             }
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {

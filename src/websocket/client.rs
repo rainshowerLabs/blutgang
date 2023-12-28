@@ -35,7 +35,7 @@ use futures_util::{
 use serde_json::Value;
 use simd_json::{
     from_slice,
-    from_str
+    from_str,
 };
 
 use tokio::sync::{
@@ -144,8 +144,7 @@ pub async fn ws_conn(
             match ws_stream.next().await.unwrap() {
                 Ok(message) => {
                     let time = time.elapsed();
-                    let rax =
-                        unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
+                    let rax = unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
                     #[cfg(feature = "debug-verbose")]
                     println!("ws_conn[{}], next: {:?}", index, rax);
 
@@ -208,9 +207,9 @@ pub async fn execute_ws_call(
         sub_data.unsubscribe_user(user_id, subscription_id);
 
         return Ok(format!(
-                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",
-                id
-            ));
+            "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",
+            id
+        ));
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
@@ -218,8 +217,8 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
-        println!("has subscription already");
         if let Ok(rax) = sub_data.subscribe_user(user_id, call.to_string()) {
+            println!("has subscription already");
             return Ok(format!(
                 "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
                 id, rax
@@ -251,7 +250,7 @@ pub async fn execute_ws_call(
         };
 
         sub_data.register_subscription(call.to_string(), sub_id.clone(), response.node_id);
-        let _ = sub_data.subscribe_user(user_id, sub_id);
+        sub_data.subscribe_user(user_id, sub_id)?;
     } else {
         cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
     }
