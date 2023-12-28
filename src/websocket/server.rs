@@ -73,7 +73,7 @@ pub async fn serve_websocket(
             // If we received a subscription, just send it to the client
             match msg {
                 RequestResult::Call(call) => {
-                    let resp = execute_ws_call(
+                    let resp = match execute_ws_call(
                         call,
                         user_id,
                         &incoming_tx,
@@ -81,8 +81,10 @@ pub async fn serve_websocket(
                         &sub_data_clone,
                         &cache_args,
                     )
-                    .await
-                    .unwrap_or("{\"error\": \"Failed to execute call\"}".to_string());
+                    .await {
+                        Ok(rax) => rax,
+                        Err(e) => format!("{{\"error\": \"{}\"}}", e),
+                    };
 
                     match websocket_sink.send(Message::text::<String>(resp)).await {
                         Ok(_) => {}

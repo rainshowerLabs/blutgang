@@ -242,6 +242,7 @@ pub async fn execute_ws_call(
         let sub_id = match response.content["result"].as_str() {
             Some(sub_id) => sub_id.to_string(),
             None => {
+                // TODO: replace id
                 return Ok(
                     "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
                         .to_string(),
@@ -250,6 +251,7 @@ pub async fn execute_ws_call(
         };
 
         sub_data.register_subscription(call.to_string(), sub_id.clone(), response.node_id);
+        // bug is here??? whjat am i not registering???
         sub_data.subscribe_user(user_id, sub_id)?;
     } else {
         cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
