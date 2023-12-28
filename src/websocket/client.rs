@@ -199,15 +199,18 @@ pub async fn execute_ws_call(
             Some(subscription_id) => subscription_id.to_string(),
             None => {
                 return Ok(format!(
-                    "\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"",
+                    "{{\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"}}",
                     id
                 ));
             }
         };
 
         sub_data.unsubscribe_user(user_id, subscription_id);
-        // TODO: change id
-        return Ok("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":true}".to_string());
+
+        return Ok(format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",
+                id
+            ));
     }
 
     let is_subscription = call["method"] == "eth_subscribe";
