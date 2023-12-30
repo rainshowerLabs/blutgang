@@ -187,6 +187,9 @@ pub async fn subscribe_to_new_heads(
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
                 nn_rwlock.latest = 0;
 
+                // Broadcast reconnect message to our wsconman instance
+                incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+
                 println!("Timeout in newHeads subscription");
             }
         };
