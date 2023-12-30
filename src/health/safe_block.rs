@@ -166,7 +166,8 @@ pub async fn subscribe_to_new_heads(
         // Listen for incoming messages on a timeout
         //
         // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
-        match timeout(Duration::from_millis(ttl * 2), broadcast_rx.recv()).await {
+        // TODO: wotdafak
+        match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), broadcast_rx.recv()).await {
             Ok(Ok(msg)) => {
                 // Write to NamedBlocknumbers
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
