@@ -48,7 +48,7 @@ macro_rules! cache_error {
     };
 }
 
-#[allow(unused_macros)]
+#[macro_export]
 macro_rules! rpc_response {
     (
         $status:expr,

@@ -96,7 +96,8 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        _ => Err(AdminError::InvalidMethod),
+        Some(_) => Err(AdminError::InvalidMethod),
+        _ => Ok(().into()),
     }
 }
 
@@ -189,6 +190,7 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
 // param[0] - RPC url
 // param[1] - max_consecutive
 // param[2] - ma_len
+// param[3] - ma_len
 fn admin_add_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
@@ -198,7 +200,7 @@ fn admin_add_rpc(
         None => return Err(AdminError::InvalidParams),
     };
 
-    if params.len() != 3 {
+    if params.len() != 5 {
         return Err(AdminError::InvalidLen);
     }
 
@@ -207,20 +209,46 @@ fn admin_add_rpc(
         None => return Err(AdminError::ParseError),
     };
 
-    let max_consecutive = params[1]
+    // ws_url is optional so it can be none
+    let ws_url = match params[1].is_null() {
+        true => None,
+        false => {
+            match params[1].as_str().map(|s| s.to_string()) {
+                Some(ws_url) => Some(ws_url),
+                None => return Err(AdminError::ParseError),
+            }
+        }
+    };
+
+    let max_consecutive = params[2]
         .to_string()
         .replace('\"', "")
         .parse::<u32>()
         .unwrap_or(0);
-    let ma_len = params[2]
+    let mut delta = params[3]
+        .to_string()
+        .replace('\"', "")
+        .parse::<u64>()
+        .unwrap_or(0);
+    let ma_len = params[4]
         .to_string()
         .replace('\"', "")
         .parse::<f64>()
         .unwrap_or(0.0);
 
+    if delta != 0 {
+        delta = 1_000_000 / delta;
+    }
+
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
-    rpc_list.push(Rpc::new(rpc.to_string(), max_consecutive, ma_len));
+    rpc_list.push(Rpc::new(
+        rpc.to_string(),
+        ws_url,
+        max_consecutive,
+        delta.into(),
+        ma_len,
+    ));
 
     let rx = json!({
         "id": Null,
@@ -372,7 +400,9 @@ mod tests {
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
             "http://example.com".to_string(),
+            None,
             5,
+            1000,
             0.5,
         )]))
     }
@@ -381,7 +411,9 @@ mod tests {
     fn create_test_poverty_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
             "http://poverty.com".to_string(),
+            None,
             2,
+            1000,
             0.1,
         )]))
     }
@@ -400,26 +432,6 @@ mod tests {
         let db = db.open().unwrap();
 
         Arc::new(db)
-    }
-
-    #[tokio::test]
-    async fn test_execute_method_blutgang_quit() {
-        // Arrange
-        let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_quit" });
-
-        // Act
-        let result = execute_method(
-            tx,
-            &create_test_rpc_list(),
-            &create_test_poverty_list(),
-            create_test_settings_config(),
-            cache,
-        )
-        .await;
-
-        // Assert
-        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -566,7 +578,31 @@ mod tests {
     async fn test_execute_method_add_to_rpc_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", 5, 0.5] });
+        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", "ws://example.com", 5, 10, 0.5] });
+
+        let rpc_list = create_test_rpc_list();
+        let len = rpc_list.read().unwrap().len();
+
+        // Act
+        let result = execute_method(
+            tx,
+            &rpc_list,
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+
+        // Assert
+        assert!(result.is_ok());
+        assert!(rpc_list.read().unwrap().len() == len + 1);
+    }
+
+    #[tokio::test]
+    async fn test_execute_method_add_to_rpc_list_no_ws() {
+        // Arrange
+        let cache = create_test_cache();
+        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", Null, 5, 10, 0.5] });
 
         let rpc_list = create_test_rpc_list();
         let len = rpc_list.read().unwrap().len();
@@ -595,10 +631,13 @@ mod tests {
 
         let rpc_list = create_test_rpc_list();
         // rpc_list has only 1 so add another one to keep the 1st one some company
-        rpc_list
-            .write()
-            .unwrap()
-            .push(Rpc::new("http://example.com".to_string(), 5, 0.5));
+        rpc_list.write().unwrap().push(Rpc::new(
+            "http://example.com".to_string(),
+            None,
+            5,
+            1000,
+            0.5,
+        ));
         let len = rpc_list.read().unwrap().len();
 
         // Act

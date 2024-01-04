@@ -1,5 +1,13 @@
 use crate::{
-    rpc::error::RpcError,
+    rpc::{
+        error::RpcError,
+        types::hex_to_decimal,
+    },
+    websocket::types::{
+        WsChannelErr,
+        WsconnMessage,
+    },
+    ws_conn_manager,
     Rpc,
 };
 use std::sync::{
@@ -22,6 +30,20 @@ pub struct NamedBlocknumbers {
     pub finalized: u64,
     pub pending: u64,
     pub number: u64,
+}
+
+impl NamedBlocknumbers {
+    #[allow(dead_code)] // allowed for tests
+    pub fn defualt() -> NamedBlocknumbers {
+        NamedBlocknumbers {
+            latest: 0,
+            earliest: 0,
+            safe: 0,
+            finalized: 0,
+            pending: 0,
+            number: 0,
+        }
+    }
 }
 
 // Get the latest finalized block
@@ -98,7 +120,79 @@ pub async fn get_safe_block(
 
     // Return as NamedBlocknumbers
     let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
-    nn_rwlock.safe = safe;
+    nn_rwlock.finalized = safe;
 
     Ok(safe)
+}
+
+// Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
+pub async fn subscribe_to_new_heads(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
+    ttl: u64,
+) {
+    // Spawn a new instance of ws_conn_manager
+    //
+    // We want to open connections to all RPCs and get a quorum
+    let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(128);
+    let rpc_list_clone = rpc_list.read().unwrap().clone();
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
+
+    tokio::task::spawn(ws_conn_manager(
+        Arc::new(RwLock::new(rpc_list_clone)),
+        incoming_rx,
+        broadcast_tx,
+        ws_error_tx,
+    ));
+
+    // Send subscription request to our local ws_conn_manager
+    incoming_tx
+        .send(WsconnMessage::Message(serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "eth_subscribe",
+            "params": ["newHeads"],
+            "id": 1,
+        })))
+        .unwrap();
+
+    // Very hacky, but wait until we receive a response subscribing us
+    let _ = broadcast_rx.recv().await;
+
+    // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
+    // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
+    // on a new node.
+    loop {
+        // Listen for incoming messages on a timeout
+        //
+        // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
+        // TODO: wotdafak
+        match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), broadcast_rx.recv()).await {
+            Ok(Ok(msg)) => {
+                // Write to NamedBlocknumbers
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                let a = hex_to_decimal(msg.content["params"]["result"]["number"].as_str().unwrap())
+                    .unwrap();
+                println!("New head: {}", a);
+                nn_rwlock.latest = a;
+            }
+            Ok(Err(e)) => {
+                // set latest to 0
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                nn_rwlock.latest = 0;
+
+                println!("Error in newHeads subscription: {}", e);
+            }
+            Err(_) => {
+                // set latest to 0
+                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
+                nn_rwlock.latest = 0;
+
+                // Broadcast reconnect message to our wsconman instance
+                incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+
+                println!("Timeout in newHeads subscription");
+            }
+        };
+    }
 }

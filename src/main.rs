@@ -3,21 +3,41 @@ mod balancer;
 mod config;
 mod health;
 mod rpc;
+mod websocket;
 
 use crate::{
     admin::listener::listen_for_admin_requests,
-    balancer::accept_http::accept_request,
+    balancer::accept_http::{
+        accept_request,
+        RequestChannels,
+    },
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
         types::Settings,
     },
     health::{
-        check::health_check,
+        check::{
+            dropped_listener,
+            health_check,
+        },
         head_cache::manage_cache,
-        safe_block::NamedBlocknumbers,
+        safe_block::{
+            subscribe_to_new_heads,
+            NamedBlocknumbers,
+        },
     },
     rpc::types::Rpc,
+    websocket::{
+        client::ws_conn_manager,
+        subscription_manager::subscription_dispatcher,
+        types::{
+            IncomingResponse,
+            SubscriptionData,
+            WsChannelErr,
+            WsconnMessage,
+        },
+    },
 };
 
 use std::{
@@ -29,8 +49,14 @@ use std::{
     },
 };
 
-use tokio::net::TcpListener;
-use tokio::sync::watch;
+use tokio::{
+    net::TcpListener,
+    sync::{
+        broadcast,
+        mpsc,
+        watch,
+    },
+};
 
 use hyper::{
     server::conn::http1,
@@ -81,33 +107,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(addr_clone).await?;
     println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr_clone);
 
-    // Spawn a thread for the health check
-    //
-    // Also handle the finalized block tracking in this thread
-    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
-    let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+    // websocket connections
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(256);
+    let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
+
+    let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    let outgoing_rx_ws = outgoing_rx.resubscribe();
+    let ws_error_tx_ws = ws_error_tx.clone();
+
+    let sub_data = Arc::new(SubscriptionData::new());
+    let sub_dispatcher = Arc::clone(&sub_data);
+
+    tokio::task::spawn(async move {
+        subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
+        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx, ws_error_tx_ws).await;
+    });
+
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
+
     let finalized_rx_arc = Arc::new(finalized_rx);
-
-    if health_check_clone {
-        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
-        let poverty_list_health = Arc::clone(&rpc_poverty_list);
-        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
-        let config_health = Arc::clone(&config);
-
-        tokio::task::spawn(async move {
-            let _ = health_check(
-                rpc_list_health,
-                poverty_list_health,
-                &blocknum_tx,
-                finalized_tx,
-                &named_blocknumbers_health,
-                &config_health,
-            )
-            .await;
-        });
-    }
+    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled_clone {
@@ -141,6 +162,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await;
     });
 
+    // Spawn a thread for the health check
+    //
+    // Also handle the finalized block tracking in this thread
+    let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+
+    if health_check_clone {
+        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+        let poverty_list_health = Arc::clone(&rpc_poverty_list);
+        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let config_health = Arc::clone(&config);
+        let health_check_ttl = config.read().unwrap().health_check_ttl;
+
+        let dropped_rpc = rpc_list_health.clone();
+        let dropped_povrty = poverty_list_health.clone();
+        let dropped_inc = incoming_tx.clone();
+        tokio::task::spawn(async move {
+            dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
+        });
+
+        tokio::task::spawn(async move {
+            subscribe_to_new_heads(
+                &rpc_list_health,
+                &named_blocknumbers_health,
+                ws_error_tx,
+                health_check_ttl,
+            )
+            .await;
+        });
+
+        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
+        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+
+        tokio::task::spawn(async move {
+            let _ = health_check(
+                rpc_list_health,
+                poverty_list_health,
+                &blocknum_tx,
+                finalized_tx,
+                &named_blocknumbers_health,
+                &config_health,
+            )
+            .await;
+        });
+    }
+
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, socketaddr) = listener.accept().await?;
@@ -157,6 +223,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
         let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
         let config_clone = Arc::clone(&config);
+        let sub_data_clone = Arc::clone(&sub_data);
+
+        let channels = RequestChannels {
+            finalized_rx: finalized_rx_clone,
+            incoming_tx: incoming_tx.clone(),
+            outgoing_rx: outgoing_rx.resubscribe(),
+        };
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -164,9 +237,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 io,
                 &rpc_list_rwlock_clone,
                 &cache_clone,
-                &finalized_rx_clone,
+                channels.clone(),
                 &named_blocknumbers_clone,
                 &head_cache_clone,
+                sub_data_clone.clone(),
                 &config_clone
             );
         });
