@@ -125,28 +125,32 @@ pub async fn ws_conn(
     index: usize,
 ) {
     let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).expect("Failed to parse URL");
-    let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
+    let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
+    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
+    // Thread for sending messages
+    let sender_error_tx = ws_error_tx.clone();
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
             #[cfg(feature = "debug-verbose")]
-            println!("ws_conn[{}], result: {:?}", index, incoming);
+            println!("ws_conn[{}], send: {:?}", index, incoming);
 
-            let time = Instant::now();
-            match ws_stream.send(Message::Text(incoming.to_string())).await {
-                Ok(_) => {}
-                Err(_) => {
-                    let _ = ws_error_tx.send(WsChannelErr::Closed(index));
-                    break;
-                }
+            if ws_sender.send(Message::Text(incoming.to_string())).await.is_err() {
+                let _ = sender_error_tx.send(WsChannelErr::Closed(index));
+                break;
             }
+        }
+    });
 
-            match ws_stream.next().await.unwrap() {
+    // Thread for receiving messages
+    tokio::spawn(async move {
+        while let Some(message) = ws_receiver.next().await {
+            match message {
                 Ok(message) => {
-                    let time = time.elapsed();
+                    let time = Instant::now();
                     let rax = unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
                     #[cfg(feature = "debug-verbose")]
-                    println!("ws_conn[{}], next: {:?}", index, rax);
+                    println!("ws_conn[{}], recv: {:?}", index, rax);
 
                     let incoming = IncomingResponse {
                         node_id: index,
@@ -154,7 +158,7 @@ pub async fn ws_conn(
                     };
 
                     let _ = broadcast_tx.send(incoming);
-                    update_rpc_latency(&rpc_list, index, time);
+                    update_rpc_latency(&rpc_list, index, time.elapsed());
                 }
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));
@@ -164,6 +168,7 @@ pub async fn ws_conn(
         }
     });
 }
+
 
 pub async fn execute_ws_call(
     mut call: Value,
