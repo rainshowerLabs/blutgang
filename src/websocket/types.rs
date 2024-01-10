@@ -13,6 +13,33 @@ use crate::websocket::error::Error;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
+// struct for receiveing calls from users to ws_conn
+// optional node index for calling specific nodes
+// #[derive(Debug, Clone)]
+// pub struct Call {
+//     pub node_id: Option<usize>,
+//     pub content: Value,
+// }
+
+// impl From<Call> for Value {
+//     fn from(call: Call) -> Self {
+//         call.content
+//     }
+// }
+
+// impl Call {
+//     fn default() -> Self {
+//         Call {
+//             node_id: None,
+//             content: Value::Null,
+//         }
+//     }
+    
+//     fn new(node_id: Option<usize>, content: Value) -> Self {
+//         Call { node_id, content }
+//     }
+// }
+
 // RequestResult enum
 #[derive(Debug, Clone)]
 pub enum RequestResult {
@@ -160,6 +187,15 @@ impl SubscriptionData {
                 subscribers.remove(&user_id);
             }
         }
+    }
+
+    // Return the node_id for a given subscription_id
+    pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+        if let Some(node_sub_info) = incoming_subscriptions.get(subscription_id) {
+            return Some(node_sub_info.node_id);
+        }
+        None
     }
 
     pub async fn dispatch_to_subscribers(

@@ -208,8 +208,21 @@ pub async fn execute_ws_call(
                 ));
             }
         };
+        // we have to get the id of the subsctiption and what node is subscribed and send the message
+        let rax = match sub_data.get_node_from_id(&subscription_id) {
+            Some(rax) => rax,
+            None => {
+                return Ok(format!(
+                    "{{\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"false\"}}",
+                    id
+                ));
+            }
+        };
 
         sub_data.unsubscribe_user(user_id, subscription_id);
+
+        // send the message to the node
+        
 
         return Ok(format!(
             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",

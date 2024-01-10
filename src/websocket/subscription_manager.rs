@@ -16,7 +16,6 @@ pub fn subscription_dispatcher(
         loop {
             // Receive the WS response
             let response = rx.recv().await.unwrap();
-            println!("subscription_dispatcher: received response: {:?}", response);
 
             // Check if its a subscription
             if response.content["method"] != "eth_subscription" {
