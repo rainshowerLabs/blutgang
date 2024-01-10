@@ -1,6 +1,6 @@
 [package]
 name = "blutgang"
-version = "0.3.0-canary"
+version = "0.3.0-canary1"
 edition = "2021"
 authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, github contributors"]
 license = "FSL-1.0-Apache-2.0"

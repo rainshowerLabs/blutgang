@@ -1,7 +1,7 @@
 use sled::Db;
 use std::sync::Arc;
 
-pub const VERSION_STR: &str = "blutgang 0.3.0-canary Garreg Mach";
+pub const VERSION_STR: &str = "blutgang 0.3.0-canary1 Garreg Mach";
 const TAGLINE: &str = "`Now there's a way forward.`";
 
 pub fn setup_data(cache: Arc<Db>) {

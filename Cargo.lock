@@ -167,7 +167,7 @@ dependencies = [
 
 [[package]]
 name = "blutgang"
-version = "0.3.0-canary"
+version = "0.3.0-canary1"
 dependencies = [
  "blake3",
  "chrono",
