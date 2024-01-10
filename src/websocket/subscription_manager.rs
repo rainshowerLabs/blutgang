@@ -154,7 +154,7 @@ mod tests {
         // Attempt to receive a message from the user's channel
         let received = incoming_rx.try_recv().unwrap();
         let received = match received {
-            WsconnMessage::Message(sub) => sub == incoming_subscription,
+            WsconnMessage::Message(sub, _) => sub == incoming_subscription,
             _ => false,
         };
 

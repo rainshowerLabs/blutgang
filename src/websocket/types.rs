@@ -13,33 +13,6 @@ use crate::websocket::error::Error;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-// struct for receiveing calls from users to ws_conn
-// optional node index for calling specific nodes
-// #[derive(Debug, Clone)]
-// pub struct Call {
-//     pub node_id: Option<usize>,
-//     pub content: Value,
-// }
-
-// impl From<Call> for Value {
-//     fn from(call: Call) -> Self {
-//         call.content
-//     }
-// }
-
-// impl Call {
-//     fn default() -> Self {
-//         Call {
-//             node_id: None,
-//             content: Value::Null,
-//         }
-//     }
-    
-//     fn new(node_id: Option<usize>, content: Value) -> Self {
-//         Call { node_id, content }
-//     }
-// }
-
 // RequestResult enum
 #[derive(Debug, Clone)]
 pub enum RequestResult {
@@ -59,14 +32,15 @@ impl From<RequestResult> for Value {
 // WsconnMessage enum
 #[derive(Debug)]
 pub enum WsconnMessage {
-    Message(Value),
+    // call received from user and optional node index
+    Message(Value, Option<usize>),
     Reconnect(),
 }
 
 impl From<WsconnMessage> for Value {
     fn from(msg: WsconnMessage) -> Self {
         match msg {
-            WsconnMessage::Message(msg) => msg,
+            WsconnMessage::Message(msg, _) => msg,
             WsconnMessage::Reconnect() => Value::Null,
         }
     }
@@ -133,7 +107,10 @@ impl SubscriptionData {
         node_id: usize,
     ) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
-        println!("register_subscription inserting: {:?}", subscription_request.clone());
+        println!(
+            "register_subscription inserting: {:?}",
+            subscription_request.clone()
+        );
         incoming_subscriptions.insert(
             subscription_request.clone(),
             NodeSubInfo {
@@ -141,7 +118,10 @@ impl SubscriptionData {
                 subscription_id,
             },
         );
-        println!("register_subscription: {:?}", incoming_subscriptions.get(&subscription_request));
+        println!(
+            "register_subscription: {:?}",
+            incoming_subscriptions.get(&subscription_request)
+        );
     }
 
     pub fn unregister_subscription(&self, subscription_request: String) {

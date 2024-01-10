@@ -148,12 +148,15 @@ pub async fn subscribe_to_new_heads(
 
     // Send subscription request to our local ws_conn_manager
     incoming_tx
-        .send(WsconnMessage::Message(serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "eth_subscribe",
-            "params": ["newHeads"],
-            "id": 1,
-        })))
+        .send(WsconnMessage::Message(
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "method": "eth_subscribe",
+                "params": ["newHeads"],
+                "id": 1,
+            }),
+            None,
+        ))
         .unwrap();
 
     // Very hacky, but wait until we receive a response subscribing us
@@ -167,7 +170,12 @@ pub async fn subscribe_to_new_heads(
         //
         // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
         // TODO: wotdafak
-        match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), broadcast_rx.recv()).await {
+        match timeout(
+            Duration::from_millis((ttl as f64 * 1.5) as u64),
+            broadcast_rx.recv(),
+        )
+        .await
+        {
             Ok(Ok(msg)) => {
                 // Write to NamedBlocknumbers
                 let mut nn_rwlock = named_numbers_rwlock.write().unwrap();

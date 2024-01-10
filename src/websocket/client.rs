@@ -63,10 +63,14 @@ pub async fn ws_conn_manager(
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
-            WsconnMessage::Message(incoming) => {
+            WsconnMessage::Message(incoming, specified_index) => {
                 if let Some(rpc_position) = {
-                    let mut rpc_list_guard = rpc_list.write().unwrap();
-                    pick(&mut rpc_list_guard).1
+                    if let Some(specified_index) = specified_index {
+                        Some(specified_index)
+                    } else {
+                        let mut rpc_list_guard = rpc_list.write().unwrap();
+                        pick(&mut rpc_list_guard).1
+                    }
                 } {
                     if rpc_position >= ws_handles.len() {
                         println!("ws_conn_manager error: rpc_position out of bounds");
@@ -135,7 +139,11 @@ pub async fn ws_conn(
             #[cfg(feature = "debug-verbose")]
             println!("ws_conn[{}], send: {:?}", index, incoming);
 
-            if ws_sender.send(Message::Text(incoming.to_string())).await.is_err() {
+            if ws_sender
+                .send(Message::Text(incoming.to_string()))
+                .await
+                .is_err()
+            {
                 let _ = sender_error_tx.send(WsChannelErr::Closed(index));
                 break;
             }
@@ -168,7 +176,6 @@ pub async fn ws_conn(
         }
     });
 }
-
 
 pub async fn execute_ws_call(
     mut call: Value,
@@ -209,8 +216,8 @@ pub async fn execute_ws_call(
             }
         };
         // we have to get the id of the subsctiption and what node is subscribed and send the message
-        let rax = match sub_data.get_node_from_id(&subscription_id) {
-            Some(rax) => rax,
+        let index = match sub_data.get_node_from_id(&subscription_id) {
+            Some(rax) => Some(rax),
             None => {
                 return Ok(format!(
                     "{{\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"false\"}}",
@@ -222,7 +229,9 @@ pub async fn execute_ws_call(
         sub_data.unsubscribe_user(user_id, subscription_id);
 
         // send the message to the node
-        
+        incoming_tx
+            .send(WsconnMessage::Message(call.clone(), index))
+            .expect("Failed to send message to ws_conn_manager");
 
         return Ok(format!(
             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",
@@ -249,7 +258,7 @@ pub async fn execute_ws_call(
 
     call["id"] = user_id.into();
     incoming_tx
-        .send(WsconnMessage::Message(call.clone()))
+        .send(WsconnMessage::Message(call.clone(), None))
         .expect("Failed to send message to ws_conn_manager");
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
@@ -264,7 +273,7 @@ pub async fn execute_ws_call(
                 return Ok(
                     "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
                         .to_string(),
-                )
+                );
             }
         };
 
@@ -346,11 +355,11 @@ mod tests {
         // Sending a message that should cause an error
         let invalid_message = json!({"invalid": "message"});
         incoming_tx
-            .send(WsconnMessage::Message(invalid_message))
+            .send(WsconnMessage::Message(invalid_message, None))
             .unwrap();
 
         // Expecting an error response
-        if let Some(WsconnMessage::Message(_)) = incoming_rx.recv().await {
+        if let Some(WsconnMessage::Message(_, _)) = incoming_rx.recv().await {
             // Handling error cases here
         }
     }

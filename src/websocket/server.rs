@@ -81,7 +81,8 @@ pub async fn serve_websocket(
                         &sub_data_clone,
                         &cache_args,
                     )
-                    .await {
+                    .await
+                    {
                         Ok(rax) => rax,
                         Err(e) => format!("{{\"error\": \"{}\"}}", e),
                     };
