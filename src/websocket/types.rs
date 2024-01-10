@@ -106,13 +106,15 @@ impl SubscriptionData {
         node_id: usize,
     ) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
+        println!("register_subscription inserting: {:?}", subscription_request.clone());
         incoming_subscriptions.insert(
-            subscription_request,
+            subscription_request.clone(),
             NodeSubInfo {
                 node_id,
                 subscription_id,
             },
         );
+        println!("register_subscription: {:?}", incoming_subscriptions.get(&subscription_request));
     }
 
     pub fn unregister_subscription(&self, subscription_request: String) {
@@ -124,6 +126,7 @@ impl SubscriptionData {
     //
     // If the subscription does not exist, return error
     pub fn subscribe_user(&self, user_id: u32, subscription: String) -> Result<String, Error> {
+        println!("subscribe_user finding: {:?}", subscription);
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
         let node_sub_info = match incoming_subscriptions.get(&subscription) {
             Some(rax) => rax,
