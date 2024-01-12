@@ -1,20 +1,31 @@
 use crate::{
+    balancer::processing::CacheArgs,
+    config::cache_setup::WS_HEALTH_CHECK_USER_ID,
     rpc::{
         error::RpcError,
         types::hex_to_decimal,
     },
-    websocket::types::{
-        WsChannelErr,
-        WsconnMessage,
+    websocket::{
+        client::execute_ws_call,
+        types::{
+            IncomingResponse,
+            RequestResult,
+            SubscriptionData,
+            UserData,
+            WsChannelErr,
+            WsconnMessage,
+        },
+        ws_conn_manager,
+        Rpc,
     },
-    ws_conn_manager,
-    Rpc,
-    config::cache_setup::WS_HEALTH_CHECK_USER_ID,
 };
+use serde_json::Value;
 use std::sync::{
     Arc,
     RwLock,
 };
+use std::unimplemented;
+use tokio::sync::broadcast;
 use tokio::{
     sync::mpsc,
     time::{
@@ -128,9 +139,13 @@ pub async fn get_safe_block(
 
 // Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
 pub async fn subscribe_to_new_heads(
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    outgoing_rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: Arc<SubscriptionData>,
+    cache_args: CacheArgs,
 ) {
     // We basically have to create a new system-only user for subscribing to newHeads
-    
+
     // Create channels for message send/receiving
     let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
 
@@ -146,6 +161,41 @@ pub async fn subscribe_to_new_heads(
     };
     sub_data.add_user(user_id, user_data);
 
+    let mut call = format!(
+        r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
+        user_id
+    );
+    let call = unsafe { simd_json::from_str(&mut call).unwrap() };
 
-    
+    // Send a message subscribing to newHeads
+    let subscription_id = match execute_ws_call(
+        call,
+        user_id,
+        &incoming_tx,
+        outgoing_rx.resubscribe(),
+        &sub_data,
+        &cache_args,
+    )
+    .await
+    {
+        Ok(mut rax) => {
+            // extract the id from rax and return it
+            let json: Value = unsafe { simd_json::from_str(&mut rax).unwrap() };
+            // TODO: error handle this
+            json["params"]["0"].as_str().unwrap().to_string()
+        }
+        Err(e) => panic!("Error subscribing to newHeads in health check: {}", e),
+    };
+
+    while let Some(msg) = rx.recv().await {
+        // Forward the message to the best available RPC
+        //
+        // If we received a subscription, just send it to the client
+        match msg {
+            RequestResult::Subscription(sub) => {
+                unimplemented!();
+            }
+            _ => {}
+        }
+    }
 }

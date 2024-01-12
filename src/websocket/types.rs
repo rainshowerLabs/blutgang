@@ -172,13 +172,15 @@ impl SubscriptionData {
     // Return the node_id for a given subscription_id
     pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        incoming_subscriptions.iter().find_map(|(_, node_sub_info)| {
-            if node_sub_info.subscription_id == subscription_id {
-                Some(node_sub_info.node_id)
-            } else {
-                None
-            }
-        })
+        incoming_subscriptions
+            .iter()
+            .find_map(|(_, node_sub_info)| {
+                if node_sub_info.subscription_id == subscription_id {
+                    Some(node_sub_info.node_id)
+                } else {
+                    None
+                }
+            })
     }
 
     pub async fn dispatch_to_subscribers(
@@ -267,7 +269,11 @@ mod tests {
         let subscription_request = "req123".to_string();
 
         // Register a subscription
-        subscription_data.register_subscription(subscription_request, subscription_id.clone(), node_id);
+        subscription_data.register_subscription(
+            subscription_request,
+            subscription_id.clone(),
+            node_id,
+        );
 
         // Verify that get_node_from_id returns the correct node_id
         assert_eq!(

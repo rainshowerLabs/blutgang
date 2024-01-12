@@ -96,10 +96,8 @@ pub async fn ws_conn_manager(
                 }
             }
             WsconnMessage::Reconnect() => {
-                {
-                    let mut ws_handle_guard = ws_handles.write().unwrap();
-                    *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
-                }
+                let mut ws_handle_guard = ws_handles.write().unwrap();
+                *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
             }
         }
     }
@@ -138,7 +136,9 @@ pub async fn ws_conn(
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
 ) {
-    let (ws_stream, _) = connect_async(&rpc.ws_url.unwrap()).await.expect("Failed to connect to WS");
+    let (ws_stream, _) = connect_async(&rpc.ws_url.unwrap())
+        .await
+        .expect("Failed to connect to WS");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     // Thread for sending messages
