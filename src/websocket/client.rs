@@ -55,11 +55,16 @@ use xxhash_rust::xxh3::xxh3_64;
 
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    ws_handles: Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
     broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
-    let mut ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+    // TODO: do we really need ws_handles to be an option??
+    {
+        let mut ws_handle_guard = ws_handles.write().unwrap();
+        *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+    }
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
@@ -72,12 +77,14 @@ pub async fn ws_conn_manager(
                         pick(&mut rpc_list_guard).1
                     }
                 } {
-                    if rpc_position >= ws_handles.len() {
+                    let ws_handles_guard = ws_handles.read().unwrap();
+
+                    if rpc_position >= ws_handles_guard.len() {
                         println!("ws_conn_manager error: rpc_position out of bounds");
                         continue;
                     }
 
-                    if let Some(ws) = &ws_handles[rpc_position] {
+                    if let Some(ws) = &ws_handles_guard[rpc_position] {
                         if ws.send(incoming).is_err() {
                             println!("ws_conn_manager error: failed to send message");
                         }
@@ -89,7 +96,10 @@ pub async fn ws_conn_manager(
                 }
             }
             WsconnMessage::Reconnect() => {
-                ws_handles = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+                {
+                    let mut ws_handle_guard = ws_handles.write().unwrap();
+                    *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+                }
             }
         }
     }
@@ -128,8 +138,7 @@ pub async fn ws_conn(
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
 ) {
-    let url = reqwest::Url::parse(&rpc.ws_url.unwrap()).expect("Failed to parse URL");
-    let (ws_stream, _) = connect_async(url).await.expect("Failed to connect to WS");
+    let (ws_stream, _) = connect_async(&rpc.ws_url.unwrap()).await.expect("Failed to connect to WS");
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     // Thread for sending messages

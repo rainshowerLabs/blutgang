@@ -113,6 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
 
     let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+    // TODO: make this more ergonomic
+    let ws_handle = Arc::new(RwLock::new(Vec::<Option<mpsc::UnboundedSender<serde_json::Value>>>::new()));
     let outgoing_rx_ws = outgoing_rx.resubscribe();
     let ws_error_tx_ws = ws_error_tx.clone();
 
@@ -121,7 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tokio::task::spawn(async move {
         subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
-        let _ = ws_conn_manager(rpc_list_ws, incoming_rx, outgoing_tx, ws_error_tx_ws).await;
+        let _ = ws_conn_manager(rpc_list_ws, ws_handle, incoming_rx, outgoing_tx, ws_error_tx_ws).await;
     });
 
     let (blocknum_tx, blocknum_rx) = watch::channel(0);

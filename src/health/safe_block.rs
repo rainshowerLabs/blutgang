@@ -127,24 +127,11 @@ pub async fn get_safe_block(
 
 // Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
 pub async fn subscribe_to_new_heads(
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     ttl: u64,
 ) {
-    // Spawn a new instance of ws_conn_manager
-    //
-    // We want to open connections to all RPCs and get a quorum
-    let (broadcast_tx, mut broadcast_rx) = tokio::sync::broadcast::channel(128);
-    let rpc_list_clone = rpc_list.read().unwrap().clone();
-    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
-
-    tokio::task::spawn(ws_conn_manager(
-        Arc::new(RwLock::new(rpc_list_clone)),
-        incoming_rx,
-        broadcast_tx,
-        ws_error_tx,
-    ));
 
     // Send subscription request to our local ws_conn_manager
     incoming_tx
@@ -159,8 +146,8 @@ pub async fn subscribe_to_new_heads(
         ))
         .unwrap();
 
-    // Very hacky, but wait until we receive a response subscribing us
-    let _ = broadcast_rx.recv().await;
+    // Wait until we receive a response subscribing us
+    
 
     // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
     // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
