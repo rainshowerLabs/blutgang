@@ -3,7 +3,7 @@ use crate::{
     config::cache_setup::WS_HEALTH_CHECK_USER_ID,
     rpc::{
         error::RpcError,
-        types::hex_to_decimal,
+        types::Rpc,
     },
     websocket::{
         client::execute_ws_call,
@@ -12,13 +12,11 @@ use crate::{
             RequestResult,
             SubscriptionData,
             UserData,
-            WsChannelErr,
             WsconnMessage,
         },
-        ws_conn_manager,
-        Rpc,
     },
 };
+
 use serde_json::Value;
 use std::sync::{
     Arc,
