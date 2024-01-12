@@ -9,6 +9,7 @@ use crate::{
     },
     ws_conn_manager,
     Rpc,
+    config::cache_setup::WS_HEALTH_CHECK_USER_ID,
 };
 use std::sync::{
     Arc,
@@ -127,67 +128,24 @@ pub async fn get_safe_block(
 
 // Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
 pub async fn subscribe_to_new_heads(
-    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
-    named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
-    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
-    ttl: u64,
 ) {
-
-    // Send subscription request to our local ws_conn_manager
-    incoming_tx
-        .send(WsconnMessage::Message(
-            serde_json::json!({
-                "jsonrpc": "2.0",
-                "method": "eth_subscribe",
-                "params": ["newHeads"],
-                "id": 1,
-            }),
-            None,
-        ))
-        .unwrap();
-
-    // Wait until we receive a response subscribing us
+    // We basically have to create a new system-only user for subscribing to newHeads
     
+    // Create channels for message send/receiving
+    let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
 
-    // We want to subscribe to newHeads and listen for responses, and write to NamedBlocknumbers
-    // in a loop. We also want a timeout for newHeads so we can try and unsubscribe and resubscribe
-    // on a new node.
-    loop {
-        // Listen for incoming messages on a timeout
-        //
-        // If the time runs out, gg try to unsubscribe, resubscribe, and listen again
-        // TODO: wotdafak
-        match timeout(
-            Duration::from_millis((ttl as f64 * 1.5) as u64),
-            broadcast_rx.recv(),
-        )
-        .await
-        {
-            Ok(Ok(msg)) => {
-                // Write to NamedBlocknumbers
-                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
-                let a = hex_to_decimal(msg.content["params"]["result"]["number"].as_str().unwrap())
-                    .unwrap();
-                println!("New head: {}", a);
-                nn_rwlock.latest = a;
-            }
-            Ok(Err(e)) => {
-                // set latest to 0
-                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
-                nn_rwlock.latest = 0;
+    // Generate an id for our user
+    //
+    // We use this to identify which requests are for us
+    let user_id = WS_HEALTH_CHECK_USER_ID;
 
-                println!("Error in newHeads subscription: {}", e);
-            }
-            Err(_) => {
-                // set latest to 0
-                let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
-                nn_rwlock.latest = 0;
+    // Add the user to the sink map
+    println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
+    let user_data = UserData {
+        message_channel: tx.clone(),
+    };
+    sub_data.add_user(user_id, user_data);
 
-                // Broadcast reconnect message to our wsconman instance
-                incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
 
-                println!("Timeout in newHeads subscription");
-            }
-        };
-    }
+    
 }
