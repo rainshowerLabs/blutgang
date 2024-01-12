@@ -225,6 +225,7 @@ pub async fn execute_ws_call(
                 ));
             }
         };
+        println!("execute_ws_call: index: {:?}", index);
 
         sub_data.unsubscribe_user(user_id, subscription_id);
 
