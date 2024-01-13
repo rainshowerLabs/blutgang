@@ -249,6 +249,7 @@ impl SubscriptionData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use tokio::sync::mpsc;
 
     fn setup_user_and_subscription_data() -> (
@@ -290,11 +291,11 @@ mod tests {
         // Setup test data
         let node_id = 42;
         let subscription_id = "sub123".to_string();
-        let subscription_request = "req123".to_string();
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
 
         // Register a subscription
         subscription_data.register_subscription(
-            serde_json::Value::String(subscription_request),
+            subscription_request,
             subscription_id.clone(),
             node_id,
         );
@@ -317,17 +318,17 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request = "sub200".to_string();
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
         subscription_data.register_subscription(
-            serde_json::Value::String(subscription_request.clone()),
+            subscription_request.clone(),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, serde_json::Value::String(subscription_request.clone()))
+            .subscribe_user(user_id, subscription_request.clone())
             .unwrap();
         assert!(subscription_data
             .subscriptions
@@ -352,19 +353,19 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
-        let subscription_request = "sub300".to_string();
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "300".to_string();
         let node_id = 1;
         let message =
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
         subscription_data.register_subscription(
-            serde_json::Value::String(subscription_request.clone()),
+            subscription_request.clone(),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, serde_json::Value::String(subscription_request))
+            .subscribe_user(user_id, subscription_request)
             .unwrap();
         subscription_data
             .dispatch_to_subscribers(&subscription_id, node_id, &message)
@@ -418,7 +419,7 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
-        let empty_subscription_request = "sub500".to_string();
+        let empty_subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let empty_subscription_id = "500".to_string();
         let empty_node_id = 10000;
         let message = RequestResult::Subscription(serde_json::Value::String(
@@ -427,7 +428,7 @@ mod tests {
 
         // No users are subscribed to this subscription
         subscription_data.register_subscription(
-            serde_json::Value::String(empty_subscription_request),
+            empty_subscription_request,
             empty_subscription_id.clone(),
             empty_node_id,
         );
@@ -440,18 +441,18 @@ mod tests {
     #[tokio::test]
     async fn test_get_users_for_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request = "sub200".to_string();
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
         // Register and subscribe a user to the subscription
         subscription_data.register_subscription(
-            serde_json::Value::String(subscription_request.clone()),
+            subscription_request.clone(),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, serde_json::Value::String(subscription_request.clone()))
+            .subscribe_user(user_id, subscription_request.clone())
             .unwrap();
 
         // Test get_users_for_subscription function
