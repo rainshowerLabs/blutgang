@@ -201,7 +201,6 @@ mod tests {
             safe: 3,
             finalized: 4,
             pending: 5,
-            number: 6,
         }))
     }
 

@@ -2,6 +2,13 @@ use crate::Rpc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
+// System consts
+pub const WS_HEALTH_CHECK_USER_ID: u32 = 1;
+
+// Version consts, dont impact functionality
+pub const VERSION_STR: &str = "blutgang 0.3.0-canary1 Garreg Mach";
+pub const TAGLINE: &str = "`Now there's a way forward.`";
+
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
 pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Vec<Rpc> {
     // Return empty vec if we dont supply any RPCs

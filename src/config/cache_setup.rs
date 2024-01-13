@@ -1,13 +1,9 @@
+use crate::config::setup::{
+    VERSION_STR,
+    TAGLINE
+};
 use sled::Db;
 use std::sync::Arc;
-
-// System consts
-pub const WS_HEALTH_CHECK_USER_ID: u32 = 1;
-
-// Version consts, dont impact functionality
-
-pub const VERSION_STR: &str = "blutgang 0.3.0-canary1 Garreg Mach";
-const TAGLINE: &str = "`Now there's a way forward.`";
 
 pub fn setup_data(cache: Arc<Db>) {
     let version_json = format!(
