@@ -20,7 +20,6 @@ use crate::{
     },
 };
 
-use serde_json::Value;
 use std::sync::{
     Arc,
     RwLock,
@@ -42,7 +41,6 @@ pub struct NamedBlocknumbers {
     pub safe: u64,
     pub finalized: u64,
     pub pending: u64,
-    pub number: u64,
 }
 
 impl NamedBlocknumbers {
@@ -54,7 +52,6 @@ impl NamedBlocknumbers {
             safe: 0,
             finalized: 0,
             pending: 0,
-            number: 0,
         }
     }
 }
