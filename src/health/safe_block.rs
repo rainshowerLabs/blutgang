@@ -218,3 +218,69 @@ pub async fn subscribe_to_new_heads(
         }
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use tokio::sync::mpsc;
+//     use std::sync::{Arc, RwLock};
+
+//     fn mock_rpc() -> Rpc {
+//         Rpc::new("http://localhost:3030".to_string(), Some("ws://localhost:3030".to_string()), 1000, 1, 10.0)
+//     }
+
+//     // #[tokio::test]
+//     // async fn test_get_safe_block_empty_rpc_list() {
+//     //     let rpc_list = Arc::new(RwLock::new(Vec::new()));
+//     //     let (finalized_tx, _) = tokio::sync::watch::channel(0);
+//     //     let named_numbers_rwlock = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+//     //     let ttl = 1000;
+
+//     //     let result = get_safe_block(&rpc_list, &finalized_tx, &named_numbers_rwlock, ttl).await;
+//     //     assert!(result.is_ok());
+//     //     assert_eq!(result.unwrap(), 0);
+//     // }
+
+//     // #[tokio::test]
+//     // async fn test_get_safe_block_with_rpc() {
+//     //     let rpc_list = Arc::new(RwLock::new(vec![mock_rpc()]));
+//     //     let (finalized_tx, _) = tokio::sync::watch::channel(0);
+//     //     let named_numbers_rwlock = Arc::new(RwLock::new(NamedBlocknumbers::default()));
+//     //     let ttl = 1000;
+
+//     //     let result = get_safe_block(&rpc_list, &finalized_tx, &named_numbers_rwlock, ttl).await;
+//     //     assert!(result.is_ok());
+//     //     assert_eq!(result.unwrap(), 0); // Assuming mocked RPC returns 0 for finalized block
+//     // }
+
+//     #[tokio::test]
+//     async fn test_subscribe_to_new_heads() {
+//         let (incoming_tx, _) = mpsc::unbounded_channel();
+//         let (outgoing_tx, outgoing_rx) = broadcast::channel(10);
+//         let sub_data = Arc::new(SubscriptionData::new());
+//         let cache_args = CacheArgs::default();
+//         let ttl = 1000;
+
+//         // Mock sending newHead subscription message
+//         outgoing_tx.send(IncomingResponse {
+//             content: serde_json::json!({
+//                 "params": {
+//                     "result": {
+//                         "number": "0x1"
+//                     }
+//                 }
+//             }),
+//             node_id: 1,
+//         }).unwrap();
+
+//         tokio::spawn(async move {
+//             subscribe_to_new_heads(incoming_tx, outgoing_rx, sub_data, cache_args, ttl).await;
+//         });
+
+//         // Allow for some processing time
+//         tokio::time::sleep(Duration::from_millis(500)).await;
+
+//         // Expectations and assertions would typically follow here,
+//         // but they are limited due to the nature of `subscribe_to_new_heads` function's loop.
+//     }
+// }
