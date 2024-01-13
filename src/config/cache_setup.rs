@@ -1,6 +1,6 @@
 use crate::config::setup::{
+    TAGLINE,
     VERSION_STR,
-    TAGLINE
 };
 use sled::Db;
 use std::sync::Arc;

@@ -196,15 +196,12 @@ pub async fn subscribe_to_new_heads(
     loop {
         match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), rx.recv()).await {
             Ok(Some(msg)) => {
-                match msg {
-                    RequestResult::Subscription(sub) => {
-                        let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
-                        let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
-                            .unwrap();
-                        println!("New head: {}", a);
-                        nn_rwlock.latest = a;
-                    }
-                    _ => {}
+                if let RequestResult::Subscription(sub) = msg {
+                    let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
+                    let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
+                        .unwrap();
+                    println!("New head: {}", a);
+                    nn_rwlock.latest = a;
                 }
             }
             Ok(None) => {

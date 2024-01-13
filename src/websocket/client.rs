@@ -241,11 +241,6 @@ pub async fn execute_ws_call(
 
         sub_data.unsubscribe_user(user_id, subscription_id);
 
-        // send the message to the node
-        // incoming_tx
-        //     .send(WsconnMessage::Message(call.clone(), index))
-        //     .expect("Failed to send message to ws_conn_manager");
-
         return Ok(format!(
             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":true}}",
             id

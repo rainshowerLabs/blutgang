@@ -3,10 +3,11 @@ use std::{
         HashMap,
         HashSet,
     },
+    println,
     sync::{
         Arc,
         RwLock,
-    }, println,
+    },
 };
 
 use crate::websocket::error::Error;
@@ -136,7 +137,9 @@ impl SubscriptionData {
     //
     // If the subscription does not exist, return error
     pub fn subscribe_user(&self, user_id: u32, subscription: Value) -> Result<String, Error> {
-        if subscription["params"].as_array().is_none() ||  subscription["params"].as_array().unwrap().is_empty() {
+        if subscription["params"].as_array().is_none()
+            || subscription["params"].as_array().unwrap().is_empty()
+        {
             return Err(format!("Invalid subscription params for {}", subscription).into());
         }
 
@@ -291,7 +294,8 @@ mod tests {
         // Setup test data
         let node_id = 42;
         let subscription_id = "sub123".to_string();
-        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
 
         // Register a subscription
         subscription_data.register_subscription(
@@ -318,7 +322,8 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
@@ -353,7 +358,8 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
-        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "300".to_string();
         let node_id = 1;
         let message =
@@ -419,7 +425,8 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
-        let empty_subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let empty_subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let empty_subscription_id = "500".to_string();
         let empty_node_id = 10000;
         let message = RequestResult::Subscription(serde_json::Value::String(
@@ -441,7 +448,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_users_for_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
@@ -462,7 +470,8 @@ mod tests {
 
         // Test with a non-existent subscription_id
         let non_existent_subscription_id = "nonexistent".to_string();
-        let empty_users = subscription_data.get_users_for_subscription(&non_existent_subscription_id);
+        let empty_users =
+            subscription_data.get_users_for_subscription(&non_existent_subscription_id);
         assert!(empty_users.is_empty());
     }
 
