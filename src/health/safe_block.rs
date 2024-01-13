@@ -178,7 +178,12 @@ pub async fn subscribe_to_new_heads(
     .await
     {
         Ok(_) => {}
-        Err(e) => panic!("Error subscribing to newHeads in health check: {}", e),
+        Err(e) => {
+            panic!(
+                "FATAL: Error subscribing to newHeads in health check: {}",
+                e
+            )
+        }
     };
 
     // New message == new head received. We can then update and process
@@ -199,7 +204,7 @@ pub async fn subscribe_to_new_heads(
             }
             Ok(None) => {
                 // Handle the case where the channel is closed
-                panic!("Channel closed in newHeads subscription");
+                panic!("FATAL: Channel closed in newHeads subscription");
             }
             Err(_) => {
                 // Handle the timeout case

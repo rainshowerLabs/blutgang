@@ -61,9 +61,11 @@ pub async fn ws_conn_manager(
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
     // TODO: do we really need ws_handles to be an option??
+    // borrow checker dum
+    let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
     {
         let mut ws_handle_guard = ws_handles.write().unwrap();
-        *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+        *ws_handle_guard = ws_vec;
     }
 
     while let Some(message) = incoming_rx.recv().await {
@@ -96,8 +98,9 @@ pub async fn ws_conn_manager(
                 }
             }
             WsconnMessage::Reconnect() => {
+                let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
                 let mut ws_handle_guard = ws_handles.write().unwrap();
-                *ws_handle_guard = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+                *ws_handle_guard = ws_vec;
             }
         }
     }

@@ -5,11 +5,16 @@ mod health;
 mod rpc;
 mod websocket;
 
+// TODO: we need a major refactor of whatever is happening in here
+
 use crate::{
     admin::listener::listen_for_admin_requests,
-    balancer::accept_http::{
-        accept_request,
-        RequestChannels,
+    balancer::{
+        accept_http::{
+            accept_request,
+            RequestChannels,
+        },
+        processing::CacheArgs,
     },
     config::{
         cache_setup::setup_data,
@@ -138,7 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
-    let finalized_rx_arc = Arc::new(finalized_rx);
+    let finalized_rx_arc = Arc::new(finalized_rx.clone());
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // Spawn a thread for the admin namespace if enabled
@@ -181,22 +186,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if health_check_clone {
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let poverty_list_health = Arc::clone(&rpc_poverty_list);
-        let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
         let config_health = Arc::clone(&config);
         let health_check_ttl = config.read().unwrap().health_check_ttl;
 
         let dropped_rpc = rpc_list_health.clone();
         let dropped_povrty = poverty_list_health.clone();
         let dropped_inc = incoming_tx.clone();
+
+        let heads_inc = incoming_tx.clone();
+        let heads_rx = outgoing_rx.resubscribe();
+        let heads_sub_data = sub_data.clone();
+
+        let cache_args = CacheArgs {
+            finalized_rx: finalized_rx.clone(),
+            named_numbers: named_blocknumbers.clone(),
+            cache: cache.clone(),
+            head_cache: head_cache.clone(),
+        };
+
         tokio::task::spawn(async move {
             dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
         });
 
         tokio::task::spawn(async move {
             subscribe_to_new_heads(
-                &rpc_list_health,
-                &named_blocknumbers_health,
-                ws_error_tx,
+                heads_inc,
+                heads_rx,
+                heads_sub_data,
+                cache_args,
                 health_check_ttl,
             )
             .await;
