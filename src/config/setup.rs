@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 pub const WS_HEALTH_CHECK_USER_ID: u32 = 1;
 
 // Version consts, dont impact functionality
-pub const VERSION_STR: &str = "blutgang 0.3.0-canary1 Garreg Mach";
+pub const VERSION_STR: &str = "blutgang 0.3.0-canary2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
