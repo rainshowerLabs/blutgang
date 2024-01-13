@@ -25,6 +25,8 @@ use std::sync::{
     RwLock,
 };
 
+use serde_json::Value;
+
 use tokio::sync::broadcast;
 use tokio::{
     sync::mpsc,
@@ -164,11 +166,11 @@ pub async fn subscribe_to_new_heads(
         r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
         user_id
     );
-    let call = unsafe { simd_json::from_str(&mut call).unwrap() };
+    let call: Value = unsafe { simd_json::from_str(&mut call).unwrap() };
 
     // Send a message subscribing to newHeads
     match execute_ws_call(
-        call,
+        call.clone(),
         user_id,
         &incoming_tx,
         outgoing_rx,
@@ -177,7 +179,10 @@ pub async fn subscribe_to_new_heads(
     )
     .await
     {
-        Ok(_) => {}
+        Ok(_) => {
+            // yes, it makes sense do do this conversion, things break if not
+            let _ = sub_data.subscribe_user(user_id, call.to_string());
+        }
         Err(e) => {
             panic!(
                 "FATAL: Error subscribing to newHeads in health check: {}",
