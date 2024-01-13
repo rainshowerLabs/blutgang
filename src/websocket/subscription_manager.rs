@@ -4,7 +4,7 @@ use crate::websocket::types::{
     SubscriptionData,
 };
 
-use std::sync::Arc;
+use std::{sync::Arc, println};
 use tokio::sync::broadcast;
 
 // Sends all subscriptions to their relevant nodes
@@ -32,6 +32,7 @@ pub fn subscription_dispatcher(
             // TODO: this is retarded???
             let resp_clone = response.clone();
             let id = response.content["params"]["subscription"].as_str().unwrap();
+            println!("users subscribed to this: {}", sub_data.get_users_for_subscription(id).len());
 
             // Send the response to all the users
             match sub_data

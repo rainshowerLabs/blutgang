@@ -70,9 +70,9 @@ pub struct IncomingResponse {
 }
 
 pub struct SubscriptionData {
-    pub users: Arc<RwLock<HashMap<u32, UserData>>>,
-    pub subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u32>>>>,
-    pub incoming_subscriptions: Arc<RwLock<HashMap<String, NodeSubInfo>>>,
+    users: Arc<RwLock<HashMap<u32, UserData>>>,
+    subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u32>>>>,
+    incoming_subscriptions: Arc<RwLock<HashMap<String, NodeSubInfo>>>,
 }
 
 impl SubscriptionData {
@@ -181,6 +181,20 @@ impl SubscriptionData {
                     None
                 }
             })
+    }
+
+    pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
+        let subscriptions = self.subscriptions.read().unwrap();
+        let mut users = Vec::new();
+
+        for (node_sub_info, subscribers) in subscriptions.iter() {
+            if node_sub_info.subscription_id == subscription_id {
+                users.extend(subscribers.iter().copied());
+                break;
+            }
+        }
+
+        users
     }
 
     pub async fn dispatch_to_subscribers(
@@ -411,6 +425,34 @@ mod tests {
             .dispatch_to_subscribers(&empty_subscription_id, empty_node_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed even though there are no subscribers
+    }
+
+    #[tokio::test]
+    async fn test_get_users_for_subscription() {
+        let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+        let subscription_request = "sub200".to_string();
+        let subscription_id = "200".to_string();
+        let node_id = 1;
+
+        // Register and subscribe a user to the subscription
+        subscription_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.clone(),
+            node_id,
+        );
+        subscription_data
+            .subscribe_user(user_id, subscription_request.clone())
+            .unwrap();
+
+        // Test get_users_for_subscription function
+        let users = subscription_data.get_users_for_subscription(&subscription_id);
+        assert_eq!(users.len(), 1);
+        assert!(users.contains(&user_id));
+
+        // Test with a non-existent subscription_id
+        let non_existent_subscription_id = "nonexistent".to_string();
+        let empty_users = subscription_data.get_users_for_subscription(&non_existent_subscription_id);
+        assert!(empty_users.is_empty());
     }
 
     #[tokio::test]
