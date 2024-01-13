@@ -2,7 +2,7 @@ use sled::Db;
 use std::sync::Arc;
 
 // System consts
-pub const WS_HEALTH_CHECK_USER_ID: u32 = 0;
+pub const WS_HEALTH_CHECK_USER_ID: u32 = 1;
 
 // Version consts, dont impact functionality
 
