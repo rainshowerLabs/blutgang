@@ -257,7 +257,7 @@ pub async fn execute_ws_call(
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
         // if not continue
-        if let Ok(rax) = sub_data.subscribe_user(user_id, call.to_string()) {
+        if let Ok(rax) = sub_data.subscribe_user(user_id, call.clone()) {
             println!("has subscription already");
             return Ok(format!(
                 "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
@@ -291,9 +291,9 @@ pub async fn execute_ws_call(
         };
 
         println!("sub_id: {}", sub_id);
-        sub_data.register_subscription(call.to_string(), sub_id.clone(), response.node_id);
+        sub_data.register_subscription(call.clone(), sub_id.clone(), response.node_id);
         // bug is here??? whjat am i not registering???
-        sub_data.subscribe_user(user_id, call.to_string())?;
+        sub_data.subscribe_user(user_id, call)?;
     } else {
         cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
     }

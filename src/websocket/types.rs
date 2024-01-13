@@ -6,7 +6,7 @@ use std::{
     sync::{
         Arc,
         RwLock,
-    },
+    }, println,
 };
 
 use crate::websocket::error::Error;
@@ -102,17 +102,20 @@ impl SubscriptionData {
     // Used to add a new subscription to the active subscription list
     pub fn register_subscription(
         &self,
-        subscription_request: String,
+        subscription: Value,
         subscription_id: String,
         node_id: usize,
     ) {
+        // TODO: pepega
+        let subscription = format!("{}", subscription["params"]);
+
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
             "register_subscription inserting: {:?}",
-            subscription_request.clone()
+            subscription.clone()
         );
         incoming_subscriptions.insert(
-            subscription_request.clone(),
+            subscription.clone(),
             NodeSubInfo {
                 node_id,
                 subscription_id,
@@ -120,7 +123,7 @@ impl SubscriptionData {
         );
         println!(
             "register_subscription: {:?}",
-            incoming_subscriptions.get(&subscription_request)
+            incoming_subscriptions.get(&subscription)
         );
     }
 
@@ -132,8 +135,15 @@ impl SubscriptionData {
     // Subscribe user to existing subscription and return the subscription id
     //
     // If the subscription does not exist, return error
-    pub fn subscribe_user(&self, user_id: u32, subscription: String) -> Result<String, Error> {
-        println!("subscribe_user finding: {:?}", subscription);
+    pub fn subscribe_user(&self, user_id: u32, subscription: Value) -> Result<String, Error> {
+        if subscription["params"].as_array().is_none() ||  subscription["params"].as_array().unwrap().is_empty() {
+            return Err(format!("Invalid subscription params for {}", subscription).into());
+        }
+
+        // TODO: pepega
+        let subscription = format!("{}", subscription["params"]);
+
+        println!("subscribe_user finding: {}", subscription);
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
         let node_sub_info = match incoming_subscriptions.get(&subscription) {
             Some(rax) => rax,
@@ -284,7 +294,7 @@ mod tests {
 
         // Register a subscription
         subscription_data.register_subscription(
-            subscription_request,
+            serde_json::Value::String(subscription_request),
             subscription_id.clone(),
             node_id,
         );
@@ -312,12 +322,12 @@ mod tests {
         let node_id = 1;
 
         subscription_data.register_subscription(
-            subscription_request.clone(),
+            serde_json::Value::String(subscription_request.clone()),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, subscription_request.clone())
+            .subscribe_user(user_id, serde_json::Value::String(subscription_request.clone()))
             .unwrap();
         assert!(subscription_data
             .subscriptions
@@ -349,12 +359,12 @@ mod tests {
             RequestResult::Subscription(serde_json::Value::String("test message".to_string()));
 
         subscription_data.register_subscription(
-            subscription_request.clone(),
+            serde_json::Value::String(subscription_request.clone()),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, subscription_request)
+            .subscribe_user(user_id, serde_json::Value::String(subscription_request))
             .unwrap();
         subscription_data
             .dispatch_to_subscribers(&subscription_id, node_id, &message)
@@ -417,7 +427,7 @@ mod tests {
 
         // No users are subscribed to this subscription
         subscription_data.register_subscription(
-            empty_subscription_request,
+            serde_json::Value::String(empty_subscription_request),
             empty_subscription_id.clone(),
             empty_node_id,
         );
@@ -436,12 +446,12 @@ mod tests {
 
         // Register and subscribe a user to the subscription
         subscription_data.register_subscription(
-            subscription_request.clone(),
+            serde_json::Value::String(subscription_request.clone()),
             subscription_id.clone(),
             node_id,
         );
         subscription_data
-            .subscribe_user(user_id, subscription_request.clone())
+            .subscribe_user(user_id, serde_json::Value::String(subscription_request.clone()))
             .unwrap();
 
         // Test get_users_for_subscription function

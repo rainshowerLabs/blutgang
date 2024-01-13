@@ -181,7 +181,7 @@ pub async fn subscribe_to_new_heads(
     {
         Ok(_) => {
             // yes, it makes sense do do this conversion, things break if not
-            let _ = sub_data.subscribe_user(user_id, call.to_string());
+            let _ = sub_data.subscribe_user(user_id, call);
         }
         Err(e) => {
             panic!(
