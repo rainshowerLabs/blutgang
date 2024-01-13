@@ -170,7 +170,7 @@ pub async fn subscribe_to_new_heads(
     let call = unsafe { simd_json::from_str(&mut call).unwrap() };
 
     // Send a message subscribing to newHeads
-    let subscription_id = match execute_ws_call(
+    match execute_ws_call(
         call,
         user_id,
         &incoming_tx,
@@ -180,12 +180,7 @@ pub async fn subscribe_to_new_heads(
     )
     .await
     {
-        Ok(mut rax) => {
-            // extract the id from rax and return it
-            let json: Value = unsafe { simd_json::from_str(&mut rax).unwrap() };
-            // TODO: error handle this
-            json["params"]["0"].as_str().unwrap().to_string()
-        }
+        Ok(_) => {}
         Err(e) => panic!("Error subscribing to newHeads in health check: {}", e),
     };
 
