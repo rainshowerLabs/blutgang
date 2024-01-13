@@ -3,7 +3,10 @@ use crate::{
     config::cache_setup::WS_HEALTH_CHECK_USER_ID,
     rpc::{
         error::RpcError,
-        types::Rpc,
+        types::{
+            hex_to_decimal,
+            Rpc,
+        },
     },
     websocket::{
         client::execute_ws_call,
@@ -22,7 +25,7 @@ use std::sync::{
     Arc,
     RwLock,
 };
-use std::unimplemented;
+
 use tokio::sync::broadcast;
 use tokio::{
     sync::mpsc,
@@ -141,6 +144,7 @@ pub async fn subscribe_to_new_heads(
     outgoing_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
+    ttl: u64,
 ) {
     // We basically have to create a new system-only user for subscribing to newHeads
 
@@ -170,7 +174,7 @@ pub async fn subscribe_to_new_heads(
         call,
         user_id,
         &incoming_tx,
-        outgoing_rx.resubscribe(),
+        outgoing_rx,
         &sub_data,
         &cache_args,
     )
@@ -185,15 +189,33 @@ pub async fn subscribe_to_new_heads(
         Err(e) => panic!("Error subscribing to newHeads in health check: {}", e),
     };
 
-    while let Some(msg) = rx.recv().await {
-        // Forward the message to the best available RPC
-        //
-        // If we received a subscription, just send it to the client
-        match msg {
-            RequestResult::Subscription(sub) => {
-                unimplemented!();
+    // New message == new head received. We can then update and process
+    // everything associated with a new head block.
+    loop {
+        match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), rx.recv()).await {
+            Ok(Some(msg)) => {
+                match msg {
+                    RequestResult::Subscription(sub) => {
+                        let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
+                        let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
+                            .unwrap();
+                        println!("New head: {}", a);
+                        nn_rwlock.latest = a;
+                    }
+                    _ => {}
+                }
             }
-            _ => {}
+            Ok(None) => {
+                // Handle the case where the channel is closed
+                panic!("Channel closed in newHeads subscription");
+            }
+            Err(_) => {
+                // Handle the timeout case
+                let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
+                nn_rwlock.latest = 0;
+                incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+                println!("Timeout in newHeads subscription");
+            }
         }
     }
 }
