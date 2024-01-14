@@ -41,7 +41,7 @@ pub fn subscription_dispatcher(
             );
 
             // Get the subscription id
-            // TODO: this is retarded???
+            // this is retarded???
             let resp_clone = response.clone();
             let id = response.content["params"]["subscription"].as_str().unwrap();
             println!(

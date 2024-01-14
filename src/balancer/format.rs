@@ -125,7 +125,7 @@ pub fn replace_block_tags(
         | Some("eth_getTransactionCount")
         | Some("eth_getCode")
         | Some("eth_call") => 1,
-        Some("eth_getStorageAt") => 2, // Corrected index for eth_getStorageAt
+        Some("eth_getStorageAt") => 2,
         Some("eth_getBlockTransactionCountByNumber")
         | Some("eth_getUncleCountByBlockNumber")
         | Some("eth_getBlockByNumber")
