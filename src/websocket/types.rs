@@ -216,7 +216,7 @@ impl SubscriptionData {
         subscription_id: &str,
         node_id: usize,
         message: &RequestResult,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
         if let RequestResult::Call(_) = message {
             return Err("Trying to send a call as a subscription!".into());
         }
@@ -234,6 +234,7 @@ impl SubscriptionData {
                     "NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}",
                     subscription_id
                 );
+                return Ok(true);
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
@@ -246,7 +247,7 @@ impl SubscriptionData {
             }
         }
 
-        Ok(())
+        Ok(false)
     }
 }
 

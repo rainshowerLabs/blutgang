@@ -1,18 +1,27 @@
-use crate::websocket::types::{
-    IncomingResponse,
-    RequestResult,
-    SubscriptionData,
-};
+use crate::config::setup::WS_SUB_MANAGER_ID;
 
 use std::{
     println,
     sync::Arc,
 };
-use tokio::sync::broadcast;
+
+use crate::websocket::types::{
+    IncomingResponse,
+    RequestResult,
+    SubscriptionData,
+    WsconnMessage,
+};
+use tokio::sync::{
+    broadcast,
+    mpsc,
+};
+
+use serde_json::json;
 
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
     mut rx: broadcast::Receiver<IncomingResponse>,
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     sub_data: Arc<SubscriptionData>,
 ) {
     tokio::spawn(async move {
@@ -49,7 +58,15 @@ pub fn subscription_dispatcher(
                 )
                 .await
             {
-                Ok(_) => {}
+                // Getting true means that we should unsubscribe from the subscription
+                // as thre are no more users needing it.
+                Ok(true) => {
+                    let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
+                    let message = WsconnMessage::Message(unsub, Some(response.node_id));
+                    let _ = incoming_tx.send(message);
+                }
+                // False means tht we do not need to do anything
+                Ok(false) => {}
                 Err(e) => {
                     println!(
                         "\x1b[31mErr:\x1b[0m Fatal error while trying to send subscriptions: {}",

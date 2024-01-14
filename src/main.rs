@@ -191,12 +191,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Option<mpsc::UnboundedSender<serde_json::Value>>,
         >::new()));
         let outgoing_rx_ws = outgoing_rx.resubscribe();
+        let incoming_tx_ws = incoming_tx.clone();
         let ws_error_tx_ws = ws_error_tx.clone();
 
         let sub_dispatcher = Arc::clone(&sub_data);
 
         tokio::task::spawn(async move {
-            subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
+            subscription_dispatcher(outgoing_rx_ws, incoming_tx_ws, sub_dispatcher);
             let _ = ws_conn_manager(
                 rpc_list_ws,
                 ws_handle,
