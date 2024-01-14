@@ -121,6 +121,20 @@ pub struct RequestChannels {
     pub outgoing_rx: broadcast::Receiver<IncomingResponse>,
 }
 
+impl RequestChannels {
+    pub fn new(
+        finalized_rx: Arc<watch::Receiver<u64>>,
+        incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+        outgoing_rx: broadcast::Receiver<IncomingResponse>,
+    ) -> Self {
+        Self {
+            finalized_rx,
+            incoming_tx,
+            outgoing_rx,
+        }
+    }
+}
+
 impl Clone for RequestChannels {
     fn clone(&self) -> Self {
         Self {

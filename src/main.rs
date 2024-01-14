@@ -254,11 +254,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let config_clone = Arc::clone(&config);
         let sub_data_clone = Arc::clone(&sub_data);
 
-        let channels = RequestChannels {
-            finalized_rx: finalized_rx_clone,
-            incoming_tx: incoming_tx.clone(),
-            outgoing_rx: outgoing_rx.resubscribe(),
-        };
+        let channels = RequestChannels::new(
+            finalized_rx_clone,
+            incoming_tx.clone(),
+            outgoing_rx.resubscribe(),
+        );
 
         let connection_params = ConnectionParams::new(
             rpc_list_rwlock_clone,
