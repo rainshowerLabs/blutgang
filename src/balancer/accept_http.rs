@@ -98,13 +98,13 @@ impl ConnectionParams {
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
-            rpc_list_rwlock: Arc::clone(&rpc_list_rwlock),
-            channels: channels,
-            named_numbers: Arc::clone(&named_numbers.clone()),
-            head_cache: Arc::clone(&head_cache.clone()),
-            sub_data: Arc::clone(&sub_data.clone()),
-            cache: Arc::clone(&cache.clone()),
-            config: Arc::clone(&config.clone()),
+            rpc_list_rwlock: rpc_list_rwlock.clone(),
+            channels,
+            named_numbers: named_numbers.clone(),
+            head_cache: head_cache.clone(),
+            sub_data: sub_data.clone(),
+            cache: cache.clone(),
+            config: config.clone(),
         }
     }
 }
