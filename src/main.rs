@@ -80,13 +80,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
     // Copy the configuration values we need
-    let (addr_clone, do_clear_clone, health_check_clone, admin_enabled_clone) = {
+    let (addr, do_clear, do_health_check, admin_enabled, is_ws) = {
         let config_guard = config.read().unwrap();
         (
             config_guard.address,
             config_guard.do_clear,
             config_guard.health_check,
             config_guard.admin.enabled,
+            config_guard.is_ws,
         )
     };
 
@@ -100,7 +101,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
     // Clear database if specified
-    if do_clear_clone {
+    if do_clear {
         cache.clear().unwrap();
         println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
     }
@@ -110,8 +111,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     setup_data(Arc::clone(&cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
-    let listener = TcpListener::bind(addr_clone).await?;
-    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr_clone);
+    let listener = TcpListener::bind(addr).await?;
+    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr);
 
     // websocket connections
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
@@ -148,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // Spawn a thread for the admin namespace if enabled
-    if admin_enabled_clone {
+    if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
         let poverty_list_admin = Arc::clone(&rpc_poverty_list);
         let cache_admin = Arc::clone(&cache);
@@ -184,7 +185,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Also handle the finalized block tracking in this thread
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
 
-    if health_check_clone {
+    if do_health_check {
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let poverty_list_health = Arc::clone(&rpc_poverty_list);
         let config_health = Arc::clone(&config);
@@ -205,20 +206,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
         });
 
-        let heads_inc = incoming_tx.clone();
-        let heads_rx = outgoing_rx.resubscribe();
-        let heads_sub_data = sub_data.clone();
+        if is_ws {
+            let heads_inc = incoming_tx.clone();
+            let heads_rx = outgoing_rx.resubscribe();
+            let heads_sub_data = sub_data.clone();
 
-        tokio::task::spawn(async move {
-            subscribe_to_new_heads(
-                heads_inc,
-                heads_rx,
-                heads_sub_data,
-                cache_args,
-                health_check_ttl,
-            )
-            .await;
-        });
+            tokio::task::spawn(async move {
+                subscribe_to_new_heads(
+                    heads_inc,
+                    heads_rx,
+                    heads_sub_data,
+                    cache_args,
+                    health_check_ttl,
+                )
+                .await;
+            });
+        }
 
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
