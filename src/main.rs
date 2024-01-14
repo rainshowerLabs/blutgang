@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
     // Copy the configuration values we need
-    let (addr, do_clear, do_health_check, admin_enabled, is_ws) = {
+    let (addr, do_clear, do_health_check, admin_enabled, is_ws, health_check_ttl) = {
         let config_guard = config.read().unwrap();
         (
             config_guard.address,
@@ -88,6 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_guard.health_check,
             config_guard.admin.enabled,
             config_guard.is_ws,
+            config_guard.health_check_ttl,
         )
     };
 
@@ -113,34 +114,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
     println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr);
-
-    // websocket connections
-    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
-    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(256);
-    let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
-
-    let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
-    // TODO: make this more ergonomic
-    let ws_handle = Arc::new(RwLock::new(Vec::<
-        Option<mpsc::UnboundedSender<serde_json::Value>>,
-    >::new()));
-    let outgoing_rx_ws = outgoing_rx.resubscribe();
-    let ws_error_tx_ws = ws_error_tx.clone();
-
-    let sub_data = Arc::new(SubscriptionData::new());
-    let sub_dispatcher = Arc::clone(&sub_data);
-
-    tokio::task::spawn(async move {
-        subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
-        let _ = ws_conn_manager(
-            rpc_list_ws,
-            ws_handle,
-            incoming_rx,
-            outgoing_tx,
-            ws_error_tx_ws,
-        )
-        .await;
-    });
 
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
@@ -186,42 +159,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers::default()));
 
     if do_health_check {
-        let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let poverty_list_health = Arc::clone(&rpc_poverty_list);
         let config_health = Arc::clone(&config);
-        let health_check_ttl = config.read().unwrap().health_check_ttl;
-
-        let dropped_rpc = rpc_list_health.clone();
-        let dropped_povrty = poverty_list_health.clone();
-        let dropped_inc = incoming_tx.clone();
-
-        let cache_args = CacheArgs {
-            finalized_rx: finalized_rx.clone(),
-            named_numbers: named_blocknumbers.clone(),
-            cache: cache.clone(),
-            head_cache: head_cache.clone(),
-        };
-
-        tokio::task::spawn(async move {
-            dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
-        });
-
-        if is_ws {
-            let heads_inc = incoming_tx.clone();
-            let heads_rx = outgoing_rx.resubscribe();
-            let heads_sub_data = sub_data.clone();
-
-            tokio::task::spawn(async move {
-                subscribe_to_new_heads(
-                    heads_inc,
-                    heads_rx,
-                    heads_sub_data,
-                    cache_args,
-                    health_check_ttl,
-                )
-                .await;
-            });
-        }
 
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
@@ -237,6 +176,68 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await;
         });
+    }
+
+    // WebSocket connection + health check setup. Only runs when every node has a WS endpoint.
+    let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(256);
+    let sub_data = Arc::new(SubscriptionData::new());
+    if is_ws {
+        let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
+
+        let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
+        // TODO: make this more ergonomic
+        let ws_handle = Arc::new(RwLock::new(Vec::<
+            Option<mpsc::UnboundedSender<serde_json::Value>>,
+        >::new()));
+        let outgoing_rx_ws = outgoing_rx.resubscribe();
+        let ws_error_tx_ws = ws_error_tx.clone();
+
+        let sub_dispatcher = Arc::clone(&sub_data);
+
+        tokio::task::spawn(async move {
+            subscription_dispatcher(outgoing_rx_ws, sub_dispatcher);
+            let _ = ws_conn_manager(
+                rpc_list_ws,
+                ws_handle,
+                incoming_rx,
+                outgoing_tx,
+                ws_error_tx_ws,
+            )
+            .await;
+        });
+
+        if do_health_check {
+            let dropped_rpc = Arc::clone(&rpc_list_rwlock);
+            let dropped_povrty = Arc::clone(&rpc_poverty_list);
+            let dropped_inc = incoming_tx.clone();
+
+            tokio::task::spawn(async move {
+                dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
+            });
+
+            let heads_inc = incoming_tx.clone();
+            let heads_rx = outgoing_rx.resubscribe();
+            let heads_sub_data = sub_data.clone();
+
+            let cache_args = CacheArgs {
+                finalized_rx: finalized_rx.clone(),
+                named_numbers: named_blocknumbers.clone(),
+                cache: cache.clone(),
+                head_cache: head_cache.clone(),
+            };
+
+            tokio::task::spawn(async move {
+                subscribe_to_new_heads(
+                    heads_inc,
+                    heads_rx,
+                    heads_sub_data,
+                    cache_args,
+                    health_check_ttl.try_into().unwrap(),
+                )
+                .await;
+            });
+        }
     }
 
     // We start a loop to continuously accept incoming connections

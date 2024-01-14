@@ -298,7 +298,9 @@ impl Settings {
 
         if !is_ws {
             println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes.");
-            println!("\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info.")
+            println!(
+                "\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info."
+            )
         }
 
         // Admin namespace things
