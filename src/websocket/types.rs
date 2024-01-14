@@ -231,7 +231,7 @@ impl SubscriptionData {
             if subscribers.is_empty() {
                 self.unregister_subscription(subscription_id.to_string());
                 println!(
-                    "NO MORE USERS TO SEND THIS SUBSCRIPTION TO. ID: {}",
+                    "No more users to send subscription to. Unsubscribing from ID: {}",
                     subscription_id
                 );
                 return Ok(true);
