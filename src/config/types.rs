@@ -57,6 +57,7 @@ impl Debug for AdminSettings {
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
+    pub is_ws: bool,
     pub do_clear: bool,
     pub address: SocketAddr,
     pub health_check: bool,
@@ -71,6 +72,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rpc_list: Vec::new(),
+            is_ws: true,
             do_clear: false,
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
@@ -236,6 +238,9 @@ impl Settings {
         // Parse all the other tables as RPCs and put them in a Vec<Rpc>
         //
         // Sort RPCs by latency if enabled
+
+        // `is_ws` flag is used to turn off WS specific things when a WS endpoint isnt present.
+        let mut is_ws = true;
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
@@ -281,7 +286,7 @@ impl Settings {
                         )
                     }
                     None => {
-                        println!("Using only HTTP for: {}", table_name);
+                        is_ws = false;
                         None
                     }
                 };
@@ -289,6 +294,11 @@ impl Settings {
                 let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length);
                 rpc_list.push(rpc);
             }
+        }
+
+        if !is_ws {
+            println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes.");
+            println!("\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info.")
         }
 
         // Admin namespace things
@@ -355,6 +365,7 @@ impl Settings {
 
         Settings {
             rpc_list,
+            is_ws,
             do_clear,
             address,
             health_check,
@@ -492,6 +503,7 @@ impl Settings {
 
         Settings {
             rpc_list,
+            is_ws: false,
             do_clear: clear,
             address,
             health_check,

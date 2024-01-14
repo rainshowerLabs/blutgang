@@ -76,7 +76,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Get all the cli args amd set them
+    // Get all the cli args and set them
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
     // Copy the configuration values we need
