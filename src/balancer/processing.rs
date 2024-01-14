@@ -12,11 +12,12 @@ use crate::{
 
 use std::{
     collections::BTreeMap,
+    println,
     sync::{
         Arc,
         RwLock,
     },
-    time::Duration, println,
+    time::Duration,
 };
 
 use tokio::sync::watch;

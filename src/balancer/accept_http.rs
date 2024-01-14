@@ -364,10 +364,12 @@ pub async fn accept_request(
         println!("\x1b[35mInfo:\x1b[0m Received WS upgrade request");
 
         if !connection_params.config.read().unwrap().is_ws {
-            return rpc_response!(500, Full::new(Bytes::from(
-                "{code:-32005, message:\"error: WebSockets are disabled!\"}"
-                    .to_string(),
-            )));
+            return rpc_response!(
+                500,
+                Full::new(Bytes::from(
+                    "{code:-32005, message:\"error: WebSockets are disabled!\"}".to_string(),
+                ))
+            );
         }
 
         let (response, websocket) = match upgrade(&mut tx, None) {

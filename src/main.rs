@@ -233,7 +233,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     heads_rx,
                     heads_sub_data,
                     cache_args,
-                    health_check_ttl.try_into().unwrap(),
+                    health_check_ttl,
                 )
                 .await;
             });
