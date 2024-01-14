@@ -245,29 +245,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
-        // Clone the shared `rpc_list_rwlock` and cache for use in the closure
-        let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
-        let cache_clone = Arc::clone(&cache);
-        let head_cache_clone = Arc::clone(&head_cache);
-        let finalized_rx_clone = Arc::clone(&finalized_rx_arc);
-        let named_blocknumbers_clone = Arc::clone(&named_blocknumbers);
-        let config_clone = Arc::clone(&config);
-        let sub_data_clone = Arc::clone(&sub_data);
-
         let channels = RequestChannels::new(
-            finalized_rx_clone,
+            finalized_rx_arc.clone(),
             incoming_tx.clone(),
             outgoing_rx.resubscribe(),
         );
 
         let connection_params = ConnectionParams::new(
-            rpc_list_rwlock_clone,
+            &rpc_list_rwlock,
             channels,
-            named_blocknumbers_clone,
-            head_cache_clone,
-            sub_data_clone,
-            cache_clone,
-            config_clone,
+            &named_blocknumbers,
+            &head_cache,
+            &sub_data,
+            &cache,
+            &config,
         );
 
         // Spawn a tokio task to serve multiple connections concurrently

@@ -89,22 +89,22 @@ pub struct ConnectionParams {
 
 impl ConnectionParams {
     pub fn new(
-        rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+        rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
         channels: RequestChannels,
-        named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-        head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-        sub_data: Arc<SubscriptionData>,
-        cache: Arc<Db>,
-        config: Arc<RwLock<Settings>>,
+        named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
+        head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+        sub_data: &Arc<SubscriptionData>,
+        cache: &Arc<Db>,
+        config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
-            rpc_list_rwlock,
-            channels,
-            named_numbers,
-            head_cache,
-            sub_data,
-            cache,
-            config,
+            rpc_list_rwlock: Arc::clone(&rpc_list_rwlock),
+            channels: channels,
+            named_numbers: Arc::clone(&named_numbers.clone()),
+            head_cache: Arc::clone(&head_cache.clone()),
+            sub_data: Arc::clone(&sub_data.clone()),
+            cache: Arc::clone(&cache.clone()),
+            config: Arc::clone(&config.clone()),
         }
     }
 }
