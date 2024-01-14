@@ -12,6 +12,7 @@ use crate::{
     balancer::{
         accept_http::{
             accept_request,
+            ConnectionParams,
             RequestChannels,
         },
         processing::CacheArgs,
@@ -193,10 +194,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let dropped_povrty = poverty_list_health.clone();
         let dropped_inc = incoming_tx.clone();
 
-        let heads_inc = incoming_tx.clone();
-        let heads_rx = outgoing_rx.resubscribe();
-        let heads_sub_data = sub_data.clone();
-
         let cache_args = CacheArgs {
             finalized_rx: finalized_rx.clone(),
             named_numbers: named_blocknumbers.clone(),
@@ -207,6 +204,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::task::spawn(async move {
             dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc).await
         });
+
+        let heads_inc = incoming_tx.clone();
+        let heads_rx = outgoing_rx.resubscribe();
+        let heads_sub_data = sub_data.clone();
 
         tokio::task::spawn(async move {
             subscribe_to_new_heads(
@@ -259,18 +260,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             outgoing_rx: outgoing_rx.resubscribe(),
         };
 
+        let connection_params = ConnectionParams::new(
+            rpc_list_rwlock_clone,
+            channels,
+            named_blocknumbers_clone,
+            head_cache_clone,
+            sub_data_clone,
+            cache_clone,
+            config_clone,
+        );
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            accept!(
-                io,
-                &rpc_list_rwlock_clone,
-                &cache_clone,
-                channels.clone(),
-                &named_blocknumbers_clone,
-                &head_cache_clone,
-                sub_data_clone.clone(),
-                &config_clone
-            );
+            accept!(io, connection_params.clone());
         });
     }
 }

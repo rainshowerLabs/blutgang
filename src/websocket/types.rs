@@ -70,6 +70,7 @@ pub struct IncomingResponse {
     pub node_id: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct SubscriptionData {
     users: Arc<RwLock<HashMap<u32, UserData>>>,
     subscriptions: Arc<RwLock<HashMap<NodeSubInfo, HashSet<u32>>>>,

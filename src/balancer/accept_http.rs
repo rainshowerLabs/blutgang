@@ -76,6 +76,39 @@ use std::{
     },
 };
 
+#[derive(Debug, Clone)]
+pub struct ConnectionParams {
+    pub rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    pub channels: RequestChannels,
+    pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
+    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    pub sub_data: Arc<SubscriptionData>,
+    pub cache: Arc<Db>,
+    pub config: Arc<RwLock<Settings>>,
+}
+
+impl ConnectionParams {
+    pub fn new(
+        rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+        channels: RequestChannels,
+        named_numbers: Arc<RwLock<NamedBlocknumbers>>,
+        head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+        sub_data: Arc<SubscriptionData>,
+        cache: Arc<Db>,
+        config: Arc<RwLock<Settings>>,
+    ) -> Self {
+        ConnectionParams {
+            rpc_list_rwlock,
+            channels,
+            named_numbers,
+            head_cache,
+            sub_data,
+            cache,
+            config,
+        }
+    }
+}
+
 struct RequestParams {
     ttl: u128,
     max_retries: u32,
@@ -103,13 +136,7 @@ impl Clone for RequestChannels {
 macro_rules! accept {
     (
         $io:expr,
-        $rpc_list_rwlock:expr,
-        $cache:expr,
-        $channels:expr,
-        $named_numbers:expr,
-        $head_cache:expr,
-        $sub_data:expr,
-        $config:expr
+        $connection_params:expr
     ) => {
         // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
@@ -117,16 +144,7 @@ macro_rules! accept {
             .serve_connection(
                 $io,
                 service_fn(|req| {
-                    let response = accept_request(
-                        req,
-                        Arc::clone($rpc_list_rwlock),
-                        $channels,
-                        $named_numbers,
-                        $head_cache,
-                        $sub_data,
-                        Arc::clone($cache),
-                        $config,
-                    );
+                    let response = accept_request(req, $connection_params);
                     response
                 }),
             )
@@ -325,13 +343,7 @@ async fn forward_body(
 // In case of a timeout, returns an error.
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
-    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    channels: RequestChannels,
-    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
-    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    sub_data: Arc<SubscriptionData>,
-    cache: Arc<Db>,
-    config: &Arc<RwLock<Settings>>,
+    connection_params: ConnectionParams,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
@@ -349,19 +361,19 @@ pub async fn accept_request(
         };
 
         let cache_args = CacheArgs {
-            finalized_rx: channels.finalized_rx.as_ref().clone(),
-            named_numbers: named_numbers.clone(),
-            cache,
-            head_cache: head_cache.clone(),
+            finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
+            named_numbers: connection_params.named_numbers.clone(),
+            cache: connection_params.cache,
+            head_cache: connection_params.head_cache.clone(),
         };
 
         // Spawn a task to handle the websocket connection.
         tokio::task::spawn(async move {
             if let Err(e) = serve_websocket(
                 websocket,
-                channels.incoming_tx,
-                channels.outgoing_rx,
-                sub_data.clone(),
+                connection_params.channels.incoming_tx,
+                connection_params.channels.outgoing_rx,
+                connection_params.sub_data.clone(),
                 cache_args,
             )
             .await
@@ -380,7 +392,7 @@ pub async fn accept_request(
 
     // RequestParams from config
     let params = {
-        let config_guard = config.read().unwrap();
+        let config_guard = connection_params.config.read().unwrap();
         RequestParams {
             ttl: config_guard.ttl,
             max_retries: config_guard.max_retries,
@@ -394,11 +406,11 @@ pub async fn accept_request(
     let time = Instant::now();
     (response, rpc_position) = forward_body(
         tx,
-        &rpc_list_rwlock,
-        &channels.finalized_rx,
-        named_numbers,
-        head_cache,
-        cache,
+        &connection_params.rpc_list_rwlock,
+        &connection_params.channels.finalized_rx,
+        &connection_params.named_numbers,
+        &connection_params.head_cache,
+        connection_params.cache,
         params,
     )
     .await;
@@ -411,7 +423,7 @@ pub async fn accept_request(
     // Here, we update the latency of the RPC that was used to process the request
     // if `rpc_position` is Some.
     if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&rpc_list_rwlock, rpc_position, time);
+        update_rpc_latency(&connection_params.rpc_list_rwlock, rpc_position, time);
     }
 
     response
