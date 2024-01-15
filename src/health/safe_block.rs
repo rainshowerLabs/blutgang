@@ -27,9 +27,12 @@ use std::sync::{
 
 use serde_json::Value;
 
-use tokio::sync::broadcast;
 use tokio::{
-    sync::mpsc,
+    sync::{
+        mpsc,
+        watch,
+        broadcast,
+    },
     time::{
         timeout,
         Duration,
@@ -141,6 +144,7 @@ pub async fn get_safe_block(
 pub async fn subscribe_to_new_heads(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<IncomingResponse>,
+    blocknum_tx: watch::Sender<u64>,
     sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
     ttl: u64,
@@ -200,6 +204,7 @@ pub async fn subscribe_to_new_heads(
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
                     println!("New head: {}", a);
+                    let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
                 }
             }

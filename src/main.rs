@@ -169,7 +169,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let _ = health_check(
                 rpc_list_health,
                 poverty_list_health,
-                &blocknum_tx,
                 finalized_tx,
                 &named_blocknumbers_health,
                 &config_health,
@@ -229,13 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             tokio::task::spawn(async move {
-                subscribe_to_new_heads(
-                    heads_inc,
-                    heads_rx,
-                    heads_sub_data,
-                    cache_args,
-                    health_check_ttl,
-                )
+                subscribe_to_new_heads(heads_inc, heads_rx, blocknum_tx, heads_sub_data, cache_args, health_check_ttl)
                 .await;
             });
         }
