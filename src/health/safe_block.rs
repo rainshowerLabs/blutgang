@@ -140,6 +140,42 @@ pub async fn get_safe_block(
     Ok(safe)
 }
 
+// Send a message subscribing to newHeads
+async fn send_newheads_sub_message(
+    user_id: u32,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
+    outgoing_rx: &broadcast::Receiver<IncomingResponse>,
+    sub_data: &Arc<SubscriptionData>,
+    cache_args: &CacheArgs,
+) {
+    let mut call = format!(
+        r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
+        user_id
+    );
+    let call: Value = unsafe { simd_json::from_str(&mut call).unwrap() };
+
+    match execute_ws_call(
+        call.clone(),
+        user_id,
+        &incoming_tx,
+        outgoing_rx.resubscribe(),
+        &sub_data,
+        &cache_args,
+    )
+    .await
+    {
+        Ok(_) => {
+            let _ = sub_data.subscribe_user(user_id, call);
+        }
+        Err(e) => {
+            panic!(
+                "FATAL: Error subscribing to newHeads in health check: {}",
+                e
+            )
+        }
+    };   
+}
+
 // Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
 pub async fn subscribe_to_new_heads(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
@@ -166,33 +202,13 @@ pub async fn subscribe_to_new_heads(
     };
     sub_data.add_user(user_id, user_data);
 
-    let mut call = format!(
-        r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
-        user_id
-    );
-    let call: Value = unsafe { simd_json::from_str(&mut call).unwrap() };
-
-    // Send a message subscribing to newHeads
-    match execute_ws_call(
-        call.clone(),
+    send_newheads_sub_message(
         user_id,
         &incoming_tx,
-        outgoing_rx,
+        &outgoing_rx,
         &sub_data,
         &cache_args,
-    )
-    .await
-    {
-        Ok(_) => {
-            let _ = sub_data.subscribe_user(user_id, call);
-        }
-        Err(e) => {
-            panic!(
-                "FATAL: Error subscribing to newHeads in health check: {}",
-                e
-            )
-        }
-    };
+    ).await;
 
     // New message == new head received. We can then update and process
     // everything associated with a new head block.
@@ -214,10 +230,19 @@ pub async fn subscribe_to_new_heads(
             }
             Err(_) => {
                 // Handle the timeout case
-                let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
-                nn_rwlock.latest = 0;
-                incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+                {
+                    let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
+                    nn_rwlock.latest = 0;
+                    incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+                }
                 println!("Timeout in newHeads subscription");
+                send_newheads_sub_message(
+                    user_id,
+                    &incoming_tx,
+                    &outgoing_rx,
+                    &sub_data,
+                    &cache_args,
+                ).await;
             }
         }
     }
