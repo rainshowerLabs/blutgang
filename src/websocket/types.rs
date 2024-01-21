@@ -214,11 +214,13 @@ impl SubscriptionData {
     pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
         let mut rax: Vec<String>;
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        incoming_subscriptions.iter().map(|(subscription, node_sub_info)| {
-            if node_sub_info.node_id == node_id {
-                rax.push(subscription.to_owned());
-            }
-        });
+        incoming_subscriptions
+            .iter()
+            .map(|(subscription, node_sub_info)| {
+                if node_sub_info.node_id == node_id {
+                    rax.push(subscription.to_owned());
+                }
+            });
 
         return rax;
     }

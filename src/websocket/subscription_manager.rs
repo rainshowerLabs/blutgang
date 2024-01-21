@@ -90,13 +90,26 @@ pub fn move_subscriptions(
     mut rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
-    target: usize,
 ) -> Result<(), Error> {
     // First we collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
 
-    // 
+    // Next, we want to send unsubscribe messages (for postoriety) to node_id
+    for id in ids {
+        let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
+        let message = WsconnMessage::Message(unsub, Some(node_id));
+        let _ = incoming_tx.send(message);
+    }
+
+    // Finally, we want to send subscription messages to `target`, register them, and move over the users
+    for params in subs {
+        let sub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_subscribe","params": params});
+        let message = WsconnMessage::Message(unsub, None);
+        let _ = incoming_tx.send(message);
+
+        // Wait for the response and register the user
+    } 
 
     Ok(())
 }
