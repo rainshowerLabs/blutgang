@@ -1,16 +1,21 @@
-use crate::config::setup::WS_SUB_MANAGER_ID;
+use crate::{
+    config::setup::WS_SUB_MANAGER_ID,
+    websocket::{
+        error::Error,
+        types::{
+            IncomingResponse,
+            RequestResult,
+            SubscriptionData,
+            WsconnMessage,
+        },
+    },
+};
 
 use std::{
     println,
     sync::Arc,
 };
 
-use crate::websocket::types::{
-    IncomingResponse,
-    RequestResult,
-    SubscriptionData,
-    WsconnMessage,
-};
 use tokio::sync::{
     broadcast,
     mpsc,
@@ -76,6 +81,24 @@ pub fn subscription_dispatcher(
             };
         }
     });
+}
+
+// Moves all subscriptions from one node to another one.
+// Used during node failiure. Do not use this liberally as it is very heavy.
+pub fn move_subscriptions(
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    mut rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: Arc<SubscriptionData>,
+    node_id: usize,
+    target: usize,
+) -> Result<(), Error> {
+    // First we collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
+    let subs = sub_data.get_subscription_by_node(node_id);
+    let ids = sub_data.get_sub_id_by_node(node_id);
+
+    // 
+
+    Ok(())
 }
 
 #[cfg(test)]

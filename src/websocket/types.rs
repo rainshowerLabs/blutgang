@@ -197,6 +197,32 @@ impl SubscriptionData {
             })
     }
 
+    // Return all sub ids for a given node_id
+    pub fn get_sub_id_by_node(&self, node_id: usize) -> Vec<String> {
+        let mut rax: Vec<String>;
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+        incoming_subscriptions.iter().map(|(_, node_sub_info)| {
+            if node_sub_info.node_id == node_id {
+                rax.push(node_sub_info.subscription_id);
+            }
+        });
+
+        return rax;
+    }
+
+    // Return all subscriptions for a given node_id
+    pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
+        let mut rax: Vec<String>;
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+        incoming_subscriptions.iter().map(|(subscription, node_sub_info)| {
+            if node_sub_info.node_id == node_id {
+                rax.push(subscription.to_owned());
+            }
+        });
+
+        return rax;
+    }
+
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
         let subscriptions = self.subscriptions.read().unwrap();
         let mut users = Vec::new();

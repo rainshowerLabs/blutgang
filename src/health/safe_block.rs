@@ -29,9 +29,9 @@ use serde_json::Value;
 
 use tokio::{
     sync::{
+        broadcast,
         mpsc,
         watch,
-        broadcast,
     },
     time::{
         timeout,
@@ -173,7 +173,7 @@ async fn send_newheads_sub_message(
                 e
             )
         }
-    };   
+    };
 }
 
 // Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
@@ -202,13 +202,7 @@ pub async fn subscribe_to_new_heads(
     };
     sub_data.add_user(user_id, user_data);
 
-    send_newheads_sub_message(
-        user_id,
-        &incoming_tx,
-        &outgoing_rx,
-        &sub_data,
-        &cache_args,
-    ).await;
+    send_newheads_sub_message(user_id, &incoming_tx, &outgoing_rx, &sub_data, &cache_args).await;
 
     // New message == new head received. We can then update and process
     // everything associated with a new head block.
@@ -242,7 +236,8 @@ pub async fn subscribe_to_new_heads(
                     &outgoing_rx,
                     &sub_data,
                     &cache_args,
-                ).await;
+                )
+                .await;
             }
         }
     }

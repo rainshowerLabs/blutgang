@@ -228,7 +228,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
 
             tokio::task::spawn(async move {
-                subscribe_to_new_heads(heads_inc, heads_rx, blocknum_tx, heads_sub_data, cache_args, health_check_ttl)
+                subscribe_to_new_heads(
+                    heads_inc,
+                    heads_rx,
+                    blocknum_tx,
+                    heads_sub_data,
+                    cache_args,
+                    health_check_ttl,
+                )
                 .await;
             });
         }
