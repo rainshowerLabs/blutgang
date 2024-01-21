@@ -102,13 +102,19 @@ pub fn move_subscriptions(
         let _ = incoming_tx.send(message);
     }
 
+
+    // Spawn a thread that listens to the subscription messages
+    tokio::spawn(async move {
+        let response = rx.recv().await.unwrap();
+
+        if response.content["id"] == WS_SUB_MANAGER_ID {}
+    });
+
     // Finally, we want to send subscription messages to `target`, register them, and move over the users
     for params in subs {
         let sub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_subscribe","params": params});
-        let message = WsconnMessage::Message(unsub, None);
+        let message = WsconnMessage::Message(sub, None);
         let _ = incoming_tx.send(message);
-
-        // Wait for the response and register the user
     } 
 
     Ok(())
