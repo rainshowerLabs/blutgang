@@ -15,7 +15,6 @@ use std::{
     println,
     sync::{
         Arc,
-        RwLock,
     },
 };
 
@@ -96,7 +95,7 @@ pub fn subscription_dispatcher(
 // Used during node failiure. Do not use this liberally as it is very heavy.
 pub fn move_subscriptions(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
-    mut rx: broadcast::Receiver<IncomingResponse>,
+    rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
@@ -117,7 +116,7 @@ pub fn move_subscriptions(
     let mut pairs = Vec::new();
     let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
     for params in subs {
-        id = id + 1;
+        id += 1;
         let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
         let message = WsconnMessage::Message(sub, None);
 

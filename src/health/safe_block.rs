@@ -157,10 +157,10 @@ async fn send_newheads_sub_message(
     match execute_ws_call(
         call.clone(),
         user_id,
-        &incoming_tx,
+        incoming_tx,
         outgoing_rx.resubscribe(),
-        &sub_data,
-        &cache_args,
+        sub_data,
+        cache_args,
     )
     .await
     {

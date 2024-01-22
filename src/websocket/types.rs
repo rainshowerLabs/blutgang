@@ -121,14 +121,14 @@ impl SubscriptionData {
         );
     }
 
-    fn raw_register(&self, subscription: &String, subscription_id: String, node_id: usize) {
+    fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
             "register_subscription inserting: {:?}",
-            subscription.clone()
+            subscription.to_owned()
         );
         incoming_subscriptions.insert(
-            subscription.clone(),
+            subscription.to_owned(),
             NodeSubInfo {
                 node_id,
                 subscription_id,
@@ -220,7 +220,7 @@ impl SubscriptionData {
             }
         });
 
-        return rax;
+        rax
     }
 
     // Return all subscriptions for a given node_id
@@ -235,7 +235,7 @@ impl SubscriptionData {
                 }
             });
 
-        return rax;
+        rax
     }
 
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
