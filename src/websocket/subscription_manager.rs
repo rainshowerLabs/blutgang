@@ -13,7 +13,10 @@ use crate::{
 
 use std::{
     println,
-    sync::Arc,
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 
 use tokio::sync::{
@@ -26,7 +29,7 @@ use serde_json::json;
 #[derive(Debug)]
 struct IdParamPair {
     pub id: u32,
-    pub params: String
+    pub params: String,
 }
 
 // Sends all subscriptions to their relevant nodes
@@ -97,6 +100,8 @@ pub fn move_subscriptions(
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
+    let _ = rx; // bind `rx` so we have time to process all messages
+
     // First we collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
@@ -108,28 +113,22 @@ pub fn move_subscriptions(
         let _ = incoming_tx.send(message);
     }
 
-
-    // Spawn a thread that listens to the subscription messages
-    tokio::spawn(async move {
-        let response = rx.recv().await.unwrap();
-
-        if response.content["id"] == WS_SUB_MANAGER_ID {}
-    });
-
     // Finally, we want to send subscription messages to `target`, register them, and move over the users
     let mut pairs = Vec::new();
-    let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic
+    let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
     for params in subs {
         id = id + 1;
         let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
         let message = WsconnMessage::Message(sub, None);
-        let _ = incoming_tx.send(message);
-        let rax = IdParamPair {
-            id,
-            params,
-        };
+
+        let rax = IdParamPair { id, params };
         pairs.push(rax);
+
+        let _ = incoming_tx.send(message);
     }
+
+    // Listen on `rx` for incoming messages.
+    // We're only interested in ones that have the right ID as specified in pairs
 
     Ok(())
 }

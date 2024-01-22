@@ -111,6 +111,17 @@ impl SubscriptionData {
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
 
+        self.raw_register(&subscription, subscription_id, node_id);
+        println!(
+            "register_subscription: {:?}",
+            self.incoming_subscriptions
+                .read()
+                .unwrap()
+                .get(&subscription)
+        );
+    }
+
+    fn raw_register(&self, subscription: &String, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
             "register_subscription inserting: {:?}",
@@ -122,10 +133,6 @@ impl SubscriptionData {
                 node_id,
                 subscription_id,
             },
-        );
-        println!(
-            "register_subscription: {:?}",
-            incoming_subscriptions.get(&subscription)
         );
     }
 
@@ -146,10 +153,14 @@ impl SubscriptionData {
 
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
-
         println!("subscribe_user finding: {}", subscription);
+
+        self.raw_subscribe(user_id, &subscription)
+    }
+
+    fn raw_subscribe(&self, user_id: u32, subscription: &String) -> Result<String, Error> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        let node_sub_info = match incoming_subscriptions.get(&subscription) {
+        let node_sub_info = match incoming_subscriptions.get(subscription) {
             Some(rax) => rax,
             None => return Err(format!("Subscription {} does not exist!", subscription).into()),
         };
@@ -197,13 +208,15 @@ impl SubscriptionData {
             })
     }
 
+    // NO TESTS
+
     // Return all sub ids for a given node_id
     pub fn get_sub_id_by_node(&self, node_id: usize) -> Vec<String> {
-        let mut rax: Vec<String>;
+        let mut rax = vec![];
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        incoming_subscriptions.iter().map(|(_, node_sub_info)| {
+        let _ = incoming_subscriptions.iter().map(|(_, node_sub_info)| {
             if node_sub_info.node_id == node_id {
-                rax.push(node_sub_info.subscription_id);
+                rax.push(node_sub_info.subscription_id.to_owned());
             }
         });
 
@@ -212,9 +225,9 @@ impl SubscriptionData {
 
     // Return all subscriptions for a given node_id
     pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
-        let mut rax: Vec<String>;
+        let mut rax = vec![];
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        incoming_subscriptions
+        let _ = incoming_subscriptions
             .iter()
             .map(|(subscription, node_sub_info)| {
                 if node_sub_info.node_id == node_id {
@@ -238,6 +251,34 @@ impl SubscriptionData {
 
         users
     }
+
+    // Moves all subscription from one node to another
+    pub fn move_subscriptions(
+        &self,
+        target: usize,
+        request: String,
+        subscription_id: String,
+    ) -> Result<(), Error> {
+        // Get all the users that are subscribed to our subscription
+        let users = self.get_users_for_subscription(&request);
+        // Unsubscribe everyone from the subscription
+        for user_id in users.iter() {
+            self.unsubscribe_user(*user_id, request.clone());
+        }
+
+        // Unregister/register
+        self.unregister_subscription(request.clone());
+        self.raw_register(&request, subscription_id, target);
+
+        // resubscribe all the users now
+        for user_id in users.iter() {
+            self.raw_subscribe(*user_id, &request)?;
+        }
+
+        Ok(())
+    }
+
+    /// UP TO HERE
 
     pub async fn dispatch_to_subscribers(
         &self,
