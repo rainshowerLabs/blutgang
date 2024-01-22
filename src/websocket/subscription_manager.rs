@@ -23,6 +23,12 @@ use tokio::sync::{
 
 use serde_json::json;
 
+#[derive(Debug)]
+struct IdParamPair {
+    pub id: u32,
+    pub params: String
+}
+
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
     mut rx: broadcast::Receiver<IncomingResponse>,
@@ -111,11 +117,19 @@ pub fn move_subscriptions(
     });
 
     // Finally, we want to send subscription messages to `target`, register them, and move over the users
+    let mut pairs = Vec::new();
+    let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic
     for params in subs {
-        let sub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_subscribe","params": params});
+        id = id + 1;
+        let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
         let message = WsconnMessage::Message(sub, None);
         let _ = incoming_tx.send(message);
-    } 
+        let rax = IdParamPair {
+            id,
+            params,
+        };
+        pairs.push(rax);
+    }
 
     Ok(())
 }

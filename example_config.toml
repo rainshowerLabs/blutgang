@@ -54,10 +54,11 @@ flush_every_ms = 24000
 
 # Add seperate RPCs as TOML tables
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
-[llama]
-# RPC url
-url = "https://eth.llamarpc.com"
+
+[merkle]
+url = "https://eth.merkle.io"
+ws_url = "wss://eth.merkle.io"
+max_consecutive = 150
 # The maximum ammount of time we can use this rpc in a row.
-max_consecutive = 5
-# Max ammount of querries per second. Doesn't do anything for now.
-max_per_second = 0
+max_per_second = 200
+# Max ammount of querries per second.
