@@ -16,6 +16,7 @@ use std::{
     sync::{
         Arc,
     },
+    collections::HashMap,
 };
 
 use tokio::sync::{
@@ -99,8 +100,6 @@ pub fn move_subscriptions(
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
-    let _ = rx; // bind `rx` so we have time to process all messages
-
     // First we collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
@@ -113,21 +112,31 @@ pub fn move_subscriptions(
     }
 
     // Finally, we want to send subscription messages to `target`, register them, and move over the users
-    let mut pairs = Vec::new();
+    let _ = rx; // bind `rx` so we have time to process all messages
+    let mut pairs = HashMap::new();
     let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
     for params in subs {
         id += 1;
         let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
         let message = WsconnMessage::Message(sub, None);
 
-        let rax = IdParamPair { id, params };
-        pairs.push(rax);
+        pairs[id] = params;
 
         let _ = incoming_tx.send(message);
     }
 
     // Listen on `rx` for incoming messages.
     // We're only interested in ones that have the right ID as specified in pairs
+
+    loop {
+        let response = rx.recv().await.unwrap();
+
+        // Discard any response that does not have a proper ID
+        if pairs.get(response["id"]).is_none() {
+            continue;
+        }
+
+    }
 
     Ok(())
 }

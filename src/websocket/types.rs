@@ -271,8 +271,8 @@ impl SubscriptionData {
         self.raw_register(&request, subscription_id, target);
 
         // resubscribe all the users now
-        for user_id in users.iter() {
-            self.raw_subscribe(*user_id, &request)?;
+        for user_id in users.iter() {)?;
+            self.raw_subscribe(*user_id, &request
         }
 
         Ok(())
