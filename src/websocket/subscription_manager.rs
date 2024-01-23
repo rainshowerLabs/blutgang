@@ -105,7 +105,7 @@ pub async fn move_subscriptions(
         let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
         let message = WsconnMessage::Message(unsub, Some(node_id));
         let rax = sub_data.get_users_for_subscription(&id);
-        sub_id_user_map.insert(sub_data.get, rax);
+        sub_id_user_map.insert(sub_data.get_params_by_id(&id).unwrap(), rax);
         let _ = incoming_tx.send(message);
     }
 
@@ -142,14 +142,16 @@ pub async fn move_subscriptions(
 
         // Discard any response that does not have a proper ID
         let params = pairs.get(&(response.content["id"].as_u64().unwrap() as u32));
-        if params.is_none()
-        {
+        if params.is_none() {
             continue;
         }
 
         // Register subscription and subscribe all the users
-        sub_data.raw_register(params.unwrap(), response.content["result"].to_string(), response.node_id);
-        for user in 
+        sub_data.raw_register(
+            params.unwrap(),
+            response.content["result"].to_string(),
+            response.node_id,
+        );
     }
 
     Ok(())
