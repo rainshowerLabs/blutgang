@@ -94,9 +94,9 @@ pub fn subscription_dispatcher(
 
 // Moves all subscriptions from one node to another one.
 // Used during node failiure. Do not use this liberally as it is very heavy.
-pub fn move_subscriptions(
+pub async fn move_subscriptions(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
-    rx: broadcast::Receiver<IncomingResponse>,
+    mut rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
@@ -113,14 +113,14 @@ pub fn move_subscriptions(
 
     // Finally, we want to send subscription messages to `target`, register them, and move over the users
     let _ = rx; // bind `rx` so we have time to process all messages
-    let mut pairs = HashMap::new();
+    let mut pairs: HashMap<u32, String> = HashMap::new();
     let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
     for params in subs {
         id += 1;
         let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
         let message = WsconnMessage::Message(sub, None);
 
-        pairs[id] = params;
+        pairs.insert(id, params);
 
         let _ = incoming_tx.send(message);
     }
@@ -132,7 +132,7 @@ pub fn move_subscriptions(
         let response = rx.recv().await.unwrap();
 
         // Discard any response that does not have a proper ID
-        if pairs.get(response["id"]).is_none() {
+        if pairs.get(&(response.content["id"].as_u64().unwrap() as u32)).is_none() {
             continue;
         }
 
