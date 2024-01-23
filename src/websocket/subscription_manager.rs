@@ -12,25 +12,20 @@ use crate::{
 };
 
 use std::{
-    println,
-    sync::{
-        Arc,
-    },
     collections::HashMap,
+    println,
+    sync::Arc,
 };
 
 use tokio::sync::{
-    broadcast,
+    broadcast::{
+        self,
+        error::RecvError,
+    },
     mpsc,
 };
 
 use serde_json::json;
-
-#[derive(Debug)]
-struct IdParamPair {
-    pub id: u32,
-    pub params: String,
-}
 
 // Sends all subscriptions to their relevant nodes
 pub fn subscription_dispatcher(
@@ -127,15 +122,28 @@ pub async fn move_subscriptions(
 
     // Listen on `rx` for incoming messages.
     // We're only interested in ones that have the right ID as specified in pairs
-
+    //
+    //
     loop {
-        let response = rx.recv().await.unwrap();
+        // TODO: errors!
+        let response = match rx.recv().await {
+            Ok(rax) => rax,
+            Err(RecvError::Lagged(_)) => {
+                println!("\x1b[31mErr:\x1b[0m Receiver lagged while moving channels! Restart Blutgang ASAP!!!");
+                break;
+            }
+            Err(RecvError::Closed) => {
+                panic!("\x1b[31mErr:\x1b[0m Channel closed while moving subscriptions!")
+            }
+        };
 
         // Discard any response that does not have a proper ID
-        if pairs.get(&(response.content["id"].as_u64().unwrap() as u32)).is_none() {
+        if pairs
+            .get(&(response.content["id"].as_u64().unwrap() as u32))
+            .is_none()
+        {
             continue;
         }
-
     }
 
     Ok(())
