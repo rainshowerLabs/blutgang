@@ -95,18 +95,21 @@ pub async fn move_subscriptions(
     sub_data: Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
-    // First we collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
+    // Collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
+    let mut sub_id_user_map = HashMap::new();
 
-    // Next, we want to send unsubscribe messages (for postoriety) to node_id
+    // We want to send unsubscribe messages (for postoriety) to node_id
     for id in ids {
         let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
         let message = WsconnMessage::Message(unsub, Some(node_id));
+        let rax = sub_data.get_users_for_subscription(&id);
+        sub_id_user_map.insert(sub_data.get, rax);
         let _ = incoming_tx.send(message);
     }
 
-    // Finally, we want to send subscription messages to `target`, register them, and move over the users
+    // We want to send subscription messages to `target`, register them, and move over the users
     let _ = rx; // bind `rx` so we have time to process all messages
     let mut pairs: HashMap<u32, String> = HashMap::new();
     let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
@@ -138,12 +141,15 @@ pub async fn move_subscriptions(
         };
 
         // Discard any response that does not have a proper ID
-        if pairs
-            .get(&(response.content["id"].as_u64().unwrap() as u32))
-            .is_none()
+        let params = pairs.get(&(response.content["id"].as_u64().unwrap() as u32));
+        if params.is_none()
         {
             continue;
         }
+
+        // Register subscription and subscribe all the users
+        sub_data.raw_register(params.unwrap(), response.content["result"].to_string(), response.node_id);
+        for user in 
     }
 
     Ok(())

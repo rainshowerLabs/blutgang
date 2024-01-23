@@ -121,7 +121,7 @@ impl SubscriptionData {
         );
     }
 
-    fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
+    pub fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
             "register_subscription inserting: {:?}",
@@ -250,6 +250,12 @@ impl SubscriptionData {
         }
 
         users
+    }
+
+    pub fn get_params_by_id(&self, subscription_id: &str) -> String {
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+
+        
     }
 
     // Moves all subscription from one node to another
