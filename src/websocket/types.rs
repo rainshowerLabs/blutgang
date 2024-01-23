@@ -252,10 +252,15 @@ impl SubscriptionData {
         users
     }
 
-    pub fn get_params_by_id(&self, subscription_id: &str) -> String {
+    pub fn get_params_by_id(&self, subscription_id: &str) -> Option<String> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
 
-        
+        for (params, sub_data) in &*incoming_subscriptions {
+            if sub_data.subscription_id == subscription_id {
+                return Some(params.to_string());
+            }
+        }
+        None
     }
 
     // Moves all subscription from one node to another
