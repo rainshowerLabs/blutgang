@@ -212,32 +212,38 @@ impl SubscriptionData {
 
     // Return all sub ids for a given node_id
     pub fn get_sub_id_by_node(&self, node_id: usize) -> Vec<String> {
-        let mut rax = vec![];
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        let _ = incoming_subscriptions.iter().map(|(_, node_sub_info)| {
-            if node_sub_info.node_id == node_id {
-                rax.push(node_sub_info.subscription_id.to_owned());
-            }
-        });
-
-        rax
+        incoming_subscriptions
+            .iter()
+            .filter_map(|(_, node_sub_info)| {
+                if node_sub_info.node_id == node_id {
+                    Some(node_sub_info.subscription_id.to_owned())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
+
 
     // Return all subscriptions for a given node_id
     pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
-        let mut rax = vec![];
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        let _ = incoming_subscriptions
+        incoming_subscriptions
             .iter()
-            .map(|(subscription, node_sub_info)| {
+            .filter_map(|(subscription, node_sub_info)| {
                 if node_sub_info.node_id == node_id {
-                    rax.push(subscription.to_owned());
+                    // Assuming the subscription string is in a JSON array format, like "[\"newHeads\"]"
+                    serde_json::from_str::<Vec<String>>(subscription)
+                        .ok()
+                        .and_then(|v| v.into_iter().next())
+                } else {
+                    None
                 }
-            });
-
-        rax
+            })
+            .collect()
     }
-
+    
     // Return a Vec of all users subscribed to a subscription
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
         let subscriptions = self.subscriptions.read().unwrap();
