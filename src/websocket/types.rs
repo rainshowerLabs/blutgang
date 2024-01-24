@@ -121,7 +121,7 @@ impl SubscriptionData {
         );
     }
 
-    pub fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
+    fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
             "register_subscription inserting: {:?}",

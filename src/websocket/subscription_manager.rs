@@ -141,17 +141,24 @@ pub async fn move_subscriptions(
         };
 
         // Discard any response that does not have a proper ID
-        let params = pairs.get(&(response.content["id"].as_u64().unwrap() as u32));
-        if params.is_none() {
-            continue;
-        }
+        let pair_id = response.content["id"].as_u64().unwrap() as u32;
+        let params = match pairs.get(&pair_id) {
+            Some(rax) => rax.to_string(),
+            None => continue,
+        };
 
-        // Register subscription and subscribe all the users
-        sub_data.raw_register(
-            params.unwrap(),
-            response.content["result"].to_string(),
+        let _ = match sub_data.move_subscriptions(
             response.node_id,
-        );
+            params,
+            response.content["result"].as_str().unwrap().to_string(),
+        ) {
+            Ok(_) => Ok::<(), Error>(()),
+            Err(err) => Err(err.into()),
+        };
+        pairs.remove(&pair_id);
+        if pairs.is_empty() {
+            break;
+        }
     }
 
     Ok(())
