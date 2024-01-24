@@ -52,6 +52,12 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 ![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/8ce9a690-d2eb-4910-9a5d-807c2bdd4649)
 ![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/50d78e5f-2209-488d-82fc-8018388a82e7)
 
+## Acknowledgements
+
+- [dshackle](https://github.com/emeraldpay/dshackle) for pioneering fault tolerant node balancers.
+- [proxyd](https://github.com/ethereum-optimism/optimism/tree/develop/proxyd) for inspiration.
+- [web3-proxy](https://github.com/llamanodes/web3-proxy) for an alternative approach at building Eth load balancers in Rust.
+
 ## Notes on the license
 
 Blutgang is libre software licensed under the AGPL-3.0 license. If you are using blutgang in a commercial enviroment, and do not get a commercial license from us, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
