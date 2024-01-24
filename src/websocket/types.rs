@@ -124,7 +124,7 @@ impl SubscriptionData {
     fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
-            "register_subscription inserting: {:?}",
+            "register_subscription inserting: {}",
             subscription.to_owned()
         );
         incoming_subscriptions.insert(
@@ -208,8 +208,6 @@ impl SubscriptionData {
             })
     }
 
-    // NO TESTS
-
     // Return all sub ids for a given node_id
     pub fn get_sub_id_by_node(&self, node_id: usize) -> Vec<String> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
@@ -243,13 +241,15 @@ impl SubscriptionData {
             })
             .collect()
     }
-    
+
     // Return a Vec of all users subscribed to a subscription
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
         let subscriptions = self.subscriptions.read().unwrap();
         let mut users = Vec::new();
 
+        println!("subscription_id: {}", subscription_id);
         for (node_sub_info, subscribers) in subscriptions.iter() {
+            println!("node_sub_info.subscription_id {}", node_sub_info.subscription_id);
             if node_sub_info.subscription_id == subscription_id {
                 users.extend(subscribers.iter().copied());
                 break;
@@ -268,6 +268,7 @@ impl SubscriptionData {
     ) -> Result<(), Error> {
         // Get all the users that are subscribed to our subscription
         let users = self.get_users_for_subscription(&request);
+        println!("len: {}", users.len());
         // Unsubscribe everyone from the subscription
         for user_id in users.iter() {
             self.unsubscribe_user(*user_id, request.clone());
@@ -277,15 +278,16 @@ impl SubscriptionData {
         self.unregister_subscription(request.clone());
         self.raw_register(&request, subscription_id, target);
 
+        println!("len: {}", users.len());
+
         // resubscribe all the users now
         for user_id in users.iter() {
+            println!("{} {}", user_id, request);
             self.raw_subscribe(*user_id, &request)?;
         }
 
         Ok(())
     }
-
-    /// UP TO HERE
 
     pub async fn dispatch_to_subscribers(
         &self,
@@ -595,11 +597,17 @@ mod tests {
         let subscription_data = SubscriptionData::new();
         let source_node_id = 30;
         let target_node_id = 31;
-        let subscription_request = "oldHeads".to_string();
+        let subscription_request = json!({"params": ["oldHeads"]});
         let subscription_id = "sub789".to_string();
 
         let (tx, _rx) = mpsc::unbounded_channel();
         let user_id = 123;
+        subscription_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.clone(),
+            source_node_id,
+        );
+
         subscription_data.add_user(
             user_id,
             UserData {
@@ -607,19 +615,14 @@ mod tests {
             },
         );
 
-        subscription_data.raw_register(
-            &subscription_request,
-            subscription_id.clone(),
-            source_node_id,
-        );
         subscription_data
-            .raw_subscribe(user_id, &subscription_request)
+            .subscribe_user(user_id, subscription_request)
             .unwrap();
 
         assert!(subscription_data
             .move_subscriptions(
                 target_node_id,
-                subscription_request.clone(),
+                r#"["oldHeads"]"#.to_string(),
                 subscription_id.clone()
             )
             .is_ok());
@@ -638,7 +641,7 @@ mod tests {
         // Check if subscription has been moved from the old node
         let old_node_sub_info = NodeSubInfo {
             node_id: source_node_id,
-            subscription_id: subscription_request,
+            subscription_id: r#"["oldHeads"]"#.to_string(),
         };
         assert!(subscriptions.get(&old_node_sub_info).is_none());
     }
