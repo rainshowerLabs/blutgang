@@ -132,11 +132,10 @@ pub async fn move_subscriptions(
         let response = match rx.recv().await {
             Ok(rax) => rax,
             Err(RecvError::Lagged(_)) => {
-                println!("\x1b[31mErr:\x1b[0m Receiver lagged while moving channels! Restart Blutgang ASAP!!!");
-                break;
+                return Err("Receiver lagged while moving channels! Restart Blutgang ASAP!!!".into())
             }
             Err(RecvError::Closed) => {
-                panic!("\x1b[31mErr:\x1b[0m Channel closed while moving subscriptions!")
+                return Err("Channel closed while moving subscriptions!".into())
             }
         };
 
@@ -153,7 +152,7 @@ pub async fn move_subscriptions(
             response.content["result"].as_str().unwrap().to_string(),
         ) {
             Ok(_) => Ok::<(), Error>(()),
-            Err(err) => Err(err.into()),
+            Err(err) => Err(err),
         };
         pairs.remove(&pair_id);
         if pairs.is_empty() {
