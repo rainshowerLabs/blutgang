@@ -151,8 +151,8 @@ pub async fn move_subscriptions(
             params,
             response.content["result"].as_str().unwrap().to_string(),
         ) {
-            Ok(_) => Ok::<(), Error>(()),
-            Err(err) => Err(err),
+            Ok(_) => {},
+            Err(err) => return Err(err),
         };
         pairs.remove(&pair_id);
         if pairs.is_empty() {
