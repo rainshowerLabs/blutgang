@@ -238,6 +238,7 @@ impl SubscriptionData {
         rax
     }
 
+    // Return a Vec of all users subscribed to a subscription
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
         let subscriptions = self.subscriptions.read().unwrap();
         let mut users = Vec::new();
@@ -250,17 +251,6 @@ impl SubscriptionData {
         }
 
         users
-    }
-
-    pub fn get_params_by_id(&self, subscription_id: &str) -> Option<String> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-
-        for (params, sub_data) in &*incoming_subscriptions {
-            if sub_data.subscription_id == subscription_id {
-                return Some(params.to_string());
-            }
-        }
-        None
     }
 
     // Moves all subscription from one node to another
@@ -502,6 +492,184 @@ mod tests {
             .unwrap()
             .get(&nonexistent_node_sub_info)
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_get_sub_id_by_node() {
+        let subscription_data = SubscriptionData::new();
+        let node_id = 10;
+        let subscription_id = "sub123".to_string();
+
+        let subscription_request = json!({"params": ["newHeads"]});
+        subscription_data.register_subscription(
+            subscription_request,
+            subscription_id.clone(),
+            node_id,
+        );
+
+        let sub_ids = subscription_data.get_sub_id_by_node(node_id);
+        assert_eq!(sub_ids, vec![subscription_id]);
+
+        let sub_ids_for_nonexistent_node = subscription_data.get_sub_id_by_node(999);
+        assert!(sub_ids_for_nonexistent_node.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_sub_id_by_node_with_multiple_subscriptions() {
+        let subscription_data = SubscriptionData::new();
+        let node_id = 10;
+
+        let subscription_request_1 = json!({"params": ["newHeads"]});
+        let subscription_request_2 = json!({"params": ["logs"]});
+
+        subscription_data.register_subscription(
+            subscription_request_1,
+            "sub123".to_string(),
+            node_id,
+        );
+        subscription_data.register_subscription(
+            subscription_request_2,
+            "sub456".to_string(),
+            node_id,
+        );
+
+        let sub_ids = subscription_data.get_sub_id_by_node(node_id);
+        assert_eq!(sub_ids.len(), 2);
+        assert!(sub_ids.contains(&"sub123".to_string()));
+        assert!(sub_ids.contains(&"sub456".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_subscription_by_node() {
+        let subscription_data = SubscriptionData::new();
+        let node_id = 20;
+        let subscription_request_str = "newHeads".to_string();
+
+        let subscription_request = json!({"params": [subscription_request_str.clone()]});
+        subscription_data.register_subscription(
+            subscription_request,
+            "sub456".to_string(),
+            node_id,
+        );
+
+        let subscriptions = subscription_data.get_subscription_by_node(node_id);
+        assert_eq!(subscriptions, vec![subscription_request_str]);
+
+        let subscriptions_for_nonexistent_node = subscription_data.get_subscription_by_node(999);
+        assert!(subscriptions_for_nonexistent_node.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_subscription_by_node_with_multiple_subscriptions() {
+        let subscription_data = SubscriptionData::new();
+        let node_id = 20;
+
+        let subscription_request_1 = json!({"params": ["newHeads"]});
+        let subscription_request_2 = json!({"params": ["logs"]});
+
+        subscription_data.register_subscription(
+            subscription_request_1,
+            "sub789".to_string(),
+            node_id,
+        );
+        subscription_data.register_subscription(
+            subscription_request_2,
+            "sub101112".to_string(),
+            node_id,
+        );
+
+        let subscriptions = subscription_data.get_subscription_by_node(node_id);
+        assert_eq!(subscriptions.len(), 2);
+        assert!(subscriptions.contains(&"newHeads".to_string()));
+        assert!(subscriptions.contains(&"logs".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_move_subscriptions() {
+        let subscription_data = SubscriptionData::new();
+        let source_node_id = 30;
+        let target_node_id = 31;
+        let subscription_request = "oldHeads".to_string();
+        let subscription_id = "sub789".to_string();
+
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let user_id = 123;
+        subscription_data.add_user(
+            user_id,
+            UserData {
+                message_channel: tx,
+            },
+        );
+
+        subscription_data.raw_register(
+            &subscription_request,
+            subscription_id.clone(),
+            source_node_id,
+        );
+        subscription_data
+            .raw_subscribe(user_id, &subscription_request)
+            .unwrap();
+
+        assert!(subscription_data
+            .move_subscriptions(
+                target_node_id,
+                subscription_request.clone(),
+                subscription_id.clone()
+            )
+            .is_ok());
+
+        // Check if user is subscribed to the new node
+        let subscriptions = subscription_data.subscriptions.read().unwrap();
+        let node_sub_info = NodeSubInfo {
+            node_id: target_node_id,
+            subscription_id,
+        };
+        assert!(subscriptions
+            .get(&node_sub_info)
+            .unwrap()
+            .contains(&user_id));
+
+        // Check if subscription has been moved from the old node
+        let old_node_sub_info = NodeSubInfo {
+            node_id: source_node_id,
+            subscription_id: subscription_request,
+        };
+        assert!(subscriptions.get(&old_node_sub_info).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_move_subscriptions_with_no_subscribers() {
+        let subscription_data = SubscriptionData::new();
+        let source_node_id = 30;
+        let target_node_id = 31;
+        let subscription_request = "oldHeads".to_string();
+        let subscription_id = "sub789".to_string();
+
+        subscription_data.raw_register(
+            &subscription_request,
+            subscription_id.clone(),
+            source_node_id,
+        );
+
+        assert!(subscription_data
+            .move_subscriptions(
+                target_node_id,
+                subscription_request.clone(),
+                subscription_id.clone()
+            )
+            .is_ok());
+
+        // Check if the subscription exists for the target node
+        let incoming_subscriptions = subscription_data.incoming_subscriptions.read().unwrap();
+        let node_sub_info = incoming_subscriptions.get(&subscription_request).unwrap();
+        assert_eq!(node_sub_info.node_id, target_node_id);
+
+        // Ensure there are no subscribers to the moved subscription
+        let subscriptions = subscription_data.subscriptions.read().unwrap();
+        assert!(
+            subscriptions.get(&node_sub_info).is_none()
+                || subscriptions.get(&node_sub_info).unwrap().is_empty()
+        );
     }
 
     #[tokio::test]

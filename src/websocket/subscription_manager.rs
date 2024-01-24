@@ -98,14 +98,11 @@ pub async fn move_subscriptions(
     // Collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
-    let mut sub_id_user_map = HashMap::new();
 
     // We want to send unsubscribe messages (for postoriety) to node_id
     for id in ids {
         let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
         let message = WsconnMessage::Message(unsub, Some(node_id));
-        let rax = sub_data.get_users_for_subscription(&id);
-        sub_id_user_map.insert(sub_data.get_params_by_id(&id).unwrap(), rax);
         let _ = incoming_tx.send(message);
     }
 
@@ -125,14 +122,14 @@ pub async fn move_subscriptions(
 
     // Listen on `rx` for incoming messages.
     // We're only interested in ones that have the right ID as specified in pairs
-    //
-    //
     loop {
         // TODO: errors!
         let response = match rx.recv().await {
             Ok(rax) => rax,
             Err(RecvError::Lagged(_)) => {
-                return Err("Receiver lagged while moving channels! Restart Blutgang ASAP!!!".into())
+                return Err(
+                    "Receiver lagged while moving channels! Restart Blutgang ASAP!!!".into(),
+                )
             }
             Err(RecvError::Closed) => {
                 return Err("Channel closed while moving subscriptions!".into())
@@ -146,14 +143,15 @@ pub async fn move_subscriptions(
             None => continue,
         };
 
-        let _ = match sub_data.move_subscriptions(
+        match sub_data.move_subscriptions(
             response.node_id,
             params,
             response.content["result"].as_str().unwrap().to_string(),
         ) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(err) => return Err(err),
         };
+
         pairs.remove(&pair_id);
         if pairs.is_empty() {
             break;
