@@ -10,6 +10,7 @@ use crate::{
     },
     websocket::{
         client::execute_ws_call,
+        subscription_manager::move_subscriptions,
         types::{
             IncomingResponse,
             RequestResult,
@@ -206,6 +207,7 @@ pub async fn subscribe_to_new_heads(
 
     // New message == new head received. We can then update and process
     // everything associated with a new head block.
+    let mut subscription_id: String = "".to_string();
     loop {
         match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), rx.recv()).await {
             Ok(Some(msg)) => {
@@ -213,6 +215,7 @@ pub async fn subscribe_to_new_heads(
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
+                    subscription_id = sub["subscription"].as_str().unwrap().to_owned();
                     println!("New head: {}", a);
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
@@ -230,12 +233,12 @@ pub async fn subscribe_to_new_heads(
                     incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
                 }
                 println!("Timeout in newHeads subscription");
-                send_newheads_sub_message(
-                    user_id,
-                    &incoming_tx,
-                    &outgoing_rx,
-                    &sub_data,
-                    &cache_args,
+                let node_id = sub_data.get_node_from_id(&subscription_id).unwrap();
+                let _ = move_subscriptions(
+                    incoming_tx.clone(),
+                    outgoing_rx.resubscribe(),
+                    sub_data.clone(),
+                    node_id,
                 )
                 .await;
             }
