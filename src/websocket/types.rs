@@ -3,7 +3,6 @@ use std::{
         HashMap,
         HashSet,
     },
-    println,
     sync::{
         Arc,
         RwLock,
@@ -239,8 +238,6 @@ impl SubscriptionData {
 
     pub fn get_sub_id_by_params(&self, params: &str) -> Option<String> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
-        println!("params: {}", params);
-        println!("i have cancer {:?}", incoming_subscriptions);
         incoming_subscriptions
             .iter()
             .filter_map(|(subscription, node_sub_info)| {
