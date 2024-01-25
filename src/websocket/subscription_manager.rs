@@ -143,6 +143,7 @@ pub async fn move_subscriptions(
             None => continue,
         };
 
+        println!("adasdadsa {}", response.content["result"].as_str().unwrap().to_string());
         match sub_data.move_subscriptions(
             response.node_id,
             params,

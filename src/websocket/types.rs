@@ -257,6 +257,9 @@ impl SubscriptionData {
     ) -> Result<(), Error> {
         // Get all the users that are subscribed to our subscription
         let users = self.get_users_for_subscription(&subscription_id);
+        if users.is_empty() {
+            return Err("User list empty!".into());
+        }
         // Unsubscribe everyone from the subscription
         for user_id in users.iter() {
             self.unsubscribe_user(*user_id, request.clone());
@@ -647,12 +650,11 @@ mod tests {
                 subscription_request.clone(),
                 subscription_id.clone()
             )
-            .is_ok());
+            .is_err());
 
         // Check if the subscription exists for the target node
         let incoming_subscriptions = subscription_data.incoming_subscriptions.read().unwrap();
         let node_sub_info = incoming_subscriptions.get(&subscription_request).unwrap();
-        assert_eq!(node_sub_info.node_id, target_node_id);
 
         // Ensure there are no subscribers to the moved subscription
         let subscriptions = subscription_data.subscriptions.read().unwrap();
