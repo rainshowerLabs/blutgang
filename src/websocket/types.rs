@@ -303,9 +303,7 @@ impl SubscriptionData {
                 if let Some(user) = users.get(&user_id) {
                     user.message_channel
                         .send(message.clone())
-                        .unwrap_or_else(|e| {
-                            println!("Error sending message to user {}: {}", user_id, e);
-                        });
+                        .map_err(|e| e)?;
                 }
             }
         }
