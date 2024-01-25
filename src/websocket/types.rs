@@ -3,6 +3,7 @@ use std::{
         HashMap,
         HashSet,
     },
+    println,
     sync::{
         Arc,
         RwLock,
@@ -222,15 +223,34 @@ impl SubscriptionData {
             .iter()
             .filter_map(|(subscription, node_sub_info)| {
                 if node_sub_info.node_id == node_id {
-                    // Assuming the subscription string is in a JSON array format, like "[\"newHeads\"]"
+                    // Parse the subscription string as a JSON array
                     serde_json::from_str::<Vec<String>>(subscription)
                         .ok()
-                        .and_then(|v| v.into_iter().next())
+                        .and_then(|v| {
+                            // Serialize each Vec<String> back into a JSON string format
+                            serde_json::to_string(&v).ok()
+                        })
                 } else {
                     None
                 }
             })
             .collect()
+    }
+
+    pub fn get_sub_id_by_params(&self, params: &str) -> Option<String> {
+        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
+        println!("params: {}", params);
+        println!("i have cancer {:?}", incoming_subscriptions);
+        incoming_subscriptions
+            .iter()
+            .filter_map(|(subscription, node_sub_info)| {
+                if subscription == params {
+                    Some(node_sub_info.subscription_id.to_owned())
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 
     // Return a Vec of all users subscribed to a subscription
@@ -535,9 +555,10 @@ mod tests {
     async fn test_get_subscription_by_node() {
         let subscription_data = SubscriptionData::new();
         let node_id = 20;
-        let subscription_request_str = "newHeads".to_string();
+        let subscription_params = vec!["newHeads"];
+        let subscription_request_str = serde_json::to_string(&subscription_params).unwrap();
 
-        let subscription_request = json!({"params": [subscription_request_str.clone()]});
+        let subscription_request = json!({"params": subscription_params});
         subscription_data.register_subscription(
             subscription_request,
             "sub456".to_string(),
@@ -552,12 +573,53 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_sub_id_by_params() {
+        // Create a mock SubscriptionData
+        let sub_data = SubscriptionData {
+            users: Arc::new(RwLock::new(HashMap::new())),
+            subscriptions: Arc::new(RwLock::new(HashMap::new())),
+            incoming_subscriptions: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        // Mock subscription data
+        let params = "newHeads";
+        let subscription_id = "sub123";
+        let node_id = 1;
+        sub_data.incoming_subscriptions.write().unwrap().insert(
+            params.to_string(),
+            NodeSubInfo {
+                node_id,
+                subscription_id: subscription_id.to_string(),
+            },
+        );
+
+        // Test for existing params
+        let result = sub_data.get_sub_id_by_params(params);
+        assert_eq!(
+            result,
+            Some(subscription_id.to_string()),
+            "Should return the correct subscription ID for existing params"
+        );
+
+        // Test for non-existing params
+        let non_existing_params = "logs";
+        let result = sub_data.get_sub_id_by_params(non_existing_params);
+        assert_eq!(result, None, "Should return None for non-existing params");
+    }
+
+    #[tokio::test]
     async fn test_get_subscription_by_node_with_multiple_subscriptions() {
         let subscription_data = SubscriptionData::new();
         let node_id = 20;
 
-        let subscription_request_1 = json!({"params": ["newHeads"]});
-        let subscription_request_2 = json!({"params": ["logs"]});
+        let subscription_params_1 = vec!["newHeads"];
+        let subscription_request_str_1 = serde_json::to_string(&subscription_params_1).unwrap();
+
+        let subscription_params_2 = vec!["logs", "adasdas"];
+        let subscription_request_str_2 = serde_json::to_string(&subscription_params_2).unwrap();
+
+        let subscription_request_1 = json!({"params": subscription_params_1});
+        let subscription_request_2 = json!({"params": subscription_params_2});
 
         subscription_data.register_subscription(
             subscription_request_1,
@@ -572,8 +634,8 @@ mod tests {
 
         let subscriptions = subscription_data.get_subscription_by_node(node_id);
         assert_eq!(subscriptions.len(), 2);
-        assert!(subscriptions.contains(&"newHeads".to_string()));
-        assert!(subscriptions.contains(&"logs".to_string()));
+        assert!(subscriptions.contains(&subscription_request_str_1));
+        assert!(subscriptions.contains(&subscription_request_str_2));
     }
 
     #[tokio::test]

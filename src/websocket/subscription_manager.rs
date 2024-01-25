@@ -98,6 +98,8 @@ pub async fn move_subscriptions(
     // Collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
+    println!("subs: {:?}", subs);
+    println!("ids: {:?}", ids);
 
     // We want to send unsubscribe messages (for postoriety) to node_id
     for id in ids {
@@ -111,8 +113,9 @@ pub async fn move_subscriptions(
     let mut pairs: HashMap<u32, String> = HashMap::new();
     let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
     for params in subs {
+        println!("PARAMS!! {}", params);
         id += 1;
-        let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": params});
+        let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": vec![params.clone()]});
         let message = WsconnMessage::Message(sub, None);
 
         pairs.insert(id, params);
@@ -143,12 +146,16 @@ pub async fn move_subscriptions(
             None => continue,
         };
 
-        println!("adasdadsa {}", response.content["result"].as_str().unwrap().to_string());
-        match sub_data.move_subscriptions(
-            response.node_id,
-            params,
-            response.content["result"].as_str().unwrap().to_string(),
-        ) {
+        println!(
+            "adasdadsa {}",
+            response.content["result"].as_str().unwrap().to_string()
+        );
+        let sub_id = match sub_data.get_sub_id_by_params(&params) {
+            Some(rax) => rax,
+            None => return Err("No sub_id!".into()),
+        };
+        println!("AODHAOISDHIOASDH: {:?}", sub_id);
+        match sub_data.move_subscriptions(response.node_id, params, sub_id) {
             Ok(_) => {}
             Err(err) => return Err(err),
         };
