@@ -176,8 +176,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_subscription_dispatcher() {
-        let (tx, mut rx) = broadcast::channel(10);
-        let (incoming_tx, mut incoming_rx) = mpsc::unbounded_channel();
+        let (tx, rx) = broadcast::channel(10);
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
         let sub_data = Arc::new(SubscriptionData::new());
         let user_id = 1;
         let subscription_id = "sub123";
