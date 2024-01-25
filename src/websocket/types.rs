@@ -3,7 +3,6 @@ use std::{
         HashMap,
         HashSet,
     },
-    println,
     sync::{
         Arc,
         RwLock,
@@ -112,13 +111,6 @@ impl SubscriptionData {
         let subscription = format!("{}", subscription["params"]);
 
         self.raw_register(&subscription, subscription_id, node_id);
-        println!(
-            "register_subscription: {:?}",
-            self.incoming_subscriptions
-                .read()
-                .unwrap()
-                .get(&subscription)
-        );
     }
 
     fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
@@ -223,7 +215,6 @@ impl SubscriptionData {
             .collect()
     }
 
-
     // Return all subscriptions for a given node_id
     pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
@@ -247,9 +238,7 @@ impl SubscriptionData {
         let subscriptions = self.subscriptions.read().unwrap();
         let mut users = Vec::new();
 
-        println!("subscription_id: {}", subscription_id);
         for (node_sub_info, subscribers) in subscriptions.iter() {
-            println!("node_sub_info.subscription_id {}", node_sub_info.subscription_id);
             if node_sub_info.subscription_id == subscription_id {
                 users.extend(subscribers.iter().copied());
                 break;
@@ -267,8 +256,7 @@ impl SubscriptionData {
         subscription_id: String,
     ) -> Result<(), Error> {
         // Get all the users that are subscribed to our subscription
-        let users = self.get_users_for_subscription(&request);
-        println!("len: {}", users.len());
+        let users = self.get_users_for_subscription(&subscription_id);
         // Unsubscribe everyone from the subscription
         for user_id in users.iter() {
             self.unsubscribe_user(*user_id, request.clone());
@@ -278,11 +266,8 @@ impl SubscriptionData {
         self.unregister_subscription(request.clone());
         self.raw_register(&request, subscription_id, target);
 
-        println!("len: {}", users.len());
-
         // resubscribe all the users now
         for user_id in users.iter() {
-            println!("{} {}", user_id, request);
             self.raw_subscribe(*user_id, &request)?;
         }
 
