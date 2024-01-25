@@ -301,9 +301,7 @@ impl SubscriptionData {
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
-                    user.message_channel
-                        .send(message.clone())
-                        .map_err(|e| e)?;
+                    user.message_channel.send(message.clone()).map_err(|e| e)?;
                 }
             }
         }

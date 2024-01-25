@@ -163,11 +163,16 @@ pub async fn move_subscriptions(
 
 #[cfg(test)]
 mod tests {
-    use crate::websocket::types::UserData;
     use super::*;
+    use crate::websocket::types::UserData;
+    use rand::Rng;
     use serde_json::json;
-    use tokio::sync::{broadcast, mpsc};
     use std::sync::Arc;
+    use std::time::Duration;
+    use tokio::sync::{
+        broadcast,
+        mpsc,
+    };
 
     #[tokio::test]
     async fn test_subscription_dispatcher() {
@@ -179,21 +184,40 @@ mod tests {
 
         // Mock user and subscription setup
         let (user_tx, mut user_rx) = mpsc::unbounded_channel();
-        sub_data.add_user(user_id, UserData { message_channel: user_tx });
+        sub_data.add_user(
+            user_id,
+            UserData {
+                message_channel: user_tx,
+            },
+        );
 
-        let subscription_request = json!({"jsonrpc":"2.0","id": 1, "method": "eth_subscribe", "params": ["newHeads"]});
-        sub_data.register_subscription(subscription_request.clone(), subscription_id.to_string(), 0);
-        sub_data.subscribe_user(user_id, subscription_request).unwrap();
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 1, "method": "eth_subscribe", "params": ["newHeads"]});
+        sub_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.to_string(),
+            0,
+        );
+        sub_data
+            .subscribe_user(user_id, subscription_request)
+            .unwrap();
 
         subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data));
 
-        let subscription_content = json!({"method": "eth_subscription", "params": {"subscription": subscription_id}});
-        let incoming_response = IncomingResponse { content: subscription_content, node_id: 0 };
+        let subscription_content =
+            json!({"method": "eth_subscription", "params": {"subscription": subscription_id}});
+        let incoming_response = IncomingResponse {
+            content: subscription_content,
+            node_id: 0,
+        };
         tx.send(incoming_response).unwrap();
 
         // Check if the user receives the message
         if let Some(RequestResult::Subscription(msg)) = user_rx.recv().await {
-            assert_eq!(msg, json!({"method": "eth_subscription", "params": {"subscription": subscription_id}}));
+            assert_eq!(
+                msg,
+                json!({"method": "eth_subscription", "params": {"subscription": subscription_id}})
+            );
         } else {
             panic!("User did not receive the expected message.");
         }
@@ -206,26 +230,47 @@ mod tests {
         let sub_data = Arc::new(SubscriptionData::new());
         let node_id = 1;
         let user_id = 2;
-        let subscription_id = "sub789";
 
         // Setup for subscriptions
-        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
-        sub_data.register_subscription(subscription_request.clone(), subscription_id.to_string(), node_id);
-        sub_data.subscribe_user(user_id, subscription_request).unwrap();
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        sub_data.register_subscription(subscription_request.clone(), "sub789".to_string(), node_id);
+        sub_data
+            .subscribe_user(user_id, subscription_request)
+            .unwrap();
 
-        // Simulate a subscription move
+        // Spawn a thread to handle incoming subscription requests
+        let tx_clone = tx.clone();
+        tokio::spawn(async move {
+            while let Some(WsconnMessage::Message(message, _)) = incoming_rx.recv().await {
+                if message["method"] == "eth_subscribe" {
+                    let id = message["id"].as_u64().unwrap() as u32;
+                    let random_result = rand::thread_rng().gen::<u64>().to_string();
+                    let mock_response = IncomingResponse {
+                        content: json!({"jsonrpc": "2.0", "id": id, "result": random_result}),
+                        node_id: 2, // new node ID
+                    };
+                    tokio::time::sleep(Duration::from_millis(50)).await; // Simulate network delay
+                    tx_clone.send(mock_response).unwrap();
+                }
+            }
+        });
+
+        // Execute move_subscriptions
         let move_result = move_subscriptions(incoming_tx, rx, Arc::clone(&sub_data), node_id).await;
-        assert!(move_result.is_ok());
+        assert!(move_result.is_ok(), "move_subscriptions should succeed");
 
-        // Verify that the subscriptions have been moved
-        assert!(sub_data.get_subscription_by_node(node_id).is_empty());
+        // Verify the mock responses have been processed and subscriptions moved
+        let og_subs = sub_data.get_subscription_by_node(1);
+        assert!(
+            og_subs.is_empty(),
+            "Subscriptions should have been moved to the new node"
+        );
 
-        // Check the outgoing messages for unsubscribe and subscribe actions
-        if let Some(WsconnMessage::Message(msg, _)) = incoming_rx.recv().await {
-            assert_eq!(msg["method"].as_str(), Some("eth_unsubscribe"));
-            assert!(msg["params"].as_array().unwrap().contains(&json!(subscription_id)));
-        } else {
-            panic!("Expected unsubscribe message not received.");
-        }
+        let moved_subs = sub_data.get_subscription_by_node(2); // new node ID
+        assert!(
+            !moved_subs.is_empty(),
+            "Subscriptions should have been moved to the new node"
+        );
     }
 }
