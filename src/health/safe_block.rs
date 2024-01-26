@@ -240,11 +240,10 @@ pub async fn subscribe_to_new_heads(
                     sub_data.clone(),
                     node_id,
                 )
-                .await {
-                    Ok(_) => {},
-                    Err(err) => {
-                        println!("{}", err);
-                    },
+                .await
+                {
+                    Ok(_) => {}
+                    Err(err) => println!("{}", err),
                 };
             }
         }
