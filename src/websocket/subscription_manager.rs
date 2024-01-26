@@ -132,7 +132,11 @@ pub async fn move_subscriptions(
         };
 
         // Discard any response that does not have a proper ID
-        let pair_id = response.content["id"].as_u64().unwrap() as u32;
+        let pair_id = match response.content["id"].as_u64() {
+            Some(rax) => rax as u32,
+            None => continue,
+        };
+        
         let params = match pairs.get(&pair_id) {
             Some(rax) => rax.to_string(),
             None => continue,
