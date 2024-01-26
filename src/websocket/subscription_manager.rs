@@ -52,10 +52,6 @@ pub fn subscription_dispatcher(
             // this is retarded???
             let resp_clone = response.clone();
             let id = response.content["params"]["subscription"].as_str().unwrap();
-            println!(
-                "users subscribed to this: {}",
-                sub_data.get_users_for_subscription(id).len()
-            );
 
             // Send the response to all the users
             match sub_data

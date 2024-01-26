@@ -215,7 +215,7 @@ pub async fn subscribe_to_new_heads(
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
-                    subscription_id = sub["subscription"].as_str().unwrap().to_owned();
+                    subscription_id = sub["params"]["subscription"].as_str().unwrap().to_owned();
                     println!("New head: {}", a);
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
@@ -234,13 +234,18 @@ pub async fn subscribe_to_new_heads(
                 }
                 println!("Timeout in newHeads subscription");
                 let node_id = sub_data.get_node_from_id(&subscription_id).unwrap();
-                let _ = move_subscriptions(
+                match move_subscriptions(
                     incoming_tx.clone(),
                     outgoing_rx.resubscribe(),
                     sub_data.clone(),
                     node_id,
                 )
-                .await;
+                .await {
+                    Ok(_) => {},
+                    Err(err) => {
+                        println!("{}", err);
+                    },
+                };
             }
         }
     }

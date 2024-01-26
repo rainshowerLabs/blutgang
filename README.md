@@ -64,4 +64,4 @@ Thank you to all the contributors of the projects above!
 
 Blutgang is libre software licensed under the AGPL-3.0 license. If you are using blutgang in a commercial enviroment, and do not get a commercial license from us, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
 
-If you are interested in running Blutgang in your commercial application, but not quite sure if you're ready to make the jump, contact us for a no-obligations free trial w/ full comercial support [here](https://rainshower.cloud/)!
+If you are interested in running Blutgang in your commercial application, but not quite sure if you're ready to make the jump, contact us for a no-obligations free trial [here](https://rainshower.cloud/)!
