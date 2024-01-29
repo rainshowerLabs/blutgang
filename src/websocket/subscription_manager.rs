@@ -17,10 +17,7 @@ use std::{
 };
 
 use tokio::sync::{
-    broadcast::{
-        self,
-        error::RecvError,
-    },
+    broadcast,
     mpsc,
 };
 

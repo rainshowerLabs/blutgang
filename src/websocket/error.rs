@@ -7,8 +7,8 @@ use tokio_tungstenite::tungstenite;
 
 #[derive(Debug)]
 pub enum Error {
-    WsError(String),
-    ConnectionError(String),
+    Ws(String),
+    Connection(String),
     MessageSendFailed(String),
     MessageReceptionFailed(String),
     ReceiverLagged(),
@@ -25,8 +25,8 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::WsError(msg) => write!(f, "Error in WS: {}", msg),
-            Error::ConnectionError(msg) => write!(f, "Connection Error: {}", msg),
+            Error::Ws(msg) => write!(f, "Error in WS: {}", msg),
+            Error::Connection(msg) => write!(f, "Connection Error: {}", msg),
             Error::MessageSendFailed(msg) => {
                 write!(f, "Message Sending Internal Message Failed: {}", msg)
             }
@@ -52,13 +52,13 @@ impl From<tungstenite::Error> for Error {
     fn from(error: tungstenite::Error) -> Self {
         match error {
             tungstenite::Error::ConnectionClosed => {
-                Error::ConnectionError("Connection closed".to_string())
+                Error::Connection("Connection closed".to_string())
             }
             tungstenite::Error::AlreadyClosed => {
-                Error::ConnectionError("Connection already closed".to_string())
+                Error::Connection("Connection already closed".to_string())
             }
-            tungstenite::Error::Io(ref e) => Error::ConnectionError(format!("IO Error: {}", e)),
-            _ => Error::ConnectionError(format!("WebSocket error: {:?}", error)),
+            tungstenite::Error::Io(ref e) => Error::Connection(format!("IO Error: {}", e)),
+            _ => Error::Connection(format!("WebSocket error: {:?}", error)),
         }
     }
 }
@@ -88,7 +88,7 @@ impl<T> From<mpsc::error::SendError<T>> for Error {
 
 impl From<&str> for Error {
     fn from(msg: &str) -> Self {
-        Error::WsError(msg.to_string())
+        Error::Ws(msg.to_string())
     }
 }
 
