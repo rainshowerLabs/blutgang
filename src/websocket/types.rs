@@ -137,7 +137,7 @@ impl SubscriptionData {
         if subscription["params"].as_array().is_none()
             || subscription["params"].as_array().unwrap().is_empty()
         {
-            return Err(format!("Invalid subscription params for {}", subscription).into());
+            return Err(Error::FailedParsing());
         }
 
         // TODO: pepega
@@ -151,7 +151,7 @@ impl SubscriptionData {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
         let node_sub_info = match incoming_subscriptions.get(subscription) {
             Some(rax) => rax,
-            None => return Err(format!("Subscription {} does not exist!", subscription).into()),
+            None => return Err(Error::FailedParsing()),
         };
 
         let mut subscriptions = self.subscriptions.write().unwrap();
@@ -271,7 +271,7 @@ impl SubscriptionData {
         // Get all the users that are subscribed to our subscription
         let users = self.get_users_for_subscription(&subscription_id);
         if users.is_empty() {
-            return Err("User list empty!".into());
+            return Err(Error::EmptyList("User list empty!".to_string()));
         }
         // Unsubscribe everyone from the subscription
         for user_id in users.iter() {
@@ -297,7 +297,7 @@ impl SubscriptionData {
         message: &RequestResult,
     ) -> Result<bool, Error> {
         if let RequestResult::Call(_) = message {
-            return Err("Trying to send a call as a subscription!".into());
+            return Err(Error::InvalidData("Trying to send a call as a subscription!".to_string()));
         }
 
         let node_sub_info = NodeSubInfo {
@@ -645,10 +645,7 @@ mod tests {
             source_node_id,
         );
 
-        subscription_data.add_user(
-            user_id,
-            tx,
-        );
+        subscription_data.add_user(user_id, tx);
 
         subscription_data
             .subscribe_user(user_id, subscription_request)

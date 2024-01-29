@@ -103,13 +103,13 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sub_data_clone.remove_user(user_id);
-                            println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
-                            break;
+                            return Err(Error::MessageSendFailed((e).to_string()))
                         }
                     }
                 }
             }
         }
+        Ok(())
     });
 
     while let Some(message) = websocket_stream.next().await {
@@ -137,8 +137,7 @@ pub async fn serve_websocket(
             Err(e) => {
                 // Remove the user from the sink map
                 sub_data.remove_user(user_id);
-                println!("\x1b[93mWrn:\x1b[0m Error receiving message: {}", e);
-                break;
+                return Err(Error::MessageReceptionFailed(e.to_string()))
             }
             _ => {}
         }

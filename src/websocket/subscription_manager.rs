@@ -119,22 +119,12 @@ pub async fn move_subscriptions(
     // We're only interested in ones that have the right ID as specified in pairs
     while !pairs.is_empty() {
         // TODO: errors!
-        let response = match rx.recv().await {
-            Ok(rax) => rax,
-            Err(RecvError::Lagged(_)) => {
-                return Err(
-                    "Receiver lagged while moving channels! Restart Blutgang ASAP!!!".into(),
-                )
-            }
-            Err(RecvError::Closed) => {
-                return Err("Channel closed while moving subscriptions!".into())
-            }
-        };
+        let response = rx.recv().await?;
 
         // Discard any response that does not have a proper ID
         let pair_id = match response.content["id"].as_u64() {
             Some(rax) => rax as u32,
-            None => return Err("Response has no ID!".into()),
+            None => return Err(Error::InvalidData("No ID in response!".to_string())),
         };
 
         let params = match pairs.get(&pair_id) {
@@ -144,7 +134,7 @@ pub async fn move_subscriptions(
 
         let sub_id = match sub_data.get_sub_id_by_params(&params) {
             Some(rax) => rax,
-            None => return Err("No sub_id!".into()),
+            None => return Err(Error::MissingSubscription()),
         };
         match sub_data.move_subscriptions(response.node_id, params, sub_id) {
             Ok(_) => {}
@@ -179,10 +169,7 @@ mod tests {
 
         // Mock user and subscription setup
         let (user_tx, mut user_rx) = mpsc::unbounded_channel();
-        sub_data.add_user(
-            user_id,
-            user_tx,
-        );
+        sub_data.add_user(user_id, user_tx);
 
         let subscription_request =
             json!({"jsonrpc":"2.0","id": 1, "method": "eth_subscribe", "params": ["newHeads"]});

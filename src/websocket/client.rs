@@ -265,9 +265,7 @@ pub async fn execute_ws_call(
     }
 
     call["id"] = user_id.into();
-    incoming_tx
-        .send(WsconnMessage::Message(call.clone(), None))
-        .expect("Failed to send message to ws_conn_manager");
+    incoming_tx.send(WsconnMessage::Message(call.clone(), None))?;
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
@@ -287,7 +285,6 @@ pub async fn execute_ws_call(
 
         println!("sub_id: {}", sub_id);
         sub_data.register_subscription(call.clone(), sub_id.clone(), response.node_id);
-        // bug is here??? whjat am i not registering???
         sub_data.subscribe_user(user_id, call)?;
     } else {
         cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
@@ -306,7 +303,7 @@ async fn listen_for_response(
             return Ok(response);
         }
     }
-    Err("Failed to receive response from WS".into())
+    Err(Error::NoWsResponse)
 }
 
 #[cfg(test)]
