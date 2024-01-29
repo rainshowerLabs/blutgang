@@ -237,14 +237,13 @@ impl SubscriptionData {
         let incoming_subscriptions = self.incoming_subscriptions.read().unwrap();
         incoming_subscriptions
             .iter()
-            .filter_map(|(subscription, node_sub_info)| {
+            .find_map(|(subscription, node_sub_info)| {
                 if subscription == params {
                     Some(node_sub_info.subscription_id.to_owned())
                 } else {
                     None
                 }
             })
-            .next()
     }
 
     // Return a Vec of all users subscribed to a subscription
