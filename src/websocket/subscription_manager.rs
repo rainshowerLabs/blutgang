@@ -160,7 +160,6 @@ pub async fn move_subscriptions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::websocket::types::UserData;
     use rand::Rng;
     use serde_json::json;
     use std::sync::Arc;
@@ -182,9 +181,7 @@ mod tests {
         let (user_tx, mut user_rx) = mpsc::unbounded_channel();
         sub_data.add_user(
             user_id,
-            UserData {
-                message_channel: user_tx,
-            },
+            user_tx,
         );
 
         let subscription_request =

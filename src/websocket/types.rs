@@ -52,10 +52,7 @@ pub enum WsChannelErr {
     Closed(usize),
 }
 
-#[derive(Debug, Clone)]
-pub struct UserData {
-    pub message_channel: mpsc::UnboundedSender<RequestResult>,
-}
+pub type UserData = mpsc::UnboundedSender<RequestResult>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeSubInfo {
@@ -321,7 +318,7 @@ impl SubscriptionData {
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
-                    user.message_channel.send(message.clone())?;
+                    user.send(message.clone())?;
                 }
             }
         }
@@ -342,9 +339,7 @@ mod tests {
         mpsc::UnboundedReceiver<RequestResult>,
     ) {
         let (tx, rx) = mpsc::unbounded_channel();
-        let user_data = UserData {
-            message_channel: tx,
-        };
+        let user_data = tx;
         let user_id = 100;
         let subscription_data = SubscriptionData::new();
         subscription_data.add_user(user_id, user_data);
@@ -653,9 +648,7 @@ mod tests {
 
         subscription_data.add_user(
             user_id,
-            UserData {
-                message_channel: tx,
-            },
+            tx,
         );
 
         subscription_data

@@ -15,7 +15,6 @@ use crate::{
             IncomingResponse,
             RequestResult,
             SubscriptionData,
-            UserData,
             WsconnMessage,
         },
     },
@@ -198,9 +197,7 @@ pub async fn subscribe_to_new_heads(
 
     // Add the user to the sink map
     println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
-    let user_data = UserData {
-        message_channel: tx.clone(),
-    };
+    let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);
 
     send_newheads_sub_message(user_id, &incoming_tx, &outgoing_rx, &sub_data, &cache_args).await;
