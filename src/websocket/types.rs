@@ -297,7 +297,9 @@ impl SubscriptionData {
         message: &RequestResult,
     ) -> Result<bool, Error> {
         if let RequestResult::Call(_) = message {
-            return Err(Error::InvalidData("Trying to send a call as a subscription!".to_string()));
+            return Err(Error::InvalidData(
+                "Trying to send a call as a subscription!".to_string(),
+            ));
         }
 
         let node_sub_info = NodeSubInfo {

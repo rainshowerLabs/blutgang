@@ -103,7 +103,7 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sub_data_clone.remove_user(user_id);
-                            return Err(Error::MessageSendFailed((e).to_string()))
+                            return Err(Error::MessageSendFailed((e).to_string()));
                         }
                     }
                 }
@@ -137,7 +137,7 @@ pub async fn serve_websocket(
             Err(e) => {
                 // Remove the user from the sink map
                 sub_data.remove_user(user_id);
-                return Err(Error::MessageReceptionFailed(e.to_string()))
+                return Err(Error::MessageReceptionFailed(e.to_string()));
             }
             _ => {}
         }
