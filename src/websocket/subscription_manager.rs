@@ -117,7 +117,7 @@ pub async fn move_subscriptions(
 
     // Listen on `rx` for incoming messages.
     // We're only interested in ones that have the right ID as specified in pairs
-    loop {
+    while !pairs.is_empty() {
         // TODO: errors!
         let response = match rx.recv().await {
             Ok(rax) => rax,
@@ -152,9 +152,6 @@ pub async fn move_subscriptions(
         };
 
         pairs.remove(&pair_id);
-        if pairs.is_empty() {
-            break;
-        }
     }
 
     Ok(())
