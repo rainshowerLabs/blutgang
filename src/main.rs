@@ -179,7 +179,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // WebSocket connection + health check setup. Only runs when every node has a WS endpoint.
     let (incoming_tx, incoming_rx) = mpsc::unbounded_channel::<WsconnMessage>();
-    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(256);
+    let (outgoing_tx, outgoing_rx) = broadcast::channel::<IncomingResponse>(2048);
     let sub_data = Arc::new(SubscriptionData::new());
     if is_ws {
         let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
