@@ -1,5 +1,4 @@
 use crate::IncomingResponse;
-use tokio::sync::broadcast;
 use crate::SubscriptionData;
 use crate::{
     health::{
@@ -10,15 +9,16 @@ use crate::{
         },
     },
     websocket::{
-            types::{
+        subscription_manager::move_subscriptions,
+        types::{
             WsChannelErr,
             WsconnMessage,
         },
-        subscription_manager::move_subscriptions,
     },
     Rpc,
     Settings,
 };
+use tokio::sync::broadcast;
 
 use std::println;
 use std::sync::{
@@ -274,9 +274,16 @@ pub async fn dropped_listener(
         // TODO: crazy error handling
         match ws_err {
             Some(WsChannelErr::Closed(index)) => {
-                send_dropped_to_poverty(&rpc_list, &poverty_list, &incoming_tx, rx.resubscribe(), &sub_data, index)
-                    .await
-                    .unwrap_or(());
+                send_dropped_to_poverty(
+                    &rpc_list,
+                    &poverty_list,
+                    &incoming_tx,
+                    rx.resubscribe(),
+                    &sub_data,
+                    index,
+                )
+                .await
+                .unwrap_or(());
                 incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
             }
             None => {

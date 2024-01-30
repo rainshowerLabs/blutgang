@@ -234,7 +234,8 @@ mod tests {
         });
 
         // Execute move_subscriptions
-        let move_result = move_subscriptions(&incoming_tx, rx, &Arc::clone(&sub_data), node_id).await;
+        let move_result =
+            move_subscriptions(&incoming_tx, rx, &Arc::clone(&sub_data), node_id).await;
         assert!(move_result.is_ok(), "move_subscriptions should succeed");
 
         // Verify the mock responses have been processed and subscriptions moved

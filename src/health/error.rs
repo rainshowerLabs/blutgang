@@ -46,4 +46,3 @@ impl From<WsError> for HealthError {
         HealthError::InvalidResponse(error.to_string())
     }
 }
-

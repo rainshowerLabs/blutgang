@@ -215,7 +215,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let dropped_sub_data = Arc::clone(&sub_data);
 
             tokio::task::spawn(async move {
-                dropped_listener(dropped_rpc, dropped_povrty, ws_error_rx, dropped_inc, dropped_rx, dropped_sub_data).await
+                dropped_listener(
+                    dropped_rpc,
+                    dropped_povrty,
+                    ws_error_rx,
+                    dropped_inc,
+                    dropped_rx,
+                    dropped_sub_data,
+                )
+                .await
             });
 
             let heads_inc = incoming_tx.clone();
