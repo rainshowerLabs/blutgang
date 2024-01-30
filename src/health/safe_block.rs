@@ -213,7 +213,7 @@ pub async fn subscribe_to_new_heads(
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
                     subscription_id = sub["params"]["subscription"].as_str().unwrap().to_owned();
-                    println!("New head: {}", a);
+                    println!("\x1b[35mInfo:\x1b[0m New chain head: {}", a);
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
                 }
