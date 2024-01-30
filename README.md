@@ -60,8 +60,8 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 
 Thank you to all the contributors of the projects above!
 
-## Notes on the license
+## License
 
-Blutgang is libre software licensed under the AGPL-3.0 license. If you are using blutgang in a commercial enviroment, and do not get a commercial license from us, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
+Blutgang is licensed under the FSL. This means you are allowed to use Blutgang for everything except building other load balancers. Two years after release, that specific version becomes licensed under the Apache-2.0 license.
 
-If you are interested in running Blutgang in your commercial application, but not quite sure if you're ready to make the jump, contact us for a no-obligations free trial [here](https://rainshower.cloud/)!
+For commercial support, which includes k8s operators, ansible playbooks and more, contact us for a commercial license!
