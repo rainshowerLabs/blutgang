@@ -279,7 +279,11 @@ pub async fn dropped_listener(
                     .unwrap_or(());
                 incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
             }
-            None => todo!(),
+            None => {
+                return Err(HealthError::InvalidResponse(
+                    "Expected WsChannelErr!".to_string(),
+                ))
+            }
         };
     }
 }
