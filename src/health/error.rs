@@ -1,5 +1,6 @@
 // Errors
 use crate::rpc::error::RpcError;
+use crate::websocket::error::Error as WsError;
 use std::error::Error;
 
 #[derive(Debug)]
@@ -39,3 +40,10 @@ impl From<RpcError> for HealthError {
         HealthError::GetSafeBlockError(error.to_string())
     }
 }
+
+impl From<WsError> for HealthError {
+    fn from(error: WsError) -> Self {
+        HealthError::InvalidResponse(error.to_string())
+    }
+}
+
