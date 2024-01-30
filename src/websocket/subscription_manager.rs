@@ -82,9 +82,9 @@ pub fn subscription_dispatcher(
 // Moves all subscriptions from one node to another one.
 // Used during node failiure. Do not use this liberally as it is very heavy.
 pub async fn move_subscriptions(
-    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     mut rx: broadcast::Receiver<IncomingResponse>,
-    sub_data: Arc<SubscriptionData>,
+    sub_data: &Arc<SubscriptionData>,
     node_id: usize,
 ) -> Result<(), Error> {
     // Collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
@@ -234,7 +234,7 @@ mod tests {
         });
 
         // Execute move_subscriptions
-        let move_result = move_subscriptions(incoming_tx, rx, Arc::clone(&sub_data), node_id).await;
+        let move_result = move_subscriptions(&incoming_tx, rx, &Arc::clone(&sub_data), node_id).await;
         assert!(move_result.is_ok(), "move_subscriptions should succeed");
 
         // Verify the mock responses have been processed and subscriptions moved

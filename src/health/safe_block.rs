@@ -232,9 +232,9 @@ pub async fn subscribe_to_new_heads(
                 println!("Timeout in newHeads subscription");
                 let node_id = sub_data.get_node_from_id(&subscription_id).unwrap();
                 match move_subscriptions(
-                    incoming_tx.clone(),
+                    &incoming_tx,
                     outgoing_rx.resubscribe(),
-                    sub_data.clone(),
+                    &sub_data,
                     node_id,
                 )
                 .await

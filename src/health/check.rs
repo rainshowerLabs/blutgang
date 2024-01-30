@@ -1,3 +1,6 @@
+use crate::IncomingResponse;
+use tokio::sync::broadcast;
+use crate::SubscriptionData;
 use crate::{
     health::{
         error::HealthError,
@@ -6,9 +9,12 @@ use crate::{
             NamedBlocknumbers,
         },
     },
-    websocket::types::{
-        WsChannelErr,
-        WsconnMessage,
+    websocket::{
+            types::{
+            WsChannelErr,
+            WsconnMessage,
+        },
+        subscription_manager::move_subscriptions,
     },
     Rpc,
     Settings,
@@ -228,19 +234,27 @@ fn escape_poverty(
 pub async fn send_dropped_to_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
+    rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: &Arc<SubscriptionData>,
     ws_conn_index: usize,
 ) -> Result<(), HealthError> {
-    let mut rpc_list_guard = rpc_list.write().unwrap();
-    let mut poverty_list_guard = poverty_list.write().unwrap();
+    {
+        let mut rpc_list_guard = rpc_list.write().unwrap();
+        let mut poverty_list_guard = poverty_list.write().unwrap();
 
-    // Check if the RPC is in the rpc_list
-    if let Some(rpc) = rpc_list_guard.get(ws_conn_index) {
-        // Add the RPC to the poverty list
-        poverty_list_guard.push(rpc.clone());
+        // Check if the RPC is in the rpc_list
+        if let Some(rpc) = rpc_list_guard.get(ws_conn_index) {
+            // Add the RPC to the poverty list
+            poverty_list_guard.push(rpc.clone());
 
-        // Remove the RPC from the rpc_list
-        rpc_list_guard.remove(ws_conn_index);
+            // Remove the RPC from the rpc_list
+            rpc_list_guard.remove(ws_conn_index);
+        }
     }
+
+    // Move subscriptions away from that node
+    move_subscriptions(incoming_tx, rx, sub_data, ws_conn_index).await?;
 
     Ok(())
 }
@@ -251,6 +265,8 @@ pub async fn dropped_listener(
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     mut ws_err_rx: mpsc::UnboundedReceiver<WsChannelErr>,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: Arc<SubscriptionData>,
 ) -> Result<(), HealthError> {
     loop {
         let ws_err = ws_err_rx.recv().await;
@@ -258,7 +274,7 @@ pub async fn dropped_listener(
         // TODO: crazy error handling
         match ws_err {
             Some(WsChannelErr::Closed(index)) => {
-                send_dropped_to_poverty(&rpc_list, &poverty_list, index)
+                send_dropped_to_poverty(&rpc_list, &poverty_list, &incoming_tx, rx.resubscribe(), &sub_data, index)
                     .await
                     .unwrap_or(());
                 incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
