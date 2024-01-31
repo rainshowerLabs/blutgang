@@ -343,6 +343,14 @@ mod tests {
         )
     }
 
+    async fn create_mock_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
+        let rpc_list = Arc::new(RwLock::new(vec![
+            Rpc::new("http://test1".to_string(), Some("ws://test1".to_string()), 0, 0, 0.0),
+            Rpc::new("http://test2".to_string(), Some("ws://test2".to_string()), 0, 0, 0.0),
+        ]));
+        rpc_list
+    }
+
     // Helper function to setup the environment for ws_conn_manager tests
     fn setup_ws_conn_manager_test() -> (
         Arc<RwLock<Vec<Rpc>>>,
@@ -366,6 +374,20 @@ mod tests {
             broadcast_tx,
             ws_error_tx,
         )
+    }
+
+    #[tokio::test]
+    async fn test_handle_incoming_message() {
+        let rpc_list = create_mock_rpc_list().await;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let ws_handles = Arc::new(RwLock::new(vec![Some(tx)]));
+        let incoming = json!({"type": "test"});
+
+        handle_incoming_message(&ws_handles, &rpc_list, incoming.clone(), Some(0)).await;
+
+        // Check if the message was sent through the channel
+        let received = rx.recv().await;
+        assert_eq!(received, Some(incoming));
     }
 
     #[tokio::test]
