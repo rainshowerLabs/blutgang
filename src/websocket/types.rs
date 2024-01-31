@@ -142,7 +142,10 @@ impl SubscriptionData {
 
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
-        println!("\x1b[35mInfo:\x1b[0m Subscribe_user finding: {}", subscription);
+        println!(
+            "\x1b[35mInfo:\x1b[0m Subscribe_user finding: {}",
+            subscription
+        );
 
         self.raw_subscribe(user_id, &subscription)
     }

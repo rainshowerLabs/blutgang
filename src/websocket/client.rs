@@ -60,49 +60,61 @@ pub async fn ws_conn_manager(
     broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
-    // TODO: do we really need ws_handles to be an option??
-    // borrow checker dum
-    let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
-    {
-        let mut ws_handle_guard = ws_handles.write().unwrap();
-        *ws_handle_guard = ws_vec;
-    }
+    // Initialize WebSocket connections
+    update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
             WsconnMessage::Message(incoming, specified_index) => {
-                if let Some(rpc_position) = {
-                    if let Some(specified_index) = specified_index {
-                        Some(specified_index)
-                    } else {
-                        let mut rpc_list_guard = rpc_list.write().unwrap();
-                        pick(&mut rpc_list_guard).1
-                    }
-                } {
-                    let ws_handles_guard = ws_handles.read().unwrap();
-
-                    if rpc_position >= ws_handles_guard.len() {
-                        println!("ws_conn_manager error: rpc_position out of bounds");
-                        continue;
-                    }
-
-                    if let Some(ws) = &ws_handles_guard[rpc_position] {
-                        if ws.send(incoming).is_err() {
-                            println!("ws_conn_manager error: failed to send message");
-                        }
-                    } else {
-                        println!("No WS connection at index {}", rpc_position);
-                    }
-                } else {
-                    println!("ws_conn_manager error: no rpc_position");
-                }
+                handle_incoming_message(&ws_handles, &rpc_list, incoming, specified_index).await;
             }
             WsconnMessage::Reconnect() => {
-                let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
-                let mut ws_handle_guard = ws_handles.write().unwrap();
-                *ws_handle_guard = ws_vec;
+                update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
             }
         }
+    }
+}
+
+async fn update_ws_connections(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
+    broadcast_tx: &broadcast::Sender<IncomingResponse>,
+    ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
+) {
+    let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+    let mut ws_handle_guard = ws_handles.write().unwrap();
+    *ws_handle_guard = ws_vec;
+}
+
+async fn handle_incoming_message(
+    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    incoming: Value,
+    specified_index: Option<usize>,
+) {
+    let rpc_position = if let Some(index) = specified_index {
+        index
+    } else {
+        match pick(&mut rpc_list.write().unwrap()).1 {
+            Some(position) => position,
+            None => {
+                println!("Error: No RPC position available");
+                return;
+            }
+        }
+    };
+
+    if let Some(ws) = ws_handles
+        .read()
+        .unwrap()
+        .get(rpc_position)
+        .and_then(|handle| handle.as_ref())
+    {
+        if ws.send(incoming).is_err() {
+            println!("ws_conn_manager error: failed to send message");
+        }
+    } else {
+        println!("No WS connection at index {}", rpc_position);
     }
 }
 
