@@ -113,7 +113,7 @@ impl SubscriptionData {
     fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
-            "register_subscription inserting: {}",
+            "\x1b[35mInfo:\x1b[0m  Register_subscription inserting: {}",
             subscription.to_owned()
         );
         incoming_subscriptions.insert(
@@ -142,7 +142,7 @@ impl SubscriptionData {
 
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
-        println!("subscribe_user finding: {}", subscription);
+        println!("\x1b[35mInfo:\x1b[0m Subscribe_user finding: {}", subscription);
 
         self.raw_subscribe(user_id, &subscription)
     }

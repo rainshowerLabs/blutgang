@@ -269,7 +269,9 @@ pub async fn execute_ws_call(
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
+        #[cfg(feature = "debug-verbose")]
         println!("is subscription!");
+        #[cfg(feature = "debug-verbose")]
         println!("response content: {:?}", response.content);
         // add the subscription id and add this user to the dispatch
         let sub_id = match response.content["result"].as_str() {
@@ -283,7 +285,7 @@ pub async fn execute_ws_call(
             }
         };
 
-        println!("sub_id: {}", sub_id);
+        println!("\x1b[35mInfo:\x1b[0m sub_id: {}", sub_id);
         sub_data.register_subscription(call.clone(), sub_id.clone(), response.node_id);
         sub_data.subscribe_user(user_id, call)?;
     } else {
