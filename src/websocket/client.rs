@@ -179,6 +179,7 @@ pub async fn ws_conn(
 
                     let _ = broadcast_tx.send(incoming);
                     update_rpc_latency(&rpc_list, index, time.elapsed());
+                    println!("\x1b[35mInfo:\x1b[0m WS request time: {:?}", time);
                 }
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));
