@@ -113,7 +113,7 @@ impl SubscriptionData {
     fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
         let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap();
         println!(
-            "\x1b[35mInfo:\x1b[0m  Register_subscription inserting: {}",
+            "\x1b[35mInfo:\x1b[0m Register_subscription inserting: {}",
             subscription.to_owned()
         );
         incoming_subscriptions.insert(
