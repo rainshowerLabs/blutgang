@@ -7,17 +7,17 @@ do_clear = false
 # Where to bind blutgang to
 address = "127.0.0.1:3000"
 # Moving average length for the latency
-ma_length = 10
+ma_length = 100
 # Sort RPCs by latency on startup. Recommended to leave on.
 sort_on_startup = true
 # Enable health checking
 health_check = true
 # Acceptable time to wait for a response in ms
-ttl = 300
+ttl = 30
 # How many times to retry a request before giving up
 max_retries = 32
 # Time between health checks in ms
-health_check_ttl = 12000
+health_check_ttl = 1250
 
 # Note: the admin namespace contains volatile functions and
 # should not be exposed publicly.
@@ -42,10 +42,11 @@ key = ""
 db_path = "./blutgang-cache"
 # sled mode. Can be HighThroughput/LowSpace
 mode = "HighThroughput"
-# Cache size in bytes. Doesn't matter too much as you OS should also be caching.
+# Cache size in bytes.
 cache_capacity = 1000000000
 # Use zstd compression. Reduces size 60-70%,
-# and increases CPU and latency by around 10% for db writes and 2% for reads
+# and increases CPU and latency by around 10% for db writes and 2% for reads.
+# If storage constrained, it's fine to have it be on.
 compression = false
 # Print DB profile when dropped. Doesn't do anything for now.
 print_profile = false
@@ -58,7 +59,7 @@ flush_every_ms = 24000
 [merkle]
 url = "https://eth.merkle.io"
 ws_url = "wss://eth.merkle.io"
-max_consecutive = 150
 # The maximum ammount of time we can use this rpc in a row.
-max_per_second = 200
+max_consecutive = 150
 # Max ammount of querries per second.
+max_per_second = 200
