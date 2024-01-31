@@ -291,11 +291,10 @@ pub async fn execute_ws_call(
         let sub_id = match response.content["result"].as_str() {
             Some(sub_id) => sub_id.to_string(),
             None => {
-                // TODO: replace id
-                return Ok(
-                    "\"jsonrpc\":\"2.0\", \"id\":1, \"error\": \"Bad Subscription ID!\""
-                        .to_string(),
-                );
+                return Ok(format!(
+                    "\"jsonrpc\":\"2.0\", \"id\":{}, \"error\": \"Bad Subscription ID!\"",
+                    id
+                ));
             }
         };
 
@@ -345,8 +344,20 @@ mod tests {
 
     async fn create_mock_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         let rpc_list = Arc::new(RwLock::new(vec![
-            Rpc::new("http://test1".to_string(), Some("ws://test1".to_string()), 0, 0, 0.0),
-            Rpc::new("http://test2".to_string(), Some("ws://test2".to_string()), 0, 0, 0.0),
+            Rpc::new(
+                "http://test1".to_string(),
+                Some("ws://test1".to_string()),
+                0,
+                0,
+                0.0,
+            ),
+            Rpc::new(
+                "http://test2".to_string(),
+                Some("ws://test2".to_string()),
+                0,
+                0,
+                0.0,
+            ),
         ]));
         rpc_list
     }

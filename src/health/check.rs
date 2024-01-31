@@ -271,7 +271,6 @@ pub async fn dropped_listener(
     loop {
         let ws_err = ws_err_rx.recv().await;
 
-        // TODO: crazy error handling
         match ws_err {
             Some(WsChannelErr::Closed(index)) => {
                 send_dropped_to_poverty(

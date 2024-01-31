@@ -5,8 +5,6 @@ mod health;
 mod rpc;
 mod websocket;
 
-// TODO: we need a major refactor of whatever is happening in here
-
 use crate::{
     admin::listener::listen_for_admin_requests,
     balancer::{

@@ -1,5 +1,8 @@
 use crate::{
-    config::setup::WS_SUB_MANAGER_ID,
+    config::setup::{
+        MAGIC,
+        WS_SUB_MANAGER_ID,
+    },
     websocket::{
         error::Error,
         types::{
@@ -101,7 +104,7 @@ pub async fn move_subscriptions(
     // We want to send subscription messages to `target`, register them, and move over the users
     let _ = rx; // bind `rx` so we have time to process all messages
     let mut pairs: HashMap<u32, String> = HashMap::new();
-    let mut id = WS_SUB_MANAGER_ID + 32000; // TODO: replace with magic #
+    let mut id = WS_SUB_MANAGER_ID + MAGIC;
     for params in subs {
         id += 1;
         let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": vec![params.clone()]});
