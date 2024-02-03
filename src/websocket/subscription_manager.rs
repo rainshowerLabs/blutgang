@@ -20,66 +20,71 @@ use std::{
 };
 
 use tokio::sync::{
-    broadcast,
+    broadcast::{self, error::RecvError},
     mpsc,
 };
 
 use serde_json::json;
 
 // Sends all subscriptions to their relevant nodes
-pub fn subscription_dispatcher(
+pub async fn subscription_dispatcher(
     mut rx: broadcast::Receiver<IncomingResponse>,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     sub_data: Arc<SubscriptionData>,
-) {
-    tokio::spawn(async move {
-        loop {
-            // Receive the WS response
-            let response = rx.recv().await.unwrap();
+) -> Result<(), Error> {
+    loop {
+        // Receive the WS response
+        let response = match rx.recv().await {
+            Ok(rax) => rax,
+            Err(RecvError::Closed) => return Err(Error::ChannelClosed()),
+            Err(RecvError::Lagged(_)) => return Err(Error::ReceiverLagged()),
+        };
 
-            // Check if its a subscription
-            if response.content["method"] != "eth_subscription" {
-                continue;
-            }
-
-            #[cfg(feature = "debug-verbose")]
-            println!(
-                "subscription_dispatcher: received subscription: {}",
-                response.content
-            );
-
-            // Get the subscription id
-            // this is retarded???
-            let resp_clone = response.clone();
-            let id = response.content["params"]["subscription"].as_str().unwrap();
-
-            // Send the response to all the users
-            match sub_data
-                .dispatch_to_subscribers(
-                    id,
-                    response.node_id,
-                    &RequestResult::Subscription(resp_clone.content),
-                )
-                .await
-            {
-                // Getting true means that we should unsubscribe from the subscription
-                // as thre are no more users needing it.
-                Ok(true) => {
-                    let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
-                    let message = WsconnMessage::Message(unsub, Some(response.node_id));
-                    let _ = incoming_tx.send(message);
-                }
-                // False means tht we do not need to do anything
-                Ok(false) => {}
-                Err(e) => {
-                    println!(
-                        "\x1b[31mErr:\x1b[0m Fatal error while trying to send subscriptions: {}",
-                        e
-                    )
-                }
-            };
+        // Check if its a subscription
+        if response.content["method"] != "eth_subscription" {
+            continue;
         }
-    });
+
+        #[cfg(feature = "debug-verbose")]
+        println!(
+            "subscription_dispatcher: received subscription: {}",
+            response.content
+        );
+
+        // Get the subscription id
+        // this is retarded???
+        let resp_clone = response.clone();
+        let id = match response.content["params"]["subscription"].as_str() {
+            Some(rax) => rax,
+            None => continue, // if this doesnt exist something in the pipeline is wrong and should be ignored
+        };
+
+        // Send the response to all the users
+        match sub_data
+            .dispatch_to_subscribers(
+                id,
+                response.node_id,
+                &RequestResult::Subscription(resp_clone.content),
+            )
+            .await
+        {
+            // Getting true means that we should unsubscribe from the subscription
+            // as thre are no more users needing it.
+            Ok(true) => {
+                let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
+                let message = WsconnMessage::Message(unsub, Some(response.node_id));
+                let _ = incoming_tx.send(message);
+            }
+            // False means tht we do not need to do anything
+            Ok(false) => {}
+            Err(e) => {
+                println!(
+                    "\x1b[31mErr:\x1b[0m Fatal error while trying to send subscriptions: {}",
+                    e
+                )
+            }
+        };
+    }
 }
 
 // Moves all subscriptions from one node to another one.
@@ -182,7 +187,9 @@ mod tests {
             .subscribe_user(user_id, subscription_request)
             .unwrap();
 
-        subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data));
+        tokio::spawn(async move {
+            let _ = subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data)).await;            
+        });
 
         let subscription_content =
             json!({"method": "eth_subscription", "params": {"subscription": subscription_id}});
