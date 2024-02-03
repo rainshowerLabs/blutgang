@@ -66,6 +66,8 @@ pub struct IncomingResponse {
     pub node_id: usize,
 }
 
+// Main struct for storing data related to subscriptions and the associated users
+// TODO: we should probably store more data for the sake of compute performance
 #[derive(Debug, Clone)]
 pub struct SubscriptionData {
     users: Arc<RwLock<HashMap<u32, UserData>>>,
