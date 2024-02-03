@@ -81,7 +81,7 @@ async fn update_ws_connections(
     broadcast_tx: &broadcast::Sender<IncomingResponse>,
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) {
-    let ws_vec = create_ws_vec(&rpc_list, &broadcast_tx, &ws_error_tx).await;
+    let ws_vec = create_ws_vec(rpc_list, broadcast_tx, ws_error_tx).await;
     let mut ws_handle_guard = ws_handles.write().unwrap();
     *ws_handle_guard = ws_vec;
 }
