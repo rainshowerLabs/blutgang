@@ -85,17 +85,13 @@ impl SubscriptionData {
     }
 
     pub fn add_user(&self, user_id: u32, user_data: UserData) {
-        let mut users = self.users.write().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let mut users = self.users.write().unwrap_or_else(|e| e.into_inner());
 
         users.insert(user_id, user_data);
     }
 
     pub fn remove_user(&self, user_id: u32) {
-        let mut users = self.users.write().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let mut users = self.users.write().unwrap_or_else(|e| e.into_inner());
 
         if users.remove(&user_id).is_some() {
             let mut subscriptions = self.subscriptions.write().unwrap();
@@ -119,9 +115,10 @@ impl SubscriptionData {
     }
 
     fn raw_register(&self, subscription: &str, subscription_id: String, node_id: usize) {
-        let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let mut incoming_subscriptions = self
+            .incoming_subscriptions
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
 
         println!(
             "\x1b[35mInfo:\x1b[0m Register_subscription inserting: {}",
@@ -137,9 +134,10 @@ impl SubscriptionData {
     }
 
     pub fn unregister_subscription(&self, subscription_request: String) {
-        let mut incoming_subscriptions = self.incoming_subscriptions.write().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let mut incoming_subscriptions = self
+            .incoming_subscriptions
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
 
         incoming_subscriptions.remove(&subscription_request);
     }
@@ -165,9 +163,10 @@ impl SubscriptionData {
     }
 
     fn raw_subscribe(&self, user_id: u32, subscription: &String) -> Result<String, Error> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let incoming_subscriptions = self
+            .incoming_subscriptions
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         let node_sub_info = match incoming_subscriptions.get(subscription) {
             Some(rax) => rax,
@@ -185,9 +184,10 @@ impl SubscriptionData {
 
     // Unsubscribe a user from a subscription
     pub fn unsubscribe_user(&self, user_id: u32, subscription_id: String) {
-        let mut subscriptions = self.subscriptions.write().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let mut subscriptions = self
+            .subscriptions
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
 
         let mut subscriptions_to_update = Vec::new();
 
@@ -208,9 +208,10 @@ impl SubscriptionData {
 
     // Return the node_id for a given subscription_id
     pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let incoming_subscriptions = self
+            .incoming_subscriptions
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         incoming_subscriptions
             .iter()
@@ -225,9 +226,10 @@ impl SubscriptionData {
 
     // Return all sub ids for a given node_id
     pub fn get_sub_id_by_node(&self, node_id: usize) -> Vec<String> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let incoming_subscriptions = self
+            .incoming_subscriptions
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         incoming_subscriptions
             .iter()
@@ -243,9 +245,10 @@ impl SubscriptionData {
 
     // Return all subscriptions for a given node_id
     pub fn get_subscription_by_node(&self, node_id: usize) -> Vec<String> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let incoming_subscriptions = self
+            .incoming_subscriptions
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         incoming_subscriptions
             .iter()
@@ -266,9 +269,10 @@ impl SubscriptionData {
     }
 
     pub fn get_sub_id_by_params(&self, params: &str) -> Option<String> {
-        let incoming_subscriptions = self.incoming_subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let incoming_subscriptions = self
+            .incoming_subscriptions
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
 
         incoming_subscriptions
             .iter()
@@ -283,9 +287,7 @@ impl SubscriptionData {
 
     // Return a Vec of all users subscribed to a subscription
     pub fn get_users_for_subscription(&self, subscription_id: &str) -> Vec<u32> {
-        let subscriptions = self.subscriptions.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let subscriptions = self.subscriptions.read().unwrap_or_else(|e| e.into_inner());
 
         let mut users = Vec::new();
 
@@ -345,9 +347,7 @@ impl SubscriptionData {
             subscription_id: subscription_id.to_string(),
         };
 
-        let users = self.users.read().unwrap_or_else(|e| {
-            e.into_inner()
-        });
+        let users = self.users.read().unwrap_or_else(|e| e.into_inner());
         if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
             if subscribers.is_empty() {
                 self.unregister_subscription(subscription_id.to_string());

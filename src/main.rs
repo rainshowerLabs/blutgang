@@ -195,9 +195,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         tokio::task::spawn(async move {
             tokio::task::spawn(async move {
-                let _ = subscription_dispatcher(outgoing_rx_ws, incoming_tx_ws, sub_dispatcher).await;
+                let _ =
+                    subscription_dispatcher(outgoing_rx_ws, incoming_tx_ws, sub_dispatcher).await;
             });
-            
+
             let _ = ws_conn_manager(
                 rpc_list_ws,
                 ws_handle,

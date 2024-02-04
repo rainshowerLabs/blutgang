@@ -20,7 +20,10 @@ use std::{
 };
 
 use tokio::sync::{
-    broadcast::{self, error::RecvError},
+    broadcast::{
+        self,
+        error::RecvError,
+    },
     mpsc,
 };
 
@@ -188,7 +191,7 @@ mod tests {
             .unwrap();
 
         tokio::spawn(async move {
-            let _ = subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data)).await;            
+            let _ = subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data)).await;
         });
 
         let subscription_content =

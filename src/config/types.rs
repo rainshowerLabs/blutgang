@@ -362,7 +362,12 @@ impl Settings {
 
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            rpc_list = sort_by_latency(rpc_list, ma_length).await;
+            rpc_list = match sort_by_latency(rpc_list, ma_length).await {
+                Ok(rax) => rax,
+                Err(e) => {
+                    panic!("{:?}", e);
+                }
+            };
         }
 
         Settings {
