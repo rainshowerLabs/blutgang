@@ -76,7 +76,7 @@ pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Result<V
         let rpc = match rpc {
             StartingLatencyResp::Ok(rax) => rax,
             StartingLatencyResp::Error(e) => {
-                println!("{:?}", e);
+                println!("\x1b[31mErr:\x1b[0m {}", e);
                 continue;
             },
         };
