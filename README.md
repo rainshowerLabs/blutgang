@@ -64,4 +64,4 @@ Thank you to all the contributors of the projects above!
 
 Blutgang is licensed under the FSL. This means you are allowed to use Blutgang for everything except building other load balancers. Two years after release, that specific version becomes licensed under the Apache-2.0 license.
 
-For commercial support, which includes deployment scripts, ansible playbooks and more, contact us for a commercial license!
+For commercial support, which includes deployment scripts, relicensing options, ansible playbooks and more, contact us for a commercial license!
