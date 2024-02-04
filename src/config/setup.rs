@@ -47,9 +47,7 @@ async fn set_starting_latency(
 
     println!("{}: {}ns", rpc.url, rpc.status.latency);
 
-    tx.send(StartingLatencyResp::Ok(rpc))
-        .await
-        .expect("Failed to send RPC result.");
+    tx.send(StartingLatencyResp::Ok(rpc)).await?;
 
     Ok(())
 }
