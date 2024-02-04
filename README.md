@@ -36,8 +36,6 @@ RUSTFLAGS='-C target-cpu=native' cargo build --profile maxperf
 
 ### Docker
 
-*Note: The overhead of running blutgang inside of docker reduces cache read performance by 10-20%.*   
-
 The official docker image is available on [dockerhub](https://hub.docker.com/r/makemake1337/blutgang).  
 You must provide a config file to the docker container, as well as expose the port specified. Example:   
 ```bash
@@ -46,6 +44,7 @@ docker run -v /full/path/to/config.toml:/app/config.toml --network host makemake
 
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
+
 ```bash
 time sothis --source_rpc http://localhost:3000 --mode call_track --contract_address 0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6 --origin_block 17885300 --terminal_block 17892269 --calldata 0x06f13056 --query_interval 20
 ```
@@ -58,7 +57,7 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 - [proxyd](https://github.com/ethereum-optimism/optimism/tree/develop/proxyd) for inspiration.
 - [web3-proxy](https://github.com/llamanodes/web3-proxy) for an alternative approach at building Eth load balancers in Rust.
 
-Thank you to all the contributors of the projects above!
+Blutgang is standing on the shoulders of giants. Thank you to all the contributors of the projects above!
 
 ## License
 
