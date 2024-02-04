@@ -29,10 +29,12 @@ async fn set_starting_latency(
     for _ in 0..ma_length as u32 {
         let start = Instant::now();
         match rpc.block_number().await {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => {
                 tx.send(StartingLatencyResp::Error(e.into())).await?;
-                return Err(ConfigError::RpcError("Error awaiting block_number!".to_string()));
+                return Err(ConfigError::RpcError(
+                    "Error awaiting block_number!".to_string(),
+                ));
             }
         };
         let end = Instant::now();
@@ -45,13 +47,18 @@ async fn set_starting_latency(
 
     println!("{}: {}ns", rpc.url, rpc.status.latency);
 
-    tx.send(StartingLatencyResp::Ok(rpc)).await.expect("Failed to send RPC result.");
+    tx.send(StartingLatencyResp::Ok(rpc))
+        .await
+        .expect("Failed to send RPC result.");
 
     Ok(())
 }
 
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
-pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Result<Vec<Rpc>, ConfigError> {
+pub async fn sort_by_latency(
+    mut rpc_list: Vec<Rpc>,
+    ma_length: f64,
+) -> Result<Vec<Rpc>, ConfigError> {
     // Return empty vec if we dont supply any RPCs
     if rpc_list.is_empty() {
         println!("\x1b[31mErr:\x1b[0m No RPCs supplied!");
@@ -78,7 +85,7 @@ pub async fn sort_by_latency(mut rpc_list: Vec<Rpc>, ma_length: f64) -> Result<V
             StartingLatencyResp::Error(e) => {
                 println!("\x1b[31mErr:\x1b[0m {}", e);
                 continue;
-            },
+            }
         };
         sorted_rpc_list.push(rpc);
     }
