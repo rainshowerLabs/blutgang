@@ -74,6 +74,9 @@ pub async fn sort_by_latency(
 
     let mut sorted_rpc_list = Vec::new();
 
+    // Drop tx so we don't try to receive nothing
+    drop(tx);
+
     // Collect results from tasks
     while let Some(rpc) = rx.recv().await {
         let rpc = match rpc {
