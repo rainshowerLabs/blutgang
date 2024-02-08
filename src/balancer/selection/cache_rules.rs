@@ -16,6 +16,8 @@ pub fn cache_method(rx: &str) -> bool {
         "safe",
         "finalized",
         "pending",
+        "eth_subscribe",
+        "eth_unsubscribe",
     ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method
