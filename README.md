@@ -53,9 +53,9 @@ time sothis --source_rpc http://localhost:3000 --mode call_track --contract_addr
 
 ## Acknowledgements
 
-- [dshackle](https://github.com/emeraldpay/dshackle) for pioneering fault tolerant node balancers.
-- [proxyd](https://github.com/ethereum-optimism/optimism/tree/develop/proxyd) for inspiration.
-- [web3-proxy](https://github.com/llamanodes/web3-proxy) for an alternative approach at building Eth load balancers in Rust.
+- [dshackle](https://github.com/emeraldpay/dshackle)
+- [proxyd](https://github.com/ethereum-optimism/optimism/tree/develop/proxyd)
+- [web3-proxy](https://github.com/llamanodes/web3-proxy)
 
 Blutgang is standing on the shoulders of giants. Thank you to all the contributors of the projects above!
 
