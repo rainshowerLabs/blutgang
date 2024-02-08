@@ -27,11 +27,16 @@ unsafe impl Sync for Status {}
 
 #[derive(Debug, Clone)]
 pub struct Rpc {
-    pub url: String,    // url of the rpc we're forwarding requests to.
-    client: Client,     // Reqwest client
-    pub status: Status, // stores stats related to the rpc.
+    pub url: String,            // url of the rpc we're forwarding requests to.
+    client: Client,             // Reqwest client
+    pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
+    pub status: Status,         // stores stats related to the rpc.
+    // For max_consecutive
     pub max_consecutive: u32,
     pub consecutive: u32,
+    // For max_per_second
+    pub last_used: u128,
+    pub min_time_delta: u128, // microseconds
 }
 
 unsafe impl Sync for Rpc {}
@@ -40,26 +45,38 @@ impl Default for Rpc {
     fn default() -> Self {
         Self {
             url: "".to_string(),
+            ws_url: None,
             client: Client::new(),
             status: Status::default(),
             max_consecutive: 0,
             consecutive: 0,
+            last_used: 0,
+            min_time_delta: 0,
         }
     }
 }
 
 // implement new for rpc
 impl Rpc {
-    pub fn new(url: String, max_consecutive: u32, ma_length: f64) -> Self {
+    pub fn new(
+        url: String,
+        ws_url: Option<String>,
+        max_consecutive: u32,
+        min_time_delta: u128,
+        ma_length: f64,
+    ) -> Self {
         Self {
             url,
             client: Client::new(),
+            ws_url,
             status: Status {
                 ma_length,
                 ..Default::default()
             },
             max_consecutive,
             consecutive: 0,
+            last_used: 0,
+            min_time_delta,
         }
     }
 
@@ -150,10 +167,9 @@ impl Rpc {
 
 // Take in the result of eth_getBlockByNumber, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
-    // TODO: maybe this is too slow?
     let mut rx = rx.to_string();
 
-    let json: Value = unsafe { simd_json::serde::from_str(&mut rx).unwrap() };
+    let json: Value = unsafe { simd_json::serde::from_str(&mut rx)? };
 
     let number = match json["result"].as_str() {
         Some(number) => number,

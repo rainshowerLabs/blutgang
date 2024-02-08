@@ -1,3 +1,5 @@
+use crate::IncomingResponse;
+use crate::SubscriptionData;
 use crate::{
     health::{
         error::HealthError,
@@ -6,9 +8,17 @@ use crate::{
             NamedBlocknumbers,
         },
     },
+    websocket::{
+        subscription_manager::move_subscriptions,
+        types::{
+            WsChannelErr,
+            WsconnMessage,
+        },
+    },
     Rpc,
     Settings,
 };
+use tokio::sync::broadcast;
 
 use std::println;
 use std::sync::{
@@ -35,7 +45,6 @@ struct HeadResult {
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
-    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     config: &Arc<RwLock<Settings>>,
@@ -45,7 +54,7 @@ pub async fn health_check(
         let ttl = config.read().unwrap().ttl;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, blocknum_tx, &ttl).await?;
+        check(&rpc_list, &poverty_list, &ttl).await?;
         get_safe_block(
             &rpc_list,
             &finalized_tx,
@@ -60,7 +69,6 @@ pub async fn health_check(
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
-    blocknum_tx: &tokio::sync::watch::Sender<u64>,
     ttl: &u128,
 ) -> Result<(), HealthError> {
     print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
@@ -71,16 +79,6 @@ async fn check(
 
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
-    // Send new blocknumber if modified
-    let send_if_changed = |number: &mut u64| {
-        if number != &agreed_head {
-            *number = agreed_head;
-            return true;
-        }
-        false
-    };
-
-    blocknum_tx.send_if_modified(send_if_changed);
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
@@ -230,6 +228,70 @@ fn escape_poverty(
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
     Ok(())
+}
+
+// Remove the RPC that dropped out ws_conn and add it to the poverty list
+pub async fn send_dropped_to_poverty(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: &Arc<RwLock<Vec<Rpc>>>,
+    incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
+    rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: &Arc<SubscriptionData>,
+    ws_conn_index: usize,
+) -> Result<(), HealthError> {
+    {
+        let mut rpc_list_guard = rpc_list.write().unwrap();
+        let mut poverty_list_guard = poverty_list.write().unwrap();
+
+        // Check if the RPC is in the rpc_list
+        if let Some(rpc) = rpc_list_guard.get(ws_conn_index) {
+            // Add the RPC to the poverty list
+            poverty_list_guard.push(rpc.clone());
+
+            // Remove the RPC from the rpc_list
+            rpc_list_guard.remove(ws_conn_index);
+        }
+    }
+
+    // Move subscriptions away from that node
+    move_subscriptions(incoming_tx, rx, sub_data, ws_conn_index).await?;
+
+    Ok(())
+}
+
+// Listen for dropped ws connections and handle them
+pub async fn dropped_listener(
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list: Arc<RwLock<Vec<Rpc>>>,
+    mut ws_err_rx: mpsc::UnboundedReceiver<WsChannelErr>,
+    incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
+    rx: broadcast::Receiver<IncomingResponse>,
+    sub_data: Arc<SubscriptionData>,
+) -> Result<(), HealthError> {
+    loop {
+        let ws_err = ws_err_rx.recv().await;
+
+        match ws_err {
+            Some(WsChannelErr::Closed(index)) => {
+                send_dropped_to_poverty(
+                    &rpc_list,
+                    &poverty_list,
+                    &incoming_tx,
+                    rx.resubscribe(),
+                    &sub_data,
+                    index,
+                )
+                .await
+                .unwrap_or(());
+                incoming_tx.send(WsconnMessage::Reconnect()).unwrap_or(());
+            }
+            None => {
+                return Err(HealthError::InvalidResponse(
+                    "Expected WsChannelErr!".to_string(),
+                ))
+            }
+        };
+    }
 }
 
 /*

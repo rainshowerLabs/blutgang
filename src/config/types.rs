@@ -17,6 +17,7 @@ use std::{
         self,
     },
     net::SocketAddr,
+    println,
 };
 
 use toml::Value;
@@ -56,6 +57,7 @@ impl Debug for AdminSettings {
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
+    pub is_ws: bool,
     pub do_clear: bool,
     pub address: SocketAddr,
     pub health_check: bool,
@@ -70,6 +72,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rpc_list: Vec::new(),
+            is_ws: true,
             do_clear: false,
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
@@ -235,6 +238,9 @@ impl Settings {
         // Parse all the other tables as RPCs and put them in a Vec<Rpc>
         //
         // Sort RPCs by latency if enabled
+
+        // `is_ws` flag is used to turn off WS specific things when a WS endpoint isnt present.
+        let mut is_ws = true;
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
@@ -246,6 +252,20 @@ impl Settings {
                     .as_integer()
                     .expect("\x1b[31mErr:\x1b[0m Could not parse max_consecutive as int!")
                     as u32;
+
+                let mut delta = rpc_table
+                    .get("max_per_second")
+                    .expect("\x1b[31mErr:\x1b[0m Missing max_per_second from an RPC!")
+                    .as_integer()
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse max_per_second as int!")
+                    as u64;
+
+                // If the delta time isnt 0, we need to get how many microsecond need to pass
+                // before we can send a new request
+                if delta != 0 {
+                    delta = 1_000_000 / delta;
+                }
+
                 let url = rpc_table
                     .get("url")
                     .expect("\x1b[31mErr:\x1b[0m Missing URL from RPC!")
@@ -253,9 +273,34 @@ impl Settings {
                     .expect("\x1b[31mErr:\x1b[0m Could not parse URL from a RPC as str!")
                     .to_string();
 
-                let rpc = Rpc::new(url, max_consecutive, ma_length);
+                // ws_url is an Option<>
+                //
+                // If we cant read it it should be `None`
+                let ws_url = match rpc_table.get("ws_url") {
+                    Some(ws_url) => {
+                        Some(
+                            ws_url
+                                .as_str()
+                                .expect("\x1b[31mErr:\x1b[0m Could not parse ws_url as str!")
+                                .to_string(),
+                        )
+                    }
+                    None => {
+                        is_ws = false;
+                        None
+                    }
+                };
+
+                let rpc = Rpc::new(url, ws_url, max_consecutive, delta.into(), ma_length);
                 rpc_list.push(rpc);
             }
+        }
+
+        if !is_ws {
+            println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes.");
+            println!(
+                "\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info."
+            )
         }
 
         // Admin namespace things
@@ -317,11 +362,17 @@ impl Settings {
 
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            rpc_list = sort_by_latency(rpc_list, ma_length).await;
+            rpc_list = match sort_by_latency(rpc_list, ma_length).await {
+                Ok(rax) => rax,
+                Err(e) => {
+                    panic!("{:?}", e);
+                }
+            };
         }
 
         Settings {
             rpc_list,
+            is_ws,
             do_clear,
             address,
             health_check,
@@ -345,13 +396,22 @@ impl Settings {
             .expect("Invalid ma_length");
         let ma_length = ma_length.parse::<f64>().expect("Invalid ma_length");
 
+        let mut delta = matches
+            .get_one::<u64>("max_per_second")
+            .expect("Invalid max_per_second")
+            .to_owned();
+
+        if delta != 0 {
+            delta = 1_000_000 / delta;
+        }
+
         // Turn the rpc_list into a csv vec
         let rpc_list: Vec<&str> = rpc_list.split(',').collect();
         let rpc_list: Vec<String> = rpc_list.iter().map(|rpc| rpc.to_string()).collect();
         // Make a list of Rpc structs
         let rpc_list: Vec<Rpc> = rpc_list
             .iter()
-            .map(|rpc| Rpc::new(rpc.to_string(), 6, ma_length))
+            .map(|rpc| Rpc::new(rpc.to_string(), None, 6, delta.into(), ma_length))
             .collect();
 
         // Build the SocketAddr
@@ -450,6 +510,7 @@ impl Settings {
 
         Settings {
             rpc_list,
+            is_ws: false,
             do_clear: clear,
             address,
             health_check,

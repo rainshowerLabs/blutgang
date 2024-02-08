@@ -5,7 +5,6 @@ use hyper::{
     Request,
 };
 use memchr::memmem;
-use regex::Regex;
 use serde_json::{
     json,
     Value,
@@ -19,8 +18,6 @@ use std::{
         RwLock,
     },
 };
-
-use crate::rpc::error::RpcError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NamedNumber {
@@ -87,11 +84,6 @@ pub fn get_block_number_from_request(
     // Get the corresponding blockbumber from the params
     let block_number = tx["params"][position].to_string().replace('\"', "");
 
-    // If `null` return None
-    if block_number == "null" {
-        return None;
-    }
-
     // Return the corresponding named parameter from the RwLock is present
     let nn = has_named_number(&block_number);
     if nn != NamedNumber::Null {
@@ -114,6 +106,59 @@ pub fn get_block_number_from_request(
     };
 
     Some(block_number)
+}
+
+// Replaces block tags with a hex number and return the request
+pub fn replace_block_tags(
+    tx: &mut Value,
+    named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
+) -> Value {
+    // Return if `params` is not a thing
+    let params = tx["params"].as_array();
+    if params.map_or(true, |p| p.is_empty()) {
+        return tx.to_owned();
+    }
+
+    // Determine the correct parameter index based on the method
+    let position = match tx["method"].as_str() {
+        Some("eth_getBalance")
+        | Some("eth_getTransactionCount")
+        | Some("eth_getCode")
+        | Some("eth_call") => 1,
+        Some("eth_getStorageAt") => 2,
+        Some("eth_getBlockTransactionCountByNumber")
+        | Some("eth_getUncleCountByBlockNumber")
+        | Some("eth_getBlockByNumber")
+        | Some("eth_getTransactionByBlockNumberAndIndex")
+        | Some("eth_getUncleByBlockNumberAndIndex") => 0,
+        _ => return tx.to_owned(),
+    };
+
+    // Extract the block number parameter
+    let block_number = tx["params"][position].to_string().replace('\"', "");
+
+    // Check if the block number is a named tag
+    let nn = has_named_number(&block_number);
+    if nn != NamedNumber::Null {
+        let rwlock_guard = named_blocknumbers.read().unwrap();
+
+        // Replace the named block tag with its corresponding hex value
+        match nn {
+            NamedNumber::Latest => {
+                if rwlock_guard.latest != 0 {
+                    tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.latest));
+                }
+            }
+            NamedNumber::Finalized => {
+                if rwlock_guard.finalized != 0 {
+                    tx["params"][position] = json!(format!("0x{:x}", rwlock_guard.finalized));
+                }
+            }
+            _ => (),
+        }
+    }
+
+    tx.to_owned()
 }
 
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
@@ -140,34 +185,6 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
     Ok(ret)
 }
 
-pub fn _extract_id(request: &str) -> Option<String> {
-    // Define the regular expression pattern to capture the "id" field
-    let re = Regex::new(r#""id"\s*:\s*("([^"]*)"|(\d+))"#).unwrap();
-
-    if let Some(captures) = re.captures(request) {
-        if let Some(id) = captures.get(2).or(captures.get(3)) {
-            return Some(id.as_str().to_string());
-        }
-    }
-
-    None
-}
-
-pub fn _replace_id(tx: &str, id: &str) -> Result<String, RpcError> {
-    // Use regex to find and capture the "id" field with optional double quotes
-    //
-    // We could be using memmem and making it much more optimized but this is fine
-    let re = match Regex::new(r#"("id"\s*:\s*)("[^"]*"|\d+)"#) {
-        Ok(re) => re,
-        Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
-    };
-
-    // Replace "id" with the new id using the captured group
-    let replaced = re.replace(tx, |caps: &regex::Captures| format!("{}{}", &caps[1], id));
-
-    Ok(replaced.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -175,6 +192,17 @@ mod tests {
     use serde_json::json;
     use std::sync::Arc;
     use std::sync::RwLock;
+
+    // Dummy NamedBlocknumbers for testing
+    fn dummy_named_blocknumbers() -> Arc<RwLock<NamedBlocknumbers>> {
+        Arc::new(RwLock::new(NamedBlocknumbers {
+            latest: 10,
+            earliest: 2,
+            safe: 3,
+            finalized: 4,
+            pending: 5,
+        }))
+    }
 
     #[test]
     fn has_named_number_test() {
@@ -191,14 +219,7 @@ mod tests {
     #[test]
     fn get_block_number_from_request_test() {
         // Set up a fake NamedBlocknumbers
-        let named_blocknumbers = Arc::new(RwLock::new(NamedBlocknumbers {
-            latest: 1,
-            earliest: 2,
-            safe: 3,
-            finalized: 4,
-            pending: 5,
-            number: 6,
-        }));
+        let named_blocknumbers = dummy_named_blocknumbers();
 
         let request = json!({
             "id":1,
@@ -209,7 +230,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -257,7 +278,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -293,7 +314,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -365,7 +386,7 @@ mod tests {
 
         assert_eq!(
             get_block_number_from_request(request, &named_blocknumbers),
-            Some(1)
+            Some(10)
         );
 
         let request = json!({
@@ -394,60 +415,112 @@ mod tests {
     }
 
     #[test]
-    fn replace_id_test() {
-        let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _replace_id(tx, "2").unwrap();
-        assert_eq!(
-            tx,
-            r#"{"id":2,"jsonrpc":"2.0","method":"eth_call","params":...}"#
-        );
+    fn replace_named_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
 
-        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id":1, "params":...}"#;
-        let tx = _replace_id(tx, "2").unwrap();
-        assert_eq!(
-            tx,
-            r#"{"jsonrpc":"2.0","method":"eth_call", "id":2, "params":...}"#
-        );
+        let expected = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0xa"]
+        });
 
-        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": "1", "params":...}"#;
-        let tx = _replace_id(tx, "2").unwrap();
-        assert_eq!(
-            tx,
-            r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
-        );
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), expected);
+    }
 
-        let tx = r#"{"jsonrpc":"2.0","method":"eth_call", "id": 1, "params":...}"#;
-        let tx = _replace_id(tx, "2").unwrap();
+    #[test]
+    fn keep_hex_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
+    }
+
+    #[test]
+    fn handle_invalid_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "invalid"]
+        });
+
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
+    }
+
+    #[test]
+    fn replace_block_number_different_methods_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let methods = vec!["eth_getBalance", "eth_getTransactionCount"];
+
+        for method in methods {
+            let mut tx = json!({
+                "method": method,
+                "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+            });
+
+            let expected = json!({
+                "method": method,
+                "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0xa"]
+            });
+
+            let a = replace_block_tags(&mut tx, &named_blocknumbers);
+
+            assert_eq!(a, expected);
+        }
+    }
+
+    #[test]
+    fn handle_missing_or_empty_params_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx_no_params = json!({
+            "method": "eth_getBalance"
+        });
+
+        let mut tx_empty_params = json!({
+            "method": "eth_getBalance",
+            "params": []
+        });
+
         assert_eq!(
-            tx,
-            r#"{"jsonrpc":"2.0","method":"eth_call", "id": 2, "params":...}"#
+            replace_block_tags(&mut tx_no_params, &named_blocknumbers),
+            tx_no_params
+        );
+        assert_eq!(
+            replace_block_tags(&mut tx_empty_params, &named_blocknumbers),
+            tx_empty_params
         );
     }
 
     #[test]
-    fn extract_id_test() {
-        let tx = r#"{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx).unwrap();
-        assert_eq!(tx, r#"1"#);
+    fn handle_zero_blocknumber() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        named_blocknumbers.write().unwrap().latest = 0;
+        let mut tx = json!({
+            "method": "eth_getTransactionCount",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
 
-        let tx = r#"{"id": 1,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx).unwrap();
-        assert_eq!(tx, r#"1"#);
+        let expected = json!({
+            "method": "eth_getTransactionCount",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+        });
 
-        let tx = r#"{"id":1 ,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx).unwrap();
-        assert_eq!(tx, r#"1"#);
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), expected);
+    }
 
-        let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx).unwrap();
-        assert_eq!(tx, r#"1"#);
+    #[test]
+    fn handle_non_string_block_number_test() {
+        let named_blocknumbers = dummy_named_blocknumbers();
+        let mut tx = json!({
+            "method": "eth_getBalance",
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", 100]
+        });
 
-        let tx = r#"{"id":"1","jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx).unwrap();
-        assert_eq!(tx, r#"1"#);
-
-        let tx = r#"{,"jsonrpc":"2.0","method":"eth_call","params":...}"#;
-        let tx = _extract_id(tx);
-        assert_eq!(tx, None);
+        assert_eq!(replace_block_tags(&mut tx, &named_blocknumbers), tx);
     }
 }

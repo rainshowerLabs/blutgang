@@ -28,7 +28,7 @@ pub async fn manage_cache(
     while blocknum_stream.next().await.is_some() {
         let new_block = *blocknum_rx.borrow();
 
-        // If a new block is less or equal(todo) to the last block in our cache,
+        // If a new block is less or equal to the last block in our cache,
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {

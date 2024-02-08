@@ -25,4 +25,10 @@ impl std::fmt::Display for RpcError {
     }
 }
 
+impl From<simd_json::Error> for RpcError {
+    fn from(_: simd_json::Error) -> Self {
+        RpcError::InvalidResponse("Error while trying to parse JSON".to_string())
+    }
+}
+
 impl Error for RpcError {}

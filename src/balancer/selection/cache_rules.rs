@@ -2,8 +2,8 @@ use memchr::memmem;
 
 // Return true if we are supposed to be caching the input.
 //
-// The default rust string contains does not use SIMD extensions
-// memchr::memmem is way faster because it uses them
+// This loop cannot be unrolled because it wouldn't work against mangled queries that would
+// overall be valid. Too bad!
 pub fn cache_method(rx: &str) -> bool {
     // If no-cache feature is on, return false
     #[cfg(feature = "no-cache")]
@@ -16,6 +16,8 @@ pub fn cache_method(rx: &str) -> bool {
         "safe",
         "finalized",
         "pending",
+        "eth_subscribe",
+        "eth_unsubscribe",
     ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method
@@ -40,7 +42,7 @@ pub fn cache_result(rx: &str) -> bool {
 
     // just checking if `error` is present should be enough, but include the beggining error
     // codes juuuust to be extra safe
-    let blacklist = ["error", "-320", "-326", "-327"];
+    let blacklist = ["error", "-32"];
 
     for item in blacklist.iter() {
         if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {

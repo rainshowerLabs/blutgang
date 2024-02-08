@@ -36,8 +36,6 @@ RUSTFLAGS='-C target-cpu=native' cargo build --profile maxperf
 
 ### Docker
 
-*Note: The overhead of running blutgang inside of docker reduces cache read performance by 10-20%.*   
-
 The official docker image is available on [dockerhub](https://hub.docker.com/r/makemake1337/blutgang).  
 You must provide a config file to the docker container, as well as expose the port specified. Example:   
 ```bash
@@ -46,16 +44,23 @@ docker run -v /full/path/to/config.toml:/app/config.toml --network host makemake
 
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
+
 ```bash
 time sothis --source_rpc http://localhost:3000 --mode call_track --contract_address 0x1c479675ad559DC151F6Ec7ed3FbF8ceE79582B6 --origin_block 17885300 --terminal_block 17892269 --calldata 0x06f13056 --query_interval 20
 ```
 ![Figure_1](https://github.com/rainshowerLabs/blutgang/assets/55022497/8ce9a690-d2eb-4910-9a5d-807c2bdd4649)
 ![Figure_2](https://github.com/rainshowerLabs/blutgang/assets/55022497/50d78e5f-2209-488d-82fc-8018388a82e7)
 
-## Notes on the license
+## Acknowledgements
 
-Blutgang is libre software licensed under the AGPL-3.0 license. If you are using blutgang in a commercial enviroment, and do not get a commercial license from us, you are required by law to disclose the source code of blutgang, or any works based on or that use the licensed software in any way. This includes MEV bots. Blutgang respects the freedom of it's users and will *always* be free for non-commercial use.   
+- [dshackle](https://github.com/emeraldpay/dshackle)
+- [proxyd](https://github.com/ethereum-optimism/optimism/tree/develop/proxyd)
+- [web3-proxy](https://github.com/llamanodes/web3-proxy)
 
-### Commercial use and support
+Blutgang is standing on the shoulders of giants. Thank you to all the contributors of the projects above!
 
-If you want to use blutgang in a commercial setting without disclosing any source code, please [reach out](https://rainshower.cloud/).
+## License
+
+Blutgang is licensed under the FSL. This means you are allowed to use Blutgang for everything except building other load balancers. Two years after release, that specific version becomes licensed under the Apache-2.0 license.
+
+For commercial support, which includes deployment scripts, relicensing options, ansible playbooks and more, contact us for a commercial license!

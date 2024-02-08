@@ -1,4 +1,5 @@
 use crate::Rpc;
+use std::time::SystemTime;
 
 // Generic entry point fn to select the next rpc and return its position
 pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
@@ -31,7 +32,57 @@ pub fn argsort(data: &Vec<Rpc>) -> Vec<usize> {
 //
 #[cfg(all(
     feature = "selection-weighed-round-robin",
-    not(feature = "selection-random")
+    not(feature = "selection-random"),
+    not(feature = "old-weighted-round-robin"),
+))]
+fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+    // Sort by latency
+    let indices = argsort(list);
+
+    let time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("Failed to get current time")
+        .as_micros();
+
+    // Picks the second fastest one rpc that meets our requirements
+    // Also take into account min_delta_time
+
+    // Set fastest rpc as default
+    let mut choice = indices[0];
+    let mut choice_consecutive = 0;
+    for i in indices.iter().rev() {
+        if list[*i].max_consecutive > list[*i].consecutive
+            && (time - list[*i].last_used > list[*i].min_time_delta)
+        {
+            choice = *i;
+            choice_consecutive = list[*i].consecutive;
+        }
+
+        // remove consecutive
+        list[*i].consecutive = 0;
+    }
+
+    // If no RPC has been selected, fall back to the fastest RPC
+    list[choice].consecutive = choice_consecutive + 1;
+    list[choice].last_used = time;
+    (list[choice].clone(), Some(choice))
+}
+
+#[cfg(all(
+    feature = "selection-weighed-round-robin",
+    feature = "selection-random"
+))]
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
+    use rand::Rng;
+
+    let mut rng = rand::thread_rng();
+    let index = rng.gen_range(0..list.len());
+    (list[index].clone(), Some(index))
+}
+
+#[cfg(all(
+    feature = "selection-weighed-round-robin",
+    feature = "old-weighted-round-robin",
 ))]
 fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
     // Sort by latency
@@ -46,18 +97,6 @@ fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
 
     list[indices[0]].consecutive += 1;
     (list[indices[0]].clone(), Some(indices[0]))
-}
-
-#[cfg(all(
-    feature = "selection-weighed-round-robin",
-    feature = "selection-random"
-))]
-fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
-    use rand::Rng;
-
-    let mut rng = rand::thread_rng();
-    let index = rng.gen_range(0..list.len());
-    (list[index].clone(), Some(index))
 }
 
 // Tests
@@ -91,31 +130,74 @@ mod tests {
         let mut rpc2 = Rpc::default();
         let mut rpc3 = Rpc::default();
 
-        rpc1.status.latency = 1.0;
+        rpc1.status.latency = 3.0;
         rpc1.max_consecutive = 10;
-        rpc2.status.latency = 6.0;
+        rpc1.min_time_delta = 100;
+
+        rpc2.status.latency = 7.0;
         rpc2.max_consecutive = 10;
-        rpc3.status.latency = 3.0;
+        rpc2.min_time_delta = 100;
+
+        rpc3.status.latency = 5.0;
         rpc3.max_consecutive = 10;
+        rpc3.min_time_delta = 100;
 
         let mut rpc_list = vec![rpc1, rpc2, rpc3];
 
         let (rpc, index) = pick(&mut rpc_list);
         println!("rpc: {:?}", rpc);
-        assert_eq!(rpc.status.latency, 1.0);
+        assert_eq!(rpc.status.latency, 3.0);
         assert_eq!(index, Some(0));
 
         rpc_list[0].status.latency = 10000.0;
 
         let (rpc, index) = pick(&mut rpc_list);
         println!("rpc index: {:?}", index);
-        assert_eq!(rpc.status.latency, 3.0);
+        assert_eq!(rpc.status.latency, 5.0);
         assert_eq!(index, Some(2));
 
         rpc_list[2].status.latency = 100000.0;
 
         let (rpc, index) = pick(&mut rpc_list);
-        assert_eq!(rpc.status.latency, 6.0);
+        assert_eq!(rpc.status.latency, 7.0);
+        assert_eq!(index, Some(1));
+    }
+
+    // Test max_delay when picking rpcs
+    #[test]
+    fn test_pick_max_delay() {
+        let mut rpc1 = Rpc::default();
+        let mut rpc2 = Rpc::default();
+        let mut rpc3 = Rpc::default();
+
+        rpc1.status.latency = 3.0;
+        rpc1.max_consecutive = 10;
+        rpc1.min_time_delta = 1701357164371770;
+        rpc1.last_used = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Failed to get current time")
+            .as_micros();
+
+        rpc2.status.latency = 7.0;
+        rpc2.max_consecutive = 10;
+        rpc2.min_time_delta = 1;
+
+        rpc3.status.latency = 5.0;
+        rpc3.max_consecutive = 10;
+        rpc3.min_time_delta = 10000000;
+
+        let mut rpc_list = vec![rpc1, rpc2, rpc3];
+
+        // Pick rpc3 becauese rpc1 does not meet last used requirements
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc: {:?}", rpc);
+        assert_eq!(rpc.status.latency, 5.0);
+        assert_eq!(index, Some(2));
+
+        // pick rpc2 because rpc3 was just used
+        let (rpc, index) = pick(&mut rpc_list);
+        println!("rpc index: {:?}", index);
+        assert_eq!(rpc.status.latency, 7.0);
         assert_eq!(index, Some(1));
     }
 }
