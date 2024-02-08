@@ -167,7 +167,6 @@ impl Rpc {
 
 // Take in the result of eth_getBlockByNumber, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
-    // TODO: maybe this is too slow?
     let mut rx = rx.to_string();
 
     let json: Value = unsafe { simd_json::serde::from_str(&mut rx)? };

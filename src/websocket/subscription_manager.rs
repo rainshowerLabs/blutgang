@@ -126,7 +126,6 @@ pub async fn move_subscriptions(
     // Listen on `rx` for incoming messages.
     // We're only interested in ones that have the right ID as specified in pairs
     while !pairs.is_empty() {
-        // TODO: errors!
         let response = rx.recv().await?;
 
         // Discard any response that does not have a proper ID
