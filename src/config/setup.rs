@@ -99,11 +99,9 @@ pub async fn sort_by_latency(
 // mod tests {
 //     use tokio::time::sleep;
 //     use super::*;
-    
-    
+
 //     use tokio::sync::{mpsc};
 //     use std::time::Duration;
-    
 
 //     #[tokio::test]
 //     async fn test_set_starting_latency() {
@@ -126,7 +124,6 @@ pub async fn sort_by_latency(
 //             None => panic!("Expected Some, got None"),
 //         }
 //     }
-
 
 //     #[tokio::test]
 //     async fn test_sort_by_latency() {
