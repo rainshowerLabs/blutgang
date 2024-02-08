@@ -36,7 +36,7 @@ jobs:
           #remote-repository-name: enter the  remote repository name where the signatures should be stored (Default is storing the signatures in the same repository)
           #create-file-commit-message: 'For example: Creating file for storing CLA Signatures'
           #signed-commit-message: 'For example: $contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
-          custom-notsigned-prcomment: 'Thank you for opening this pull request! Before we merge this PR, please confirm that you allow Rainshower Labs to dual license your code under AGPLv3, as well as a license at our discretion. For more info, please read the readme, or contact us directly.'
+          custom-notsigned-prcomment: 'Thank you for opening this pull request! Before we merge this PR, please confirm that you allow Rainshower Labs to dual license your code under the FSL-1.0-Apache-2.0 license, as well as any license at our discretion. For more info, please read the readme, or contact us directly.'
           #custom-pr-sign-comment: 'The signature to be committed in order to sign the CLA'
           #custom-allsigned-prcomment: 'pull request comment when all contributors has signed, defaults to **CLA Assistant Lite bot** All Contributors have signed the CLA.'
           #lock-pullrequest-aftermerge: false - if you don't want this bot to automatically lock the pull request after merging (default - true)
