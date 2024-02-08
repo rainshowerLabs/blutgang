@@ -2,13 +2,13 @@
 name = "blutgang"
 version = "0.3.0"
 edition = "2021"
-authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, github contributors"]
-license = "FSL-1.0-Apache-2.0"
-description = "Fast, minimalist weighted round robin load balancing with caching for Ethereum JSON-RPC calls."
+authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, contributors"]
+license-file = "LICENSE"
+description = "Fast, minimalist load balancing with caching for Ethereum JSON-RPC calls. Full support for HTTP and WS."
 readme = "README.md"
 homepage = "https://github.com/rainshowerLabs/blutgang"
 repository = "https://github.com/rainshowerLabs/blutgang"
-keywords = ["cli", "ethereum"]
+keywords = ["cli", "ethereum", "load-balancing", "websocket", "http"]
 categories = ["command-line-utilities"]
 
 [dependencies]
