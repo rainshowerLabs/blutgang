@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y libssl-dev pkg-config && \
 
 # Build the Rust project
 # If your project uses a custom profile, replace `--release` with `--profile <your-profile>`
-RUN RUSTFLAGS='-C target-cpu=native' cargo build --release
+RUN RUSTFLAGS='-C target-cpu=native' cargo build --profile maxperf
 
 # Start a new stage to create a smaller final image
 FROM debian:bookworm
