@@ -1,5 +1,5 @@
 # Use Rust official image for the build stage
-FROM rust:latest AS build
+FROM rust:1.76-slim-bookworm AS build
 
 # Create and set the working directory
 WORKDIR /usr/src/app
