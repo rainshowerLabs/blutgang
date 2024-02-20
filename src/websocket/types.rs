@@ -372,7 +372,6 @@ impl SubscriptionData {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tokio::sync::mpsc;
 
     fn setup_user_and_subscription_data() -> (
         SubscriptionData,

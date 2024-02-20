@@ -5,7 +5,6 @@ use serde_json::{
     json,
     Value,
 };
-use simd_json;
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]

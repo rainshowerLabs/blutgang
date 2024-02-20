@@ -3,7 +3,6 @@ use tokio::sync::{
     broadcast,
     mpsc,
 };
-use tokio_tungstenite::tungstenite;
 
 #[derive(Debug)]
 pub enum Error {

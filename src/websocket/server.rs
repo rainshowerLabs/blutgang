@@ -29,7 +29,6 @@ use futures::{
 };
 
 use hyper_tungstenite::{
-    tungstenite,
     HyperWebsocket,
 };
 use tungstenite::Message;

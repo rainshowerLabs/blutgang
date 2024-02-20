@@ -36,7 +36,6 @@ use tokio::sync::{
 };
 
 use serde_json::Value;
-use simd_json;
 
 // Select either blake3 or xxhash based on the features
 #[cfg(not(feature = "xxhash"))]

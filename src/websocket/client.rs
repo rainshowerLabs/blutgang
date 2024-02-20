@@ -326,10 +326,6 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::time::Duration;
-    use tokio::sync::{
-        broadcast,
-        mpsc,
-    };
 
     // Helper function to create a mock Rpc object
     fn mock_rpc(url: &str) -> Rpc {

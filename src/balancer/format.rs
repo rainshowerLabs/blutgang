@@ -188,10 +188,7 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::balancer::format::get_block_number_from_request;
     use serde_json::json;
-    use std::sync::Arc;
-    use std::sync::RwLock;
 
     // Dummy NamedBlocknumbers for testing
     fn dummy_named_blocknumbers() -> Arc<RwLock<NamedBlocknumbers>> {

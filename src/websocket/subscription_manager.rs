@@ -159,12 +159,7 @@ mod tests {
     use super::*;
     use rand::Rng;
     use serde_json::json;
-    use std::sync::Arc;
     use std::time::Duration;
-    use tokio::sync::{
-        broadcast,
-        mpsc,
-    };
 
     #[tokio::test]
     async fn test_subscription_dispatcher() {
