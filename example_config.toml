@@ -53,13 +53,13 @@ print_profile = false
 # Frequency of flushes in ms
 flush_every_ms = 24000
 
-# Add seperate RPCs as TOML tables
+# Add separate RPCs as TOML tables
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
 
 [merkle]
 url = "https://eth.merkle.io"
 ws_url = "wss://eth.merkle.io"
-# The maximum ammount of time we can use this rpc in a row.
+# The maximum amount of time we can use this rpc in a row.
 max_consecutive = 150
-# Max ammount of querries per second.
+# Max amount of queries per second.
 max_per_second = 200
