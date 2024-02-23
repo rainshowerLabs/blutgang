@@ -98,7 +98,7 @@ async fn handle_incoming_message(
         match pick(&mut rpc_list.write().unwrap()).1 {
             Some(position) => position,
             None => {
-                println!("Error: No RPC position available");
+                println!("\x1b[31mErr:\x1b[0m No RPC position available");
                 return;
             }
         }
@@ -111,10 +111,10 @@ async fn handle_incoming_message(
         .and_then(|handle| handle.as_ref())
     {
         if ws.send(incoming).is_err() {
-            println!("ws_conn_manager error: failed to send message");
+            println!("\x1b[31mErr:\x1b[0m ws_conn_manager error: failed to send message");
         }
     } else {
-        println!("No WS connection at index {}", rpc_position);
+        println!("\x1b[31mErr:\x1b[0m No WS connection at index {}", rpc_position);
     }
 }
 
