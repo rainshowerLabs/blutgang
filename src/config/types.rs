@@ -62,6 +62,7 @@ pub struct Settings {
     pub address: SocketAddr,
     pub health_check: bool,
     pub ttl: u128,
+    pub newHeads_ttl: u128,
     pub max_retries: u32,
     pub health_check_ttl: u64,
     pub sled_config: Config,
@@ -77,6 +78,7 @@ impl Default for Settings {
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
             ttl: 1000,
+            newHeads_ttl: 2000,
             max_retries: 32,
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
@@ -107,6 +109,9 @@ impl Settings {
 
     async fn create_from_file(conf_file: String) -> Settings {
         let parsed_toml = conf_file.parse::<Value>().expect("Error parsing TOML");
+
+        // `is_ws` flag is used to turn off WS specific things when a WS endpoint isnt present.
+        let mut is_ws = true;
 
         let table_names: Vec<&String> = parsed_toml.as_table().unwrap().keys().collect::<Vec<_>>();
 
@@ -163,6 +168,16 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
+
+        let newHeads_ttl = blutgang_table
+            .get("newHeads_ttl")
+            .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
+            .as_integer()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
+        if newHeads_ttl == 0 {
+            is_ws = false;
+        }
+
         let max_retries = blutgang_table
             .get("max_retries")
             .expect("\x1b[31mErr:\x1b[0m Missing max_retries!")
@@ -239,8 +254,6 @@ impl Settings {
         //
         // Sort RPCs by latency if enabled
 
-        // `is_ws` flag is used to turn off WS specific things when a WS endpoint isnt present.
-        let mut is_ws = true;
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
             if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
@@ -297,7 +310,7 @@ impl Settings {
         }
 
         if !is_ws {
-            println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes.");
+            println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes, or newHeads_ttl is 0.");
             println!(
                 "\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info."
             )
@@ -377,6 +390,7 @@ impl Settings {
             address,
             health_check,
             ttl,
+            newHeads_ttl,
             max_retries,
             health_check_ttl,
             sled_config,
@@ -469,6 +483,12 @@ impl Settings {
             .parse::<u128>()
             .expect("Invalid ttl");
 
+        let newHeads_ttl = matches
+            .get_one::<String>("newHeads_ttl")
+            .expect("Invalid newHeads_ttl")
+            .parse::<u128>()
+            .expect("Invalid newHeads_ttl");
+
         let max_retries = matches
             .get_one::<String>("max_retries")
             .expect("Invalid max_retries")
@@ -515,6 +535,7 @@ impl Settings {
             address,
             health_check,
             ttl,
+            newHeads_ttl,
             max_retries,
             health_check_ttl,
             sled_config,
