@@ -192,22 +192,14 @@ impl SubscriptionData {
             .write()
             .unwrap_or_else(|e| e.into_inner());
 
-        let mut subscriptions_to_update = Vec::new();
-
-        // Finding all subscriptions matching the subscription_id and user_id
-        for (node_sub_info, subscribers) in subscriptions.iter() {
+        // Directly unsubscribing the user within the loop
+        for (node_sub_info, subscribers) in subscriptions.iter_mut() {
             if node_sub_info.subscription_id == subscription_id && subscribers.contains(&user_id) {
-                subscriptions_to_update.push(node_sub_info.clone());
-            }
-        }
-
-        // Unsubscribing the user from the found subscriptions
-        for node_sub_info in subscriptions_to_update {
-            if let Some(subscribers) = subscriptions.get_mut(&node_sub_info) {
                 subscribers.remove(&user_id);
             }
         }
     }
+
 
     // Unsubscribe a user from all of their subscriptions
     pub fn unsubscribe_user_from_all(&self, user_id: u32) {
@@ -216,22 +208,14 @@ impl SubscriptionData {
             .write()
             .unwrap_or_else(|e| e.into_inner());
 
-        let mut subscriptions_to_update = Vec::new();
-
-        // Finding all subscriptions matching the subscription_id and user_id
-        for (node_sub_info, subscribers) in subscriptions.iter() {
+        // Directly unsubscribing the user within the loop
+        for (_, subscribers) in subscriptions.iter_mut() {
             if subscribers.contains(&user_id) {
-                subscriptions_to_update.push(node_sub_info.clone());
-            }
-        }
-
-        // Unsubscribing the user from the found subscriptions
-        for node_sub_info in subscriptions_to_update {
-            if let Some(subscribers) = subscriptions.get_mut(&node_sub_info) {
                 subscribers.remove(&user_id);
             }
         }
     }
+
 
     // Return the node_id for a given subscription_id
     pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {

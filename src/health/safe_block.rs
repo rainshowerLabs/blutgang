@@ -206,7 +206,7 @@ pub async fn subscribe_to_new_heads(
     // everything associated with a new head block.
     let mut subscription_id: String = "".to_string();
     loop {
-        match timeout(Duration::from_millis((ttl as f64 * 1.5) as u64), rx.recv()).await {
+        match timeout(Duration::from_millis((ttl * 2) as u64), rx.recv()).await {
             Ok(Some(msg)) => {
                 if let RequestResult::Subscription(sub) = msg {
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
