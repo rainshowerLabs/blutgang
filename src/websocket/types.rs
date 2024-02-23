@@ -206,6 +206,30 @@ impl SubscriptionData {
         }
     }
 
+    // Unsubscribe a user from all of their subscriptions
+    pub fn unsubscribe_user_from_all(&self, user_id: u32) {
+        let mut subscriptions = self
+            .subscriptions
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
+
+        let mut subscriptions_to_update = Vec::new();
+
+        // Finding all subscriptions matching the subscription_id and user_id
+        for (node_sub_info, subscribers) in subscriptions.iter() {
+            if subscribers.contains(&user_id) {
+                subscriptions_to_update.push(node_sub_info.clone());
+            }
+        }
+
+        // Unsubscribing the user from the found subscriptions
+        for node_sub_info in subscriptions_to_update {
+            if let Some(subscribers) = subscriptions.get_mut(&node_sub_info) {
+                subscribers.remove(&user_id);
+            }
+        }
+    }
+
     // Return the node_id for a given subscription_id
     pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {
         let incoming_subscriptions = self
@@ -478,6 +502,43 @@ mod tests {
                 k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
             }));
     }
+
+    #[tokio::test]
+    async fn test_unsubscribe_user_from_all() {
+        let (subscription_data, user_id, _) = setup_user_and_subscription_data();
+        let subscription_request =
+            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_id = "200".to_string();
+        let node_id = 1;
+
+        subscription_data.register_subscription(
+            subscription_request.clone(),
+            subscription_id.clone(),
+            node_id,
+        );
+        subscription_data
+            .subscribe_user(user_id, subscription_request.clone())
+            .unwrap();
+        assert!(subscription_data
+            .subscriptions
+            .read()
+            .unwrap()
+            .iter()
+            .any(|(k, v)| {
+                k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
+            }));
+
+        subscription_data.unsubscribe_user_from_all(user_id);
+        assert!(!subscription_data
+            .subscriptions
+            .read()
+            .unwrap()
+            .iter()
+            .any(|(k, v)| {
+                k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
+            }));
+    }
+
 
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
