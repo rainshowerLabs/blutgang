@@ -62,7 +62,7 @@ pub struct Settings {
     pub address: SocketAddr,
     pub health_check: bool,
     pub ttl: u128,
-    pub newHeads_ttl: u128,
+    pub new_heads_ttl: u128,
     pub max_retries: u32,
     pub health_check_ttl: u64,
     pub sled_config: Config,
@@ -78,7 +78,7 @@ impl Default for Settings {
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
             ttl: 1000,
-            newHeads_ttl: 2000,
+            new_heads_ttl: 2000,
             max_retries: 32,
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
@@ -169,12 +169,13 @@ impl Settings {
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
 
-        let newHeads_ttl = blutgang_table
+        let new_heads_ttl = blutgang_table
             .get("newHeads_ttl")
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
             .as_integer()
-            .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
-        if newHeads_ttl == 0 {
+            .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!")
+            as u128;
+        if new_heads_ttl == 0 {
             is_ws = false;
         }
 
@@ -390,7 +391,7 @@ impl Settings {
             address,
             health_check,
             ttl,
-            newHeads_ttl,
+            new_heads_ttl,
             max_retries,
             health_check_ttl,
             sled_config,
@@ -483,7 +484,7 @@ impl Settings {
             .parse::<u128>()
             .expect("Invalid ttl");
 
-        let newHeads_ttl = matches
+        let new_heads_ttl = matches
             .get_one::<String>("newHeads_ttl")
             .expect("Invalid newHeads_ttl")
             .parse::<u128>()
@@ -535,7 +536,7 @@ impl Settings {
             address,
             health_check,
             ttl,
-            newHeads_ttl,
+            new_heads_ttl,
             max_retries,
             health_check_ttl,
             sled_config,
