@@ -361,7 +361,13 @@ impl SubscriptionData {
                 if let Some(user) = users.get(&user_id) {
                     #[cfg(feature = "debug-verbose")]
                     println!("Sending user_id {:?} subscription: {:?}", user_id, message.clone());
-                    user.send(message.clone())?;
+                    match user.send(message.clone()) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            println!("\x1b[93mWrn:\x1b[0m user_id {} unsubscribed without closing channel! Removing.", user_id);
+                            let _ = &self.unsubscribe_user(user_id, subscription_id.to_string());
+                        },
+                    };
                 }
             }
         }
