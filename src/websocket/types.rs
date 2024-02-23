@@ -91,6 +91,9 @@ impl SubscriptionData {
     }
 
     pub fn remove_user(&self, user_id: u32) {
+        // Remove the user from all subscriptions before doing anything
+        self.unsubscribe_user_from_all(user_id);
+
         let mut users = self.users.write().unwrap_or_else(|e| e.into_inner());
 
         if users.remove(&user_id).is_some() {
