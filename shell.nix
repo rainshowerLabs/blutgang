@@ -8,7 +8,7 @@
 
 pkgs.mkShell {
   buildInputs = [
-    (pkgs.rust-bin.nightly.latest.default.override { 
+    (pkgs.rust-bin.stable.latest.default.override { 
       extensions = [ "rust-src" "rustfmt-preview" ];
     })
     pkgs.gcc
