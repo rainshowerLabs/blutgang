@@ -273,7 +273,7 @@ pub async fn execute_ws_call(
         if let Ok(rax) = sub_data.subscribe_user(user_id, call.clone()) {
             println!("has subscription already");
             return Ok(format!(
-                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":\"{}\"}}",
                 id, rax
             ));
         }
