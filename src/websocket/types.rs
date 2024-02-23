@@ -359,6 +359,8 @@ impl SubscriptionData {
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
+                    #[cfg(feature = "debug-verbose")]
+                    println!("Sending user_id {:?} subscription: {:?}", user_id, message.clone());
                     user.send(message.clone())?;
                 }
             }

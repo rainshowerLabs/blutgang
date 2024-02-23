@@ -180,9 +180,10 @@ pub async fn ws_conn(
             match message {
                 Ok(message) => {
                     let time = Instant::now();
-                    let rax = unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
                     #[cfg(feature = "debug-verbose")]
-                    println!("ws_conn[{}], recv: {:?}", index, rax);
+                    println!("ws_conn[{}], recv: {:?}", index, message);
+
+                    let rax = unsafe { from_str(&mut message.into_text().unwrap()).unwrap() };
 
                     let incoming = IncomingResponse {
                         node_id: index,
@@ -211,6 +212,9 @@ pub async fn execute_ws_call(
     sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
+    #[cfg(feature = "debug-verbose")]
+    println!("Received incoming WS call from user_id {}: {:?}", user_id, call);
+
     let id = call["id"].take();
     let tx_hash = {
         #[cfg(not(feature = "xxhash"))]
