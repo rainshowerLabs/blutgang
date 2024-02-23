@@ -114,7 +114,10 @@ async fn handle_incoming_message(
             println!("\x1b[31mErr:\x1b[0m ws_conn_manager error: failed to send message");
         }
     } else {
-        println!("\x1b[31mErr:\x1b[0m No WS connection at index {}", rpc_position);
+        println!(
+            "\x1b[31mErr:\x1b[0m No WS connection at index {}",
+            rpc_position
+        );
     }
 }
 
@@ -213,7 +216,10 @@ pub async fn execute_ws_call(
     cache_args: &CacheArgs,
 ) -> Result<String, Error> {
     #[cfg(feature = "debug-verbose")]
-    println!("Received incoming WS call from user_id {}: {:?}", user_id, call);
+    println!(
+        "Received incoming WS call from user_id {}: {:?}",
+        user_id, call
+    );
 
     let id = call["id"].take();
     let tx_hash = {

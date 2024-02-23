@@ -28,9 +28,7 @@ use futures::{
     stream::StreamExt,
 };
 
-use hyper_tungstenite::{
-    HyperWebsocket,
-};
+use hyper_tungstenite::HyperWebsocket;
 use tungstenite::Message;
 
 /// Handle a websocket connection.

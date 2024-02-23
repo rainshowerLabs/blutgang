@@ -200,7 +200,6 @@ impl SubscriptionData {
         }
     }
 
-
     // Unsubscribe a user from all of their subscriptions
     pub fn unsubscribe_user_from_all(&self, user_id: u32) {
         let mut subscriptions = self
@@ -215,7 +214,6 @@ impl SubscriptionData {
             }
         }
     }
-
 
     // Return the node_id for a given subscription_id
     pub fn get_node_from_id(&self, subscription_id: &str) -> Option<usize> {
@@ -371,13 +369,17 @@ impl SubscriptionData {
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
                     #[cfg(feature = "debug-verbose")]
-                    println!("Sending user_id {:?} subscription: {:?}", user_id, message.clone());
+                    println!(
+                        "Sending user_id {:?} subscription: {:?}",
+                        user_id,
+                        message.clone()
+                    );
                     match user.send(message.clone()) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(_) => {
                             println!("\x1b[93mWrn:\x1b[0m user_id {} unsubscribed without closing channel! Removing.", user_id);
                             let _ = &self.unsubscribe_user(user_id, subscription_id.to_string());
-                        },
+                        }
                     };
                 }
             }
@@ -525,7 +527,6 @@ mod tests {
                 k.node_id == node_id && k.subscription_id == subscription_id && v.contains(&user_id)
             }));
     }
-
 
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
