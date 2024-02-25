@@ -78,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
     // Copy the configuration values we need
-    let (addr, do_clear, do_health_check, admin_enabled, is_ws, health_check_ttl) = {
+    let (addr, do_clear, do_health_check, admin_enabled, is_ws, expected_block_time) = {
         let config_guard = config.read().unwrap();
         (
             config_guard.address,
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_guard.health_check,
             config_guard.admin.enabled,
             config_guard.is_ws,
-            config_guard.health_check_ttl,
+            config_guard.expected_block_time
         )
     };
 
@@ -203,7 +203,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::task::spawn(async move {
             tokio::task::spawn(async move {
                 let _ =
-                    subscription_dispatcher(outgoing_rx_ws, incoming_tx_ws, sub_dispatcher).await;
+                    subscription_dispatcher(
+                        outgoing_rx_ws,
+                        incoming_tx_ws,
+                        sub_dispatcher
+                    ).await;
             });
 
             let _ = ws_conn_manager(
@@ -253,7 +257,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     blocknum_tx,
                     heads_sub_data,
                     cache_args,
-                    health_check_ttl,
+                    expected_block_time,
                 )
                 .await;
             });

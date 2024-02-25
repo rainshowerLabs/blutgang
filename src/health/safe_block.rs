@@ -183,7 +183,7 @@ pub async fn subscribe_to_new_heads(
     blocknum_tx: watch::Sender<u64>,
     sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
-    ttl: u64,
+    expected_block_time: u64,
 ) {
     // We basically have to create a new system-only user for subscribing to newHeads
 
@@ -206,7 +206,7 @@ pub async fn subscribe_to_new_heads(
     // everything associated with a new head block.
     let mut subscription_id: String = "".to_string();
     loop {
-        match timeout(Duration::from_millis((ttl * 2) as u64), rx.recv()).await {
+        match timeout(Duration::from_millis(expected_block_time), rx.recv()).await {
             Ok(Some(msg)) => {
                 if let RequestResult::Subscription(sub) = msg {
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
@@ -220,7 +220,7 @@ pub async fn subscribe_to_new_heads(
             }
             Ok(None) => {
                 // Handle the case where the channel is closed
-                panic!("FATAL: Channel closed in newHeads subscription");
+                panic!("FATAL: Channel closed in newHeads subscription.");
             }
             Err(_) => {
                 // Handle the timeout case
@@ -229,8 +229,14 @@ pub async fn subscribe_to_new_heads(
                     nn_rwlock.latest = 0;
                     incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
                 }
-                println!("Timeout in newHeads subscription");
-                let node_id = sub_data.get_node_from_id(&subscription_id).unwrap();
+                println!("\x1b[93mWrn:\x1b[0m Timeout in newHeads subscription");
+                let node_id = match sub_data.get_node_from_id(&subscription_id) {
+                    Some(node_id) => node_id,
+                    None => {
+                        println!("\x1b[31mErr:\x1b[0m Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
+                        continue;
+                    },
+                };
                 match move_subscriptions(
                     &incoming_tx,
                     outgoing_rx.resubscribe(),
