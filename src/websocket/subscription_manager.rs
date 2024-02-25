@@ -1,5 +1,5 @@
 use crate::{
-    config::setup::{
+    config::system::{
         MAGIC,
         WS_SUB_MANAGER_ID,
     },

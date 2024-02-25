@@ -1,4 +1,4 @@
-use crate::config::setup::VERSION_STR;
+use crate::config::system::VERSION_STR;
 
 use clap::{
     Arg,

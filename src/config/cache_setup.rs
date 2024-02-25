@@ -1,4 +1,4 @@
-use crate::config::setup::{
+use crate::config::system::{
     TAGLINE,
     VERSION_STR,
 };

@@ -1,6 +1,6 @@
 use crate::{
     balancer::processing::CacheArgs,
-    config::setup::WS_HEALTH_CHECK_USER_ID,
+    config::system::WS_HEALTH_CHECK_USER_ID,
     rpc::{
         error::RpcError,
         types::{
