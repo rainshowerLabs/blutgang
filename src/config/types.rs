@@ -62,7 +62,7 @@ pub struct Settings {
     pub address: SocketAddr,
     pub health_check: bool,
     pub ttl: u128,
-    pub new_heads_ttl: u128,
+    pub expected_block_time: u64,
     pub max_retries: u32,
     pub health_check_ttl: u64,
     pub sled_config: Config,
@@ -78,7 +78,7 @@ impl Default for Settings {
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
             ttl: 1000,
-            new_heads_ttl: 2000,
+            expected_block_time: 2000,
             max_retries: 32,
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
@@ -169,14 +169,18 @@ impl Settings {
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!") as u128;
 
-        let new_heads_ttl = blutgang_table
-            .get("newHeads_ttl")
+        let mut expected_block_time = blutgang_table
+            .get("expected_block_time")
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!")
-            as u128;
-        if new_heads_ttl == 0 {
+            as u64;
+        if expected_block_time == 0 {
+            println!("\x1b[93mWrn:\x1b[0m expected_block_time is 0, turning off WS and health checks!");
             is_ws = false;
+        } else {
+            // This is to account for block propagation/execution/whatever delay
+            expected_block_time = (expected_block_time as f64 * 1.1) as u64;
         }
 
         let max_retries = blutgang_table
@@ -391,7 +395,7 @@ impl Settings {
             address,
             health_check,
             ttl,
-            new_heads_ttl,
+            expected_block_time,
             max_retries,
             health_check_ttl,
             sled_config,
@@ -484,11 +488,8 @@ impl Settings {
             .parse::<u128>()
             .expect("Invalid ttl");
 
-        let new_heads_ttl = matches
-            .get_one::<String>("newHeads_ttl")
-            .expect("Invalid newHeads_ttl")
-            .parse::<u128>()
-            .expect("Invalid newHeads_ttl");
+        // Doesn't work when starting from cli due to no ws
+        let expected_block_time = 0;
 
         let max_retries = matches
             .get_one::<String>("max_retries")
@@ -536,7 +537,7 @@ impl Settings {
             address,
             health_check,
             ttl,
-            new_heads_ttl,
+            expected_block_time,
             max_retries,
             health_check_ttl,
             sled_config,

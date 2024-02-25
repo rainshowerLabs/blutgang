@@ -14,6 +14,8 @@ sort_on_startup = true
 health_check = true
 # Acceptable time to wait for a response in ms
 ttl = 30
+# Block time, used as a sanity check when not receiving subscriptions
+expected_block_time = 1270
 # How many times to retry a request before giving up
 max_retries = 32
 # Time between health checks in ms
