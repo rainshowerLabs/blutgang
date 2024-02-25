@@ -9,7 +9,7 @@ use std::{
     },
 };
 
-use crate::websocket::error::Error;
+use crate::websocket::error::WsError;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -148,11 +148,11 @@ impl SubscriptionData {
     // Subscribe user to existing subscription and return the subscription id
     //
     // If the subscription does not exist, return error
-    pub fn subscribe_user(&self, user_id: u32, subscription: Value) -> Result<String, Error> {
+    pub fn subscribe_user(&self, user_id: u32, subscription: Value) -> Result<String, WsError> {
         if subscription["params"].as_array().is_none()
             || subscription["params"].as_array().unwrap().is_empty()
         {
-            return Err(Error::FailedParsing());
+            return Err(WsError::FailedParsing());
         }
 
         // TODO: pepega
@@ -165,7 +165,7 @@ impl SubscriptionData {
         self.raw_subscribe(user_id, &subscription)
     }
 
-    fn raw_subscribe(&self, user_id: u32, subscription: &String) -> Result<String, Error> {
+    fn raw_subscribe(&self, user_id: u32, subscription: &String) -> Result<String, WsError> {
         let incoming_subscriptions = self
             .incoming_subscriptions
             .read()
@@ -173,7 +173,7 @@ impl SubscriptionData {
 
         let node_sub_info = match incoming_subscriptions.get(subscription) {
             Some(rax) => rax,
-            None => return Err(Error::FailedParsing()),
+            None => return Err(WsError::FailedParsing()),
         };
 
         let mut subscriptions = self.subscriptions.write().unwrap();
@@ -316,11 +316,11 @@ impl SubscriptionData {
         target: usize,
         request: String,
         subscription_id: String,
-    ) -> Result<(), Error> {
+    ) -> Result<(), WsError> {
         // Get all the users that are subscribed to our subscription
         let users = self.get_users_for_subscription(&subscription_id);
         if users.is_empty() {
-            return Err(Error::EmptyList("User list empty!".to_string()));
+            return Err(WsError::EmptyList("User list empty!".to_string()));
         }
         // Unsubscribe everyone from the subscription
         for user_id in users.iter() {
@@ -344,9 +344,9 @@ impl SubscriptionData {
         subscription_id: &str,
         node_id: usize,
         message: &RequestResult,
-    ) -> Result<bool, Error> {
+    ) -> Result<bool, WsError> {
         if let RequestResult::Call(_) = message {
-            return Err(Error::InvalidData(
+            return Err(WsError::InvalidData(
                 "Trying to send a call as a subscription!".to_string(),
             ));
         }

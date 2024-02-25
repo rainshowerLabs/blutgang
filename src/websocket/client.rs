@@ -10,7 +10,7 @@ use crate::{
     },
     rpc::types::Rpc,
     websocket::{
-        error::Error,
+        error::WsError,
         types::{
             IncomingResponse,
             SubscriptionData,
@@ -214,7 +214,7 @@ pub async fn execute_ws_call(
     broadcast_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
     cache_args: &CacheArgs,
-) -> Result<String, Error> {
+) -> Result<String, WsError> {
     #[cfg(feature = "debug-verbose")]
     println!(
         "Received incoming WS call from user_id {}: {:?}",
@@ -322,13 +322,13 @@ pub async fn execute_ws_call(
 async fn listen_for_response(
     user_id: u32,
     mut broadcast_rx: broadcast::Receiver<IncomingResponse>,
-) -> Result<IncomingResponse, Error> {
+) -> Result<IncomingResponse, WsError> {
     while let Ok(response) = broadcast_rx.recv().await {
         if response.content["id"].as_u64().unwrap_or(u32::MAX.into()) as u32 == user_id {
             return Ok(response);
         }
     }
-    Err(Error::NoWsResponse)
+    Err(WsError::NoWsResponse)
 }
 
 #[cfg(test)]

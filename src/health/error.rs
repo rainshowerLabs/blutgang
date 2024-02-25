@@ -1,6 +1,6 @@
 // Errors
 use crate::rpc::error::RpcError;
-use crate::websocket::error::Error as WsError;
+use crate::websocket::error::WsError;
 use std::error::Error;
 
 #[derive(Debug)]

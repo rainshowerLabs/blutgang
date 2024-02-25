@@ -4,7 +4,7 @@ use crate::{
         WS_SUB_MANAGER_ID,
     },
     websocket::{
-        error::Error,
+        error::WsError,
         types::{
             IncomingResponse,
             RequestResult,
@@ -34,13 +34,13 @@ pub async fn subscription_dispatcher(
     mut rx: broadcast::Receiver<IncomingResponse>,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     sub_data: Arc<SubscriptionData>,
-) -> Result<(), Error> {
+) -> Result<(), WsError> {
     loop {
         // Receive the WS response
         let response = match rx.recv().await {
             Ok(rax) => rax,
-            Err(RecvError::Closed) => return Err(Error::ChannelClosed()),
-            Err(RecvError::Lagged(_)) => return Err(Error::ReceiverLagged()),
+            Err(RecvError::Closed) => return Err(WsError::ChannelClosed()),
+            Err(RecvError::Lagged(_)) => return Err(WsError::ReceiverLagged()),
         };
 
         // Check if its a subscription
@@ -97,7 +97,7 @@ pub async fn move_subscriptions(
     mut rx: broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
     node_id: usize,
-) -> Result<(), Error> {
+) -> Result<(), WsError> {
     // Collect all subscriptions/ids we have assigned to `node_id` and put them in a vec
     let subs = sub_data.get_subscription_by_node(node_id);
     let ids = sub_data.get_sub_id_by_node(node_id);
@@ -131,7 +131,7 @@ pub async fn move_subscriptions(
         // Discard any response that does not have a proper ID
         let pair_id = match response.content["id"].as_u64() {
             Some(rax) => rax as u32,
-            None => return Err(Error::InvalidData("No ID in response!".to_string())),
+            None => return Err(WsError::InvalidData("No ID in response!".to_string())),
         };
 
         let params = match pairs.get(&pair_id) {
@@ -141,7 +141,7 @@ pub async fn move_subscriptions(
 
         let sub_id = match sub_data.get_sub_id_by_params(&params) {
             Some(rax) => rax,
-            None => return Err(Error::MissingSubscription()),
+            None => return Err(WsError::MissingSubscription()),
         };
         match sub_data.move_subscriptions(response.node_id, params, sub_id) {
             Ok(_) => {}

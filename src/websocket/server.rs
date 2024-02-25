@@ -4,7 +4,7 @@ use crate::{
     balancer::processing::CacheArgs,
     websocket::{
         client::execute_ws_call,
-        error::Error,
+        error::WsError,
         types::{
             IncomingResponse,
             RequestResult,
@@ -38,7 +38,7 @@ pub async fn serve_websocket(
     outgoing_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
     cache_args: CacheArgs,
-) -> Result<(), Error> {
+) -> Result<(), WsError> {
     let websocket = websocket.await?;
 
     // Split the Sink so we can do async send/recv
@@ -100,7 +100,7 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sub_data_clone.remove_user(user_id);
-                            return Err(Error::MessageSendFailed((e).to_string()));
+                            return Err(WsError::MessageSendFailed((e).to_string()));
                         }
                     }
                 }
@@ -134,7 +134,7 @@ pub async fn serve_websocket(
             Err(e) => {
                 // Remove the user from the sink map
                 sub_data.remove_user(user_id);
-                return Err(Error::MessageReceptionFailed(e.to_string()));
+                return Err(WsError::MessageReceptionFailed(e.to_string()));
             }
             _ => {}
         }
