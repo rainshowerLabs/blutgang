@@ -52,9 +52,10 @@ pub async fn health_check(
     loop {
         let health_check_ttl = config.read().unwrap().health_check_ttl;
         let ttl = config.read().unwrap().ttl;
+        let supress_rpc_check = config.read().unwrap().supress_rpc_check;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, &ttl).await?;
+        check(&rpc_list, &poverty_list, &ttl, supress_rpc_check).await?;
         get_safe_block(
             &rpc_list,
             &finalized_tx,
@@ -70,8 +71,11 @@ async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
+    supress_rpc_check: bool,
 ) -> Result<(), HealthError> {
-    print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
+    if !supress_rpc_check {
+        print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
+    }
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
     // If a head is marked at `0` that means that the rpc is delinquent
@@ -88,7 +92,9 @@ async fn check(
 
     escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
-    println!("OK!");
+    if !supress_rpc_check {
+        println!("OK!");
+    }
 
     Ok(())
 }

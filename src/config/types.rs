@@ -63,6 +63,7 @@ pub struct Settings {
     pub health_check: bool,
     pub ttl: u128,
     pub expected_block_time: u64,
+    pub supress_rpc_check: bool,
     pub max_retries: u32,
     pub health_check_ttl: u64,
     pub sled_config: Config,
@@ -78,7 +79,8 @@ impl Default for Settings {
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
             ttl: 1000,
-            expected_block_time: 2000,
+            expected_block_time: 12500,
+            supress_rpc_check: true,
             max_retries: 32,
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
@@ -200,6 +202,12 @@ impl Settings {
         } else {
             u64::MAX
         };
+
+        let supress_rpc_check = blutgang_table
+            .get("supress_rpc_check")
+            .expect("\x1b[31mErr:\x1b[0m Missing supress_rpc_check!")
+            .as_bool()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse supress_rpc_check as bool!");
 
         // Parse `sled` table
         let sled_table = parsed_toml
@@ -398,6 +406,7 @@ impl Settings {
             expected_block_time,
             max_retries,
             health_check_ttl,
+            supress_rpc_check,
             sled_config,
             admin,
         }
@@ -503,6 +512,10 @@ impl Settings {
             .parse::<u64>()
             .expect("Invalid health_check_ttl");
 
+        let supress_rpc_check = *matches
+            .get_one::<bool>("supress_rpc_check")
+            .expect("Invalid supress_rpc_check");
+
         // Admin thing setup
         let enabled = matches.get_occurrences::<String>("admin").is_some();
         let admin = if enabled {
@@ -537,6 +550,7 @@ impl Settings {
             address,
             health_check,
             ttl,
+            supress_rpc_check,
             expected_block_time,
             max_retries,
             health_check_ttl,
