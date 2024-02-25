@@ -9,10 +9,9 @@
 pkgs.mkShell {
   buildInputs = [
     (pkgs.rust-bin.stable.latest.default.override { 
-      extensions = [ "rust-src" "rustfmt-preview" ];
+      extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer"];
     })
     pkgs.gcc
-    pkgs.rust-analyzer
     pkgs.pkg-config
     pkgs.openssl
   ];
