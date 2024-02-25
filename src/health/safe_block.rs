@@ -229,7 +229,7 @@ pub async fn subscribe_to_new_heads(
                     nn_rwlock.latest = 0;
                     incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
                 }
-                println!("\x1b[93mWrn:\x1b[0m Timeout in newHeads subscription");
+                println!("\x1b[93mWrn:\x1b[0m Timeout in newHeads subscription, possible connection failiure or missed block.");
                 let node_id = match sub_data.get_node_from_id(&subscription_id) {
                     Some(node_id) => node_id,
                     None => {

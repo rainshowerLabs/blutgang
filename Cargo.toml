@@ -1,6 +1,6 @@
 [package]
 name = "blutgang"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["makemake <vukasin@gostovic.me>, Rainshower Labs, contributors"]
 license-file = "LICENSE"
@@ -51,7 +51,7 @@ incremental = false
 # Optional Blutgang features
 [features]
 default = ["selection-weighed-round-robin"]
-xxhash = ["xxhash-rust"] # 4x faster caching but potentially less secure
+xxhash = ["xxhash-rust"] # 4x faster hashing but potentially less secure
 no-cache = [] # enable this to disable caching
 debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
