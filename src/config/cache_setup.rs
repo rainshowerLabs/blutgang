@@ -1,10 +1,10 @@
 use crate::{
     config::system::{
-    TAGLINE,
-    VERSION_STR,
+        TAGLINE,
+        VERSION_STR,
     },
-    log_info,
     log_err,
+    log_info,
 };
 use sled::Db;
 use std::sync::Arc;

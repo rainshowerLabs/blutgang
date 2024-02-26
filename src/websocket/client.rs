@@ -1,6 +1,4 @@
 use crate::{
-    log_err,
-    log_info,
     balancer::{
         format::replace_block_tags,
         processing::{
@@ -10,6 +8,8 @@ use crate::{
         },
         selection::select::pick,
     },
+    log_err,
+    log_info,
     rpc::types::Rpc,
     websocket::{
         error::WsError,
@@ -116,10 +116,7 @@ async fn handle_incoming_message(
             log_err!("ws_conn_manager error: failed to send message");
         }
     } else {
-        log_err!(
-            "No WS connection at index {}",
-            rpc_position
-        );
+        log_err!("No WS connection at index {}", rpc_position);
     }
 }
 

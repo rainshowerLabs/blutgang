@@ -1,7 +1,7 @@
 use crate::{
-    Rpc,
-    log_err,
     config::error::ConfigError,
+    log_err,
+    Rpc,
 };
 use std::time::Instant;
 use tokio::sync::mpsc;

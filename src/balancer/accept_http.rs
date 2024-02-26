@@ -1,7 +1,4 @@
 use crate::{
-    log_info,
-    log_wrn,
-    log_err,
     balancer::{
         format::{
             incoming_to_value,
@@ -15,6 +12,9 @@ use crate::{
         selection::select::pick,
     },
     cache_error,
+    log_err,
+    log_info,
+    log_wrn,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,

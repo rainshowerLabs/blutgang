@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config_guard.health_check,
             config_guard.admin.enabled,
             config_guard.is_ws,
-            config_guard.expected_block_time
+            config_guard.expected_block_time,
         )
     };
 
@@ -202,11 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::task::spawn(async move {
             tokio::task::spawn(async move {
                 let _ =
-                    subscription_dispatcher(
-                        outgoing_rx_ws,
-                        incoming_tx_ws,
-                        sub_dispatcher
-                    ).await;
+                    subscription_dispatcher(outgoing_rx_ws, incoming_tx_ws, sub_dispatcher).await;
             });
 
             let _ = ws_conn_manager(

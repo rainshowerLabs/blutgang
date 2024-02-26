@@ -1,9 +1,9 @@
 use crate::{
-    log_info,
-    log_wrn,
-    log_err,
     balancer::processing::CacheArgs,
     config::system::WS_HEALTH_CHECK_USER_ID,
+    log_err,
+    log_info,
+    log_wrn,
     rpc::{
         error::RpcError,
         types::{
@@ -238,7 +238,7 @@ pub async fn subscribe_to_new_heads(
                     None => {
                         log_err!("Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
                         continue;
-                    },
+                    }
                 };
                 match move_subscriptions(
                     &incoming_tx,

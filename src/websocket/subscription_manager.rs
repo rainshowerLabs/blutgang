@@ -1,9 +1,9 @@
 use crate::{
-    log_err,
     config::system::{
         MAGIC,
         WS_SUB_MANAGER_ID,
     },
+    log_err,
     websocket::{
         error::WsError,
         types::{
@@ -82,10 +82,7 @@ pub async fn subscription_dispatcher(
             // False means tht we do not need to do anything
             Ok(false) => {}
             Err(e) => {
-                log_err!(
-                    "Fatal error while trying to send subscriptions: {}",
-                    e
-                )
+                log_err!("Fatal error while trying to send subscriptions: {}", e)
             }
         };
     }

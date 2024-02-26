@@ -1,8 +1,4 @@
 use crate::{
-    log_info,
-    IncomingResponse,
-    SubscriptionData,
-    log_wrn,
     health::{
         error::HealthError,
         safe_block::{
@@ -10,6 +6,8 @@ use crate::{
             NamedBlocknumbers,
         },
     },
+    log_info,
+    log_wrn,
     websocket::{
         subscription_manager::move_subscriptions,
         types::{
@@ -17,8 +15,10 @@ use crate::{
             WsconnMessage,
         },
     },
+    IncomingResponse,
     Rpc,
     Settings,
+    SubscriptionData,
 };
 use tokio::sync::broadcast;
 

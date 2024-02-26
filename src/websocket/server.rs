@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use crate::{
-    log_info,
     balancer::processing::CacheArgs,
+    log_info,
     websocket::{
         client::execute_ws_call,
         error::WsError,
@@ -126,7 +126,8 @@ pub async fn serve_websocket(
                 if let Some(msg) = &msg {
                     log_info!(
                         "Received close message with code {} and message: {}",
-                        msg.code, msg.reason
+                        msg.code,
+                        msg.reason
                     );
                 } else {
                     println!("Received close message");

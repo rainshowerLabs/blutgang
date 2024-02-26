@@ -44,9 +44,7 @@ pub async fn manage_cache(
         // Check if finalized_stream has changed
         if last_finalized != *finalized_rx.borrow() {
             last_finalized = *finalized_rx.borrow();
-            log_info!(
-                "New finalized block!\nRemoving stale entries from the cache."
-            );
+            log_info!("New finalized block!\nRemoving stale entries from the cache.");
             // Remove stale entries from the head_cache
             remove_stale(head_cache, last_finalized)?;
         }

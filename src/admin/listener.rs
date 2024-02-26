@@ -6,8 +6,8 @@ use std::sync::{
 use sled::Db;
 
 use crate::{
-    log_info,
     admin::accept::accept_admin_request,
+    log_info,
     Rpc,
     Settings,
 };
