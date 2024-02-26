@@ -1,4 +1,7 @@
 use crate::{
+    log_info,
+    log_wrn,
+    log_err,
     balancer::processing::CacheArgs,
     config::system::WS_HEALTH_CHECK_USER_ID,
     rpc::{
@@ -196,7 +199,7 @@ pub async fn subscribe_to_new_heads(
     let user_id = WS_HEALTH_CHECK_USER_ID;
 
     // Add the user to the sink map
-    println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
+    log_info!("Adding user {} to sink map", user_id);
     let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);
 
@@ -213,7 +216,7 @@ pub async fn subscribe_to_new_heads(
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
                     subscription_id = sub["params"]["subscription"].as_str().unwrap().to_owned();
-                    println!("\x1b[35mInfo:\x1b[0m New chain head: {}", a);
+                    log_info!("New chain head: {}", a);
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
                 }
@@ -229,11 +232,11 @@ pub async fn subscribe_to_new_heads(
                     nn_rwlock.latest = 0;
                     incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
                 }
-                println!("\x1b[93mWrn:\x1b[0m Timeout in newHeads subscription, possible connection failiure or missed block.");
+                log_wrn!("Timeout in newHeads subscription, possible connection failiure or missed block.");
                 let node_id = match sub_data.get_node_from_id(&subscription_id) {
                     Some(node_id) => node_id,
                     None => {
-                        println!("\x1b[31mErr:\x1b[0m Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
+                        log_err!("Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
                         continue;
                     },
                 };
@@ -246,7 +249,7 @@ pub async fn subscribe_to_new_heads(
                 .await
                 {
                     Ok(_) => {}
-                    Err(err) => println!("{}", err),
+                    Err(err) => log_err!("{}", err),
                 };
             }
         }

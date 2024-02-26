@@ -1,4 +1,7 @@
 use crate::{
+    log_info,
+    log_wrn,
+    log_err,
     balancer::{
         format::{
             incoming_to_value,
@@ -164,7 +167,7 @@ macro_rules! accept {
             .with_upgrades()
             .await
         {
-            println!("\x1b[31mErr:\x1b[0m Error serving connection: {:?}", err);
+            log_err!("Error serving connection: {:?}", err);
         }
     };
 }
@@ -207,7 +210,7 @@ macro_rules! get_response {
                         let mut rpc_list = $rpc_list_rwlock.write().unwrap();
                         (rpc, $rpc_position) = pick(&mut rpc_list);
                     }
-                    println!("\x1b[35mInfo:\x1b[0m Forwarding to: {}", rpc.url);
+                    log_info!("Forwarding to: {}", rpc.url);
 
                     // Check if we have any RPCs in the list, if not return error
                     if $rpc_position == None {
@@ -228,7 +231,7 @@ macro_rules! get_response {
                             break;
                         },
                         Err(_) => {
-                            println!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                            log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
                             rpc.update_latency($ttl as f64);
                             retries += 1;
                         },
@@ -360,7 +363,7 @@ pub async fn accept_request(
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
-        println!("\x1b[35mInfo:\x1b[0m Received WS upgrade request");
+        log_info!("Received WS upgrade request");
 
         if !connection_params.config.read().unwrap().is_ws {
             return rpc_response!(
@@ -374,7 +377,7 @@ pub async fn accept_request(
         let (response, websocket) = match upgrade(&mut tx, None) {
             Ok((response, websocket)) => (response, websocket),
             Err(e) => {
-                println!("\x1b[31mErr:\x1b[0m Websocket upgrade error: {e}");
+                log_err!("Websocket upgrade error: {}", e);
                 return rpc_response!(500, Full::new(Bytes::from(
                     "{code:-32004, message:\"error: Websocket upgrade error! Try again later...\"}"
                         .to_string(),
@@ -400,7 +403,7 @@ pub async fn accept_request(
             )
             .await
             {
-                println!("\x1b[31mErr:\x1b[0m Websocket connection error: {e}");
+                log_err!("Websocket connection error: {}", e);
             }
         });
 
@@ -437,7 +440,7 @@ pub async fn accept_request(
     )
     .await;
     let time = time.elapsed();
-    println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
+    log_info!("Request time: {:?}", time);
 
     // `rpc_position` is an Option<> that either contains the index of the RPC
     // we forwarded our request to, or is None if the result was cached.

@@ -46,7 +46,6 @@ use crate::{
 
 use std::{
     collections::BTreeMap,
-    println,
     sync::{
         Arc,
         RwLock,
@@ -109,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Clear database if specified
     if do_clear {
         cache.clear().unwrap();
-        println!("\x1b[93mWrn:\x1b[0m All data cleared from the database.");
+        log_wrn!("All data cleared from the database.");
     }
     // Insert data about blutgang and our settings into the DB
     //
@@ -118,7 +117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
-    println!("\x1b[35mInfo:\x1b[0m Bound to: {}", addr);
+    log_info!("Bound to: {}", addr);
 
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
@@ -133,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let cache_admin = Arc::clone(&cache);
         let config_admin = Arc::clone(&config);
         tokio::task::spawn(async move {
-            println!("\x1b[35mInfo:\x1b[0m Admin namespace enabled, accepting admin methods at admin port");
+            log_info!("Admin namespace enabled, accepting admin methods at admin port");
             let _ = listen_for_admin_requests(
                 rpc_list_admin,
                 poverty_list_admin,
@@ -267,7 +266,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, socketaddr) = listener.accept().await?;
-        println!("\x1b[35mInfo:\x1b[0m Connection from: {}", socketaddr);
+        log_info!("Connection from: {}", socketaddr);
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.

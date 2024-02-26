@@ -1,3 +1,4 @@
+use crate::log_info;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -154,7 +155,7 @@ pub async fn accept_admin_request(
         };
 
         // Reconstruct the TX as a normal json rpc request
-        println!("\x1b[35mInfo:\x1b[0m JWT claims: {:?}", token);
+        log_info!("JWT claims: {:?}", token);
 
         tx = json!({
             "id": token.claims.id,
@@ -168,7 +169,7 @@ pub async fn accept_admin_request(
     let time = Instant::now();
     let response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();
-    println!("\x1b[35mInfo:\x1b[0m Request time: {:?}", time);
+    log_info!("Request time: {:?}", time);
 
     response
 }

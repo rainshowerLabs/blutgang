@@ -1,6 +1,8 @@
-use crate::IncomingResponse;
-use crate::SubscriptionData;
 use crate::{
+    log_info,
+    IncomingResponse,
+    SubscriptionData,
+    log_wrn,
     health::{
         error::HealthError,
         safe_block::{
@@ -184,8 +186,8 @@ fn make_poverty(
         if head.reported_head < highest_head {
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
-            println!(
-                "\x1b[93mWrn:\x1b[0m {} is falling behind! Removing froma active RPC pool.",
+            log_wrn!(
+                "{} is falling behind! Removing froma active RPC pool.",
                 rpc_list_guard[head.rpc_list_index].url
             );
 
@@ -215,8 +217,8 @@ fn escape_poverty(
         if head_result.reported_head >= agreed_head {
             let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
             rpc.status.is_erroring = false;
-            println!(
-                "\x1b[35mInfo:\x1b[0m {} is following the head again! Added to active RPC pool.",
+            log_info!(
+                "{} is following the head again! Added to active RPC pool.",
                 rpc.url
             );
 

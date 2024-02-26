@@ -1,4 +1,5 @@
 use crate::{
+    log_err,
     config::system::{
         MAGIC,
         WS_SUB_MANAGER_ID,
@@ -81,8 +82,8 @@ pub async fn subscription_dispatcher(
             // False means tht we do not need to do anything
             Ok(false) => {}
             Err(e) => {
-                println!(
-                    "\x1b[31mErr:\x1b[0m Fatal error while trying to send subscriptions: {}",
+                log_err!(
+                    "Fatal error while trying to send subscriptions: {}",
                     e
                 )
             }

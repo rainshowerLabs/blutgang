@@ -1,4 +1,6 @@
 use crate::{
+    log_err,
+    log_info,
     balancer::{
         format::replace_block_tags,
         processing::{
@@ -98,7 +100,7 @@ async fn handle_incoming_message(
         match pick(&mut rpc_list.write().unwrap()).1 {
             Some(position) => position,
             None => {
-                println!("\x1b[31mErr:\x1b[0m No RPC position available");
+                log_err!("No RPC position available");
                 return;
             }
         }
@@ -111,11 +113,11 @@ async fn handle_incoming_message(
         .and_then(|handle| handle.as_ref())
     {
         if ws.send(incoming).is_err() {
-            println!("\x1b[31mErr:\x1b[0m ws_conn_manager error: failed to send message");
+            log_err!("ws_conn_manager error: failed to send message");
         }
     } else {
-        println!(
-            "\x1b[31mErr:\x1b[0m No WS connection at index {}",
+        log_err!(
+            "No WS connection at index {}",
             rpc_position
         );
     }
@@ -196,7 +198,7 @@ pub async fn ws_conn(
                     let _ = broadcast_tx.send(incoming);
                     let time = time.elapsed();
                     update_rpc_latency(&rpc_list, index, time);
-                    println!("\x1b[35mInfo:\x1b[0m WS request time: {:?}", time);
+                    log_info!("WS request time: {:?}", time);
                 }
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));

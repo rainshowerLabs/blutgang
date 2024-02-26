@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    log_info,
     balancer::processing::CacheArgs,
     websocket::{
         client::execute_ws_call,
@@ -53,7 +54,7 @@ pub async fn serve_websocket(
     let user_id = random::<u32>();
 
     // Add the user to the sink map
-    println!("\x1b[35mInfo:\x1b[0m Adding user {} to sink map", user_id);
+    log_info!("Adding user {} to sink map", user_id);
     let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);
 
@@ -112,7 +113,7 @@ pub async fn serve_websocket(
     while let Some(message) = websocket_stream.next().await {
         match message {
             Ok(Message::Text(mut msg)) => {
-                println!("\x1b[35mInfo:\x1b[0m Received WS text message: {msg}");
+                log_info!("Received WS text message: {}", msg);
                 // Send message to the channel
                 let rax = match unsafe { from_str(&mut msg) } {
                     Ok(rax) => rax,
@@ -123,8 +124,8 @@ pub async fn serve_websocket(
             }
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {
-                    println!(
-                        "\x1b[35mInfo:\x1b[0m Received close message with code {} and message: {}",
+                    log_info!(
+                        "Received close message with code {} and message: {}",
                         msg.code, msg.reason
                     );
                 } else {

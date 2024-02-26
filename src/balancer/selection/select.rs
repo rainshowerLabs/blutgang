@@ -14,7 +14,7 @@ pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
 }
 
 // Sorting algo
-pub fn argsort(data: &Vec<Rpc>) -> Vec<usize> {
+pub fn argsort(data: &[Rpc]) -> Vec<usize> {
     let mut indices = (0..data.len()).collect::<Vec<usize>>();
 
     // Use sort_by_cached_key with a closure that compares latency

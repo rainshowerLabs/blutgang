@@ -1,5 +1,8 @@
-use crate::config::error::ConfigError;
-use crate::Rpc;
+use crate::{
+    Rpc,
+    log_err,
+    config::error::ConfigError,
+};
 use std::time::Instant;
 use tokio::sync::mpsc;
 
@@ -50,7 +53,7 @@ pub async fn sort_by_latency(
 ) -> Result<Vec<Rpc>, ConfigError> {
     // Return empty vec if we dont supply any RPCs
     if rpc_list.is_empty() {
-        println!("\x1b[31mErr:\x1b[0m No RPCs supplied!");
+        log_err!("No RPCs supplied!");
         return Ok(Vec::new());
     }
 
@@ -73,7 +76,7 @@ pub async fn sort_by_latency(
         let rpc = match rpc {
             StartingLatencyResp::Ok(rax) => rax,
             StartingLatencyResp::Error(e) => {
-                println!("\x1b[31mErr:\x1b[0m {}", e);
+                log_err!("{}", e);
                 continue;
             }
         };

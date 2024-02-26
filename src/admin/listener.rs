@@ -6,6 +6,7 @@ use std::sync::{
 use sled::Db;
 
 use crate::{
+    log_info,
     admin::accept::accept_admin_request,
     Rpc,
     Settings,
@@ -66,11 +67,11 @@ pub async fn listen_for_admin_requests(
 
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
-    println!("\x1b[35mInfo:\x1b[0m Bound admin to: {}", address);
+    log_info!("Bound admin to: {}", address);
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;
-        println!("\x1b[35mInfo:\x1b[0m Admin connection from: {}", socketaddr);
+        log_info!("Admin connection from: {}", socketaddr);
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.

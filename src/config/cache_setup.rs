@@ -1,6 +1,10 @@
-use crate::config::system::{
+use crate::{
+    config::system::{
     TAGLINE,
     VERSION_STR,
+    },
+    log_info,
+    log_err,
 };
 use sled::Db;
 use std::sync::Arc;
@@ -11,7 +15,7 @@ pub fn setup_data(cache: Arc<Db>) {
         VERSION_STR, TAGLINE
     );
 
-    println!("\x1b[35mInfo:\x1b[0m Starting {}", VERSION_STR);
+    log_info!("Starting {}", VERSION_STR);
 
     // Insert kv pair `blutgang_is_lb` `true` to know what we're interacting with
     // `blutgang_is_lb` is cached as a blake3 cache
@@ -39,14 +43,14 @@ pub fn setup_data(cache: Arc<Db>) {
     if cfg!(feature = "xxhash") {
         let _ = cache.insert(b"xxhash", b"true");
         if cache.get(b"blake3").unwrap().is_some() {
-            println!("\x1b[31mErr:\x1b[0m Blutgang has detected that your DB is using blake3 while we're currently using xxhash! \
+            log_err!("Blutgang has detected that your DB is using blake3 while we're currently using xxhash! \
                 Please remove all cache entries and try again.");
             println!("If you believe this is an error, please open a pull request!");
         }
     } else {
         let _ = cache.insert(b"blake3", b"true");
         if cache.get(b"xxhash").unwrap().is_some() {
-            println!("\x1b[31mErr:\x1b[0m Blutgang has detected that your DB is using xxhash while we're currently using blake3! \
+            log_err!("Blutgang has detected that your DB is using xxhash while we're currently using blake3! \
                 Please remove all cache entries and try again.");
             println!("If you believe this is an error, please open a pull request!");
         }

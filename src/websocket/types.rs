@@ -9,7 +9,11 @@ use std::{
     },
 };
 
-use crate::websocket::error::WsError;
+use crate::{
+    websocket::error::WsError,
+    log_info,
+    log_wrn,
+};
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -123,8 +127,8 @@ impl SubscriptionData {
             .write()
             .unwrap_or_else(|e| e.into_inner());
 
-        println!(
-            "\x1b[35mInfo:\x1b[0m Register_subscription inserting: {}",
+        log_info!(
+            "Register_subscription inserting: {}",
             subscription.to_owned()
         );
         incoming_subscriptions.insert(
@@ -157,8 +161,8 @@ impl SubscriptionData {
 
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
-        println!(
-            "\x1b[35mInfo:\x1b[0m Subscribe_user finding: {}",
+        log_info!(
+            "Subscribe_user finding: {}",
             subscription
         );
 
@@ -377,7 +381,7 @@ impl SubscriptionData {
                     match user.send(message.clone()) {
                         Ok(_) => {}
                         Err(_) => {
-                            println!("\x1b[93mWrn:\x1b[0m user_id {} unsubscribed without closing channel! Removing.", user_id);
+                            log_wrn!("user_id {} unsubscribed without closing channel! Removing.", user_id);
                             let _ = &self.unsubscribe_user(user_id, subscription_id.to_string());
                         }
                     };

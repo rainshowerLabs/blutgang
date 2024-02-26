@@ -1,4 +1,6 @@
 use crate::{
+    log_wrn,
+    log_info,
     config::setup::sort_by_latency,
     Rpc,
 };
@@ -101,11 +103,11 @@ impl Settings {
         };
 
         if let Some(file) = file {
-            println!("\x1b[35mInfo:\x1b[0m Using config file at {}", path);
+            log_info!("Using config file at {}", path);
             return Settings::create_from_file(file).await;
         }
 
-        println!("\x1b[35mInfo:\x1b[0m Using command line arguments for settings...");
+        log_info!("Using command line arguments for settings...");
         Settings::create_from_matches(matches)
     }
 
@@ -178,7 +180,7 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Could not parse ttl as int!")
             as u64;
         if expected_block_time == 0 {
-            println!("\x1b[93mWrn:\x1b[0m expected_block_time is 0, turning off WS and health checks!");
+            log_wrn!("Expected_block_time is 0, turning off WS and health checks!");
             is_ws = false;
         } else {
             // This is to account for block propagation/execution/whatever delay
@@ -323,9 +325,9 @@ impl Settings {
         }
 
         if !is_ws {
-            println!("\x1b[93mWrn:\x1b[0m WebSocket endpoints not present for all nodes, or newHeads_ttl is 0.");
-            println!(
-                "\x1b[93mWrn:\x1b[0m Disabling WS only-features. Please check docs for more info."
+            log_wrn!("WebSocket endpoints not present for all nodes, or newHeads_ttl is 0.");
+            log_wrn!(
+                "Disabling WS only-features. Please check docs for more info."
             )
         }
 
