@@ -42,6 +42,14 @@ You must provide a config file to the docker container, as well as expose the po
 docker run -v /full/path/to/config.toml:/app/config.toml --network host makemake1337/blutgang
 ```
 
+### Nix
+
+Using Flakes and the [nix-community/ethereum.nix](https://github.com/nix-community/ethereum.nix) overlay:
+
+```bash
+nix run github:nix-community/ethereum.nix#blutgang -- --help
+```
+
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
 
