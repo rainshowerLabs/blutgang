@@ -9,6 +9,8 @@ pub fn cache_method(rx: &str) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
+    // all of the below cannot be cached properly
+    // `null` should never be in a proper request
     let blacklist = [
         "latest",
         "eth_blockNumber",
@@ -18,6 +20,7 @@ pub fn cache_method(rx: &str) -> bool {
         "pending",
         "eth_subscribe",
         "eth_unsubscribe",
+        "null",
     ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method
@@ -42,7 +45,9 @@ pub fn cache_result(rx: &str) -> bool {
 
     // just checking if `error` is present should be enough, but include the beggining error
     // codes juuuust to be extra safe
-    let blacklist = ["error", "-32"];
+    //
+    // `null` can appear in results if the node is malfunctioning and we shouldnt try and cache it as a result
+    let blacklist = ["error", "-32", "null"];
 
     for item in blacklist.iter() {
         if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
