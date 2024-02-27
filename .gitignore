@@ -1,6 +1,6 @@
 /target
 /.venv
-/blutgang-cache
+/blutgang-cache*
 /benchmarks.txt
 /config.toml
 /.DS_Store
