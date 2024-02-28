@@ -167,8 +167,8 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
     // Iterate over the RPC list and format each RPC
     for rpc in rpc_list.iter() {
         rpc_list_str.push_str(&format!(
-            "{{\"url\": \"{}\", \"max_consecutive\": {}, \"last_error\": {}}}",
-            rpc.url, rpc.max_consecutive, rpc.status.last_error
+            "{{\"name\": \"{}\", \"max_consecutive\": {}, \"last_error\": {}}}",
+            rpc.name, rpc.max_consecutive, rpc.status.last_error
         ));
     }
 
@@ -293,7 +293,7 @@ fn admin_remove_rpc(
     let rx = json!({
         "id": Null,
         "jsonrpc": "2.0",
-        "result": removed.url,
+        "result": removed.name,
     });
 
     Ok(rx)

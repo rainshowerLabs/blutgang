@@ -188,7 +188,7 @@ fn make_poverty(
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
             log_wrn!(
                 "{} is falling behind! Removing froma active RPC pool.",
-                rpc_list_guard[head.rpc_list_index].url
+                rpc_list_guard[head.rpc_list_index].name
             );
 
             // Add the RPC to the poverty list
@@ -219,7 +219,7 @@ fn escape_poverty(
             rpc.status.is_erroring = false;
             log_info!(
                 "{} is following the head again! Added to active RPC pool.",
-                rpc.url
+                rpc.name
             );
 
             // Move the RPC from the poverty list to the rpc list

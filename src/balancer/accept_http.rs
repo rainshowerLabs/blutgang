@@ -210,7 +210,7 @@ macro_rules! get_response {
                         let mut rpc_list = $rpc_list_rwlock.write().unwrap();
                         (rpc, $rpc_position) = pick(&mut rpc_list);
                     }
-                    log_info!("Forwarding to: {}", rpc.url);
+                    log_info!("Forwarding to: {}", rpc.name);
 
                     // Check if we have any RPCs in the list, if not return error
                     if $rpc_position == None {

@@ -118,7 +118,7 @@ mod tests {
         let vx = v.clone();
         let i = argsort(&v);
         assert_eq!(i, &[2, 0, 1]);
-        assert_eq!(v[0].url, vx[0].url);
+        assert_eq!(v[0].get_url(), vx[0].get_url());
     }
 
     // Test picking the fastest RPC

@@ -1,5 +1,6 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
+use url::Url;
 
 use serde_json::{
     json,
@@ -26,16 +27,38 @@ unsafe impl Sync for Status {}
 
 #[derive(Debug, Clone)]
 pub struct Rpc {
-    pub url: String,            // url of the rpc we're forwarding requests to.
+    pub name: String,           // sanitized name for appearing in logs
+    url: String,                // url of the rpc we're forwarding requests to.
     client: Client,             // Reqwest client
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
     pub status: Status,         // stores stats related to the rpc.
     // For max_consecutive
-    pub max_consecutive: u32,
+    pub max_consecutive: u32,   // max times we can call an rpc in a row
     pub consecutive: u32,
     // For max_per_second
-    pub last_used: u128,
-    pub min_time_delta: u128, // microseconds
+    pub last_used: u128,        // last time we sent a querry to this node
+    pub min_time_delta: u128,   // microseconds
+}
+
+// Sanitizes URLs so secrets don't get outputed.
+//
+// For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
+// as input, we output: https://eth-mainnet.g.alchemy.com/
+fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
+    let parsed_url = Url::parse(&url)?;
+
+    // Build a new URL with the scheme, host, and port (if any), but without the path or query
+    let sanitized = Url::parse(&format!(
+        "{}://{}{}",
+        parsed_url.scheme(),
+        parsed_url.host_str().unwrap_or_default(),
+        match parsed_url.port() {
+            Some(port) => format!(":{}", port),
+            None => String::new(),
+        }
+    ))?;
+
+    Ok(sanitized.to_string())
 }
 
 unsafe impl Sync for Rpc {}
@@ -43,6 +66,7 @@ unsafe impl Sync for Rpc {}
 impl Default for Rpc {
     fn default() -> Self {
         Self {
+            name: "".to_string(),
             url: "".to_string(),
             ws_url: None,
             client: Client::new(),
@@ -65,6 +89,7 @@ impl Rpc {
         ma_length: f64,
     ) -> Self {
         Self {
+            name: sanitize_url(&url).unwrap_or(url.clone()),
             url,
             client: Client::new(),
             ws_url,
@@ -77,6 +102,12 @@ impl Rpc {
             last_used: 0,
             min_time_delta,
         }
+    }
+
+    // Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth
+    #[cfg(test)]
+    pub fn get_url(&self) -> String {
+        self.url.clone()
     }
 
     // Generic fn to send rpc
