@@ -249,7 +249,9 @@ pub async fn subscribe_to_new_heads(
                 .await
                 {
                     Ok(_) => {}
-                    Err(err) => log_err!("{}", err),
+                    Err(err) => {
+                        log_err!("{}", err);
+                    }
                 };
             }
         }

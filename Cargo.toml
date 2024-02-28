@@ -28,7 +28,7 @@ memchr = "2.5.0"
 rand = { version = "0.8.5" }
 chrono = "0.4.28"
 tokio-stream = {version = "0.1.14", features = ["sync"]}
-hyper-util-blutgang = {version = "0.2.0", features = ["tokio"]}
+hyper-util-blutgang = { version = "0.2.0", features = ["tokio"] }
 simd-json = { version = "0.12.0", features = ["serde_impl"] }
 xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
 zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
@@ -37,8 +37,9 @@ jsonwebtoken = "9.1.0"
 hyper-tungstenite = "0.12.0"
 futures = "0.3.29"
 tungstenite = "0.20.1"
-tokio-tungstenite = {version = "0.20.1", features = ["native-tls"]}
+tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 futures-util = "0.3.29"
+systemd = { version = "0.10.0", optional = true }
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
@@ -50,6 +51,7 @@ incremental = false
 
 # Optional Blutgang features
 [features]
+journald = ["systemd"]
 default = ["selection-weighed-round-robin"]
 xxhash = ["xxhash-rust"] # 4x faster hashing but potentially less secure
 no-cache = [] # enable this to disable caching
@@ -57,4 +59,5 @@ debug-verbose = [] # Verbose terminal debug output
 selection-weighed-round-robin = [] # default algo
 selection-random = [] # optional random algo
 old-weighted-round-robin = [] # old algo, does not account for max per second
+systemd = ["dep:systemd"]
 # add your own below

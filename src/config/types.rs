@@ -326,7 +326,7 @@ impl Settings {
 
         if !is_ws {
             log_wrn!("WebSocket endpoints not present for all nodes, or newHeads_ttl is 0.");
-            log_wrn!("Disabling WS only-features. Please check docs for more info.")
+            log_wrn!("Disabling WS only-features. Please check docs for more info.");
         }
 
         // Admin namespace things

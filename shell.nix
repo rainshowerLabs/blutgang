@@ -14,6 +14,7 @@ pkgs.mkShell {
     pkgs.gcc
     pkgs.pkg-config
     pkgs.openssl
+    pkgs.systemdLibs
   ];
 
   shellHook = ''

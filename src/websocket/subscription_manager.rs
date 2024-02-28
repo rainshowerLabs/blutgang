@@ -82,7 +82,7 @@ pub async fn subscription_dispatcher(
             // False means tht we do not need to do anything
             Ok(false) => {}
             Err(e) => {
-                log_err!("Fatal error while trying to send subscriptions: {}", e)
+                log_err!("Fatal error while trying to send subscriptions: {}", e);
             }
         };
     }
