@@ -5,11 +5,33 @@ use crate::{
 };
 use std::time::Instant;
 use tokio::sync::mpsc;
+use url::Url;
 
 #[derive(Debug)]
 enum StartingLatencyResp {
     Ok(Rpc),
     Error(ConfigError),
+}
+
+// Sanitizes URLs so secrets don't get outputed.
+//
+// For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
+// as input, we output: https://eth-mainnet.g.alchemy.com/
+fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
+    let parsed_url = Url::parse(&url)?;
+
+    // Build a new URL with the scheme, host, and port (if any), but without the path or query
+    let sanitized = Url::parse(&format!(
+        "{}://{}{}",
+        parsed_url.scheme(),
+        parsed_url.host_str().unwrap_or_default(),
+        match parsed_url.port() {
+            Some(port) => format!(":{}", port),
+            None => String::new(),
+        }
+    ))?;
+
+    Ok(sanitized.to_string())
 }
 
 // Get the average latency for a RPC
@@ -39,7 +61,9 @@ async fn set_starting_latency(
     let avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
     rpc.update_latency(avg_latency);
 
-    println!("{}: {}ns", rpc.url, rpc.status.latency);
+    // Sanitize url if possible
+    let sanitized_url = sanitize_url(&rpc.url).unwrap_or(rpc.url.clone());
+    println!("{}: {}ns", sanitized_url, rpc.status.latency);
 
     tx.send(StartingLatencyResp::Ok(rpc)).await?;
 
