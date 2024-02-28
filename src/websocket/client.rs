@@ -10,6 +10,7 @@ use crate::{
     },
     log_err,
     log_info,
+    log_wrn,
     rpc::types::Rpc,
     websocket::{
         error::WsError,
@@ -197,9 +198,8 @@ pub async fn ws_conn(
                     let rax = match unsafe { from_str(&mut ws_message) } {
                         Ok(rax) => rax,
                         Err(e) => {
-                            log_err!("Couldn't deserialize ws_conn response {}", e);
-                            let _ = ws_error_tx.send(WsChannelErr::Closed(index));
-                            break;
+                            log_wrn!("Couldn't deserialize ws_conn response: {}", e);
+                            continue;
                         },
                     };
 
