@@ -188,11 +188,11 @@ pub async fn ws_conn(
 
                     let mut ws_message = match message.into_text() {
                         Ok(rax) => rax,
-                        Err(e) =>{
+                        Err(e) => {
                             log_err!("Received malformed message from ws_conn {}", e);
                             let _ = ws_error_tx.send(WsChannelErr::Closed(index));
                             break;
-                        },
+                        }
                     };
 
                     let rax = match unsafe { from_str(&mut ws_message) } {
@@ -200,7 +200,7 @@ pub async fn ws_conn(
                         Err(e) => {
                             log_wrn!("Couldn't deserialize ws_conn response: {}", e);
                             continue;
-                        },
+                        }
                     };
 
                     let incoming = IncomingResponse {

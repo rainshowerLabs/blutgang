@@ -33,11 +33,11 @@ pub struct Rpc {
     pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
     pub status: Status,         // stores stats related to the rpc.
     // For max_consecutive
-    pub max_consecutive: u32,   // max times we can call an rpc in a row
+    pub max_consecutive: u32, // max times we can call an rpc in a row
     pub consecutive: u32,
     // For max_per_second
-    pub last_used: u128,        // last time we sent a querry to this node
-    pub min_time_delta: u128,   // microseconds
+    pub last_used: u128,      // last time we sent a querry to this node
+    pub min_time_delta: u128, // microseconds
 }
 
 // Sanitizes URLs so secrets don't get outputed.
