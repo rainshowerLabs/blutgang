@@ -15,6 +15,7 @@ pkgs.mkShell {
     pkgs.pkg-config
     pkgs.openssl
     pkgs.systemdLibs
+    pkgs.cargo2nix
   ];
 
   shellHook = ''
