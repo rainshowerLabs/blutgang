@@ -50,6 +50,13 @@
           shellHook = ''
             export CARGO_BUILD_RUSTC_WRAPPER=$(which sccache)
             export RUSTC_WRAPPER=$(which sccache)
+            export OLD_PS1="$PS1" # Preserve the original PS1
+            export PS1="nix-shell:blutgang $PS1" # Customize this line as needed
+          '';
+
+          # reser PS1
+          shellExitHook = ''
+            export PS1="$OLD_PS1"
           '';
         };
       }
