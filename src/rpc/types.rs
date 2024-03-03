@@ -167,7 +167,7 @@ impl Rpc {
             Some(number) => number,
             None => {
                 return Err(RpcError::InvalidResponse(
-                    "error: Invalid response".to_string(),
+                    "error: Can't get finalized block!".to_string(),
                 ))
             }
         };
@@ -205,7 +205,7 @@ fn extract_number(rx: &str) -> Result<u64, RpcError> {
         Some(number) => number,
         None => {
             return Err(RpcError::InvalidResponse(
-                "error: Invalid response".to_string(),
+                "error: Extracting response from request failed!".to_string(),
             ))
         }
     };
