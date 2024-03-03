@@ -14,10 +14,11 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+      cargoMeta = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in {
         packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = "blutgang";
-          version = "0.3.2";
+          pname = cargoMeta.package.name;
+          version = cargoMeta.package.version;
           src = ./.;
           cargoLock = {
             lockFile = ./Cargo.lock;
