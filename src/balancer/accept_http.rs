@@ -284,14 +284,10 @@ async fn forward_body(
     Option<usize>,
 ) {
     // Check if body has application/json
+    let mut tx = tx;
     if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
-        return (
-            Ok(hyper::Response::builder()
-                .status(400)
-                .body(Full::new(Bytes::from("Improper content-type header")))
-                .unwrap()),
-            None,
-        );
+        let headers = tx.headers_mut();
+        headers.insert("content-type", HeaderValue::from_static("application/json"));
     }
 
     // Convert incoming body to serde value
