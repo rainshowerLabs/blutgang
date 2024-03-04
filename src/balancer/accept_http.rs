@@ -10,26 +10,13 @@ use crate::{
             CacheArgs,
         },
         selection::select::pick,
-    },
-    cache_error,
-    log_err,
-    log_info,
-    log_wrn,
-    no_rpc_available,
-    print_cache_error,
-    rpc::types::Rpc,
-    rpc_response,
-    timed_out,
-    websocket::{
+    }, cache_error, config, log_err, log_info, log_wrn, no_rpc_available, print_cache_error, rpc::types::Rpc, rpc_response, timed_out, websocket::{
         server::serve_websocket,
         types::{
             IncomingResponse,
             SubscriptionData,
         },
-    },
-    NamedBlocknumbers,
-    Settings,
-    WsconnMessage,
+    }, NamedBlocknumbers, Settings, WsconnMessage
 };
 
 use tokio::sync::{
@@ -279,15 +266,22 @@ async fn forward_body(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     params: RequestParams,
+    config: &Arc<RwLock<Settings>>
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
 ) {
-    // Check if body has application/json
-    let mut tx = tx;
-    if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
-        let headers = tx.headers_mut();
-        headers.insert("content-type", HeaderValue::from_static("application/json"));
+    if config.read().unwrap().header_check {
+        // Check if body has application/json
+        if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
+            return (
+                Ok(hyper::Response::builder()
+                    .status(400)
+                    .body(Full::new(Bytes::from("Improper content-type header")))
+                    .unwrap()),
+                None,
+            );
+        }
     }
 
     // Convert incoming body to serde value
@@ -425,7 +419,7 @@ pub async fn accept_request(
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(
+    let (response, rpc_position) = forward_body(
         tx,
         &connection_params.rpc_list_rwlock,
         &connection_params.channels.finalized_rx,
@@ -433,6 +427,7 @@ pub async fn accept_request(
         &connection_params.head_cache,
         connection_params.cache,
         params,
+        &connection_params.config,
     )
     .await;
     let time = time.elapsed();

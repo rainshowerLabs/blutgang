@@ -63,6 +63,7 @@ pub struct Settings {
     pub do_clear: bool,
     pub address: SocketAddr,
     pub health_check: bool,
+    pub header_check: bool,
     pub ttl: u128,
     pub expected_block_time: u64,
     pub supress_rpc_check: bool,
@@ -80,6 +81,7 @@ impl Default for Settings {
             do_clear: false,
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
+            header_check: true,
             ttl: 1000,
             expected_block_time: 12500,
             supress_rpc_check: true,
@@ -167,6 +169,11 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing health_check toggle!")
             .as_bool()
             .expect("\x1b[31mErr:\x1b[0m Could not parse health_check as bool!");
+        let header_check = blutgang_table
+            .get("header_check")
+            .expect("\x1b[31mErr:\x1b[0m Missing header_check toggle!")
+            .as_bool()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse header_check as bool!");
         let ttl = blutgang_table
             .get("ttl")
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
@@ -402,6 +409,7 @@ impl Settings {
             do_clear,
             address,
             health_check,
+            header_check,
             ttl,
             expected_block_time,
             max_retries,
@@ -490,6 +498,7 @@ impl Settings {
             .flush_every_ms(Some(flush_every_ms));
 
         let health_check = matches.get_occurrences::<String>("health_check").is_some();
+        let header_check = matches.get_occurrences::<String>("header_check").is_some();
 
         let ttl = matches
             .get_one::<String>("ttl")
@@ -549,6 +558,7 @@ impl Settings {
             do_clear: clear,
             address,
             health_check,
+            header_check,
             ttl,
             supress_rpc_check,
             expected_block_time,
