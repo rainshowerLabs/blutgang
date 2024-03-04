@@ -55,18 +55,25 @@ macro_rules! readiness {
 }
 
 async fn accept_readiness_request(
-    _tx: Request<hyper::body::Incoming>,
+    tx: Request<hyper::body::Incoming>,
     readiness_rx: Arc<watch::Receiver<ReadinessState>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    if tx.uri().path() != "/ready" {
+        return Ok(hyper::Response::builder()
+            .status(404)
+            .body(Full::new(Bytes::from("Not found")))
+            .unwrap());
+    }
+
     if *readiness_rx.borrow() == ReadinessState::Ready {
         return Ok(hyper::Response::builder()
             .status(200)
-            .body(Full::new(Bytes::from("ready")))
+            .body(Full::new(Bytes::from("OK")))
             .unwrap());
     } else {
         return Ok(hyper::Response::builder()
             .status(503)
-            .body(Full::new(Bytes::from("starting")))
+            .body(Full::new(Bytes::from("NOK")))
             .unwrap());
     }
 }
@@ -77,7 +84,7 @@ async fn readiness_server (
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
-    log_info!("Bound admin API to: {}", address);
+    log_info!("Bound readiness service to to: {}", address);
     let readiness_rx = Arc::new(readiness_rx);
 
     loop {
