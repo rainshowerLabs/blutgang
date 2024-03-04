@@ -49,16 +49,16 @@ macro_rules! readiness {
     };
 }
 
-async fn accept_readiness_request(
+pub async fn accept_readiness_request(
     tx: Request<hyper::body::Incoming>,
     readiness_rx: Arc<watch::Receiver<ReadinessState>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    if tx.uri().path() != "/ready" {
-        return Ok(hyper::Response::builder()
-            .status(404)
-            .body(Full::new(Bytes::from("Not found")))
-            .unwrap());
-    }
+    // if tx.uri().path() != "/ready" {
+    //     return Ok(hyper::Response::builder()
+    //         .status(404)
+    //         .body(Full::new(Bytes::from("Not found")))
+    //         .unwrap());
+    // }
 
     if *readiness_rx.borrow() == ReadinessState::Ready {
         Ok(hyper::Response::builder()
@@ -70,31 +70,5 @@ async fn accept_readiness_request(
             .status(503)
             .body(Full::new(Bytes::from("NOK")))
             .unwrap())
-    }
-}
-
-async fn readiness_server(
-    readiness_rx: watch::Receiver<ReadinessState>,
-    address: SocketAddr,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a listener and bind to it
-    let listener = TcpListener::bind(address).await?;
-    log_info!("Bound readiness service to to: {}", address);
-    let readiness_rx = Arc::new(readiness_rx);
-
-    loop {
-        let (stream, socketaddr) = listener.accept().await?;
-        log_info!("Admin connection from: {}", socketaddr);
-
-        // Use an adapter to access something implementing `tokio::io` traits as if they implement
-        // `hyper::rt` IO traits.
-        let io = TokioIo::new(stream);
-
-        let readiness_clone = readiness_rx.clone();
-
-        // Spawn a tokio task to serve multiple connections concurrently
-        tokio::task::spawn(async move {
-            readiness!(io, &readiness_clone,);
-        });
     }
 }

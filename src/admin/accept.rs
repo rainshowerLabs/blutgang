@@ -1,4 +1,7 @@
-use crate::log_info;
+use crate::{
+    log_info,
+    admin::liveready::accept_readiness_request,
+};
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -132,6 +135,10 @@ pub async fn accept_admin_request(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    if tx.uri().path() != "/ready" {
+        return accept_readiness_request(tx, readiness_rx).await;
+    }
+
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // If we have JWT enabled check that tx is valid
