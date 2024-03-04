@@ -20,10 +20,17 @@ use hyper::{
     Request,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 enum ReadinessState {
     Ready,
     Setup,
+}
+
+#[derive(PartialEq, Clone, Copy)]
+enum HealthState {
+    Healthy, // Everything nominal
+    MissingRpcs, // Some RPCs are not following the head but otherwise ok
+    Unhealhy, // Nothing works
 }
 
 #[macro_use]
@@ -50,16 +57,8 @@ macro_rules! readiness {
 }
 
 pub async fn accept_readiness_request(
-    tx: Request<hyper::body::Incoming>,
     readiness_rx: Arc<watch::Receiver<ReadinessState>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // if tx.uri().path() != "/ready" {
-    //     return Ok(hyper::Response::builder()
-    //         .status(404)
-    //         .body(Full::new(Bytes::from("Not found")))
-    //         .unwrap());
-    // }
-
     if *readiness_rx.borrow() == ReadinessState::Ready {
         Ok(hyper::Response::builder()
             .status(200)
@@ -70,5 +69,33 @@ pub async fn accept_readiness_request(
             .status(503)
             .body(Full::new(Bytes::from("NOK")))
             .unwrap())
+    }
+}
+
+pub async fn accept_health_request(
+    health_endpoint_rx: Arc<watch::Receiver<HealthState>>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    let state = *health_endpoint_rx.borrow();
+
+    match state {
+        HealthState::Healthy => {
+            return Ok(hyper::Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from("OK")))
+                .unwrap());
+        },
+        // todo: ermmmmm?
+        HealthState::MissingRpcs => {
+            return Ok(hyper::Response::builder()
+                .status(200)
+                .body(Full::new(Bytes::from("NOK")))
+                .unwrap());
+        },
+        _ => {
+            return Ok(hyper::Response::builder()
+                .status(503)
+                .body(Full::new(Bytes::from("NOK")))
+                .unwrap());
+        }
     }
 }

@@ -1,6 +1,9 @@
 use crate::{
     log_info,
-    admin::liveready::accept_readiness_request,
+    admin::liveready::{
+        accept_readiness_request,
+        accept_health_request,
+    },
 };
 use http_body_util::Full;
 use hyper::{
@@ -136,7 +139,9 @@ pub async fn accept_admin_request(
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     if tx.uri().path() != "/ready" {
-        return accept_readiness_request(tx, readiness_rx).await;
+        return accept_readiness_request(readiness_rx).await;
+    } else if tx.uri().path() != "/healthz" {
+        accept_health_request(health_endpoint_rx).await;
     }
 
     let mut tx = incoming_to_value(tx).await.unwrap();
