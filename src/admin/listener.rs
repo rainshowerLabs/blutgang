@@ -1,7 +1,10 @@
-use std::{sync::{
-    Arc,
-    RwLock,
-}, net::SocketAddr};
+use std::{
+        sync::{
+        Arc,
+        RwLock,
+    },
+    net::SocketAddr
+};
 
 use sled::Db;
 
