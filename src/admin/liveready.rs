@@ -47,14 +47,15 @@ macro_rules! readiness {
                     response
                 }),
             )
+            .await
         {
             println!("error serving admin connection: {:?}", err);
         }
     };
 }
 
-fn accept_readiness_request(
-    tx: Request<hyper::body::Incoming>,
+async fn accept_readiness_request(
+    _tx: Request<hyper::body::Incoming>,
     readiness_rx: Arc<watch::Receiver<ReadinessState>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     if *readiness_rx.borrow() == ReadinessState::Ready {
@@ -65,7 +66,7 @@ fn accept_readiness_request(
     } else {
         return Ok(hyper::Response::builder()
             .status(503)
-            .body(Full::new(Bytes::from("starting up")))
+            .body(Full::new(Bytes::from("starting")))
             .unwrap());
     }
 }
@@ -87,11 +88,13 @@ async fn readiness_server (
         // `hyper::rt` IO traits.
         let io = TokioIo::new(stream);
 
+        let readiness_clone = readiness_rx.clone();
+
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             readiness!(
                 io,
-                &readiness_rx,
+                &readiness_clone,
             );
         });
     }
