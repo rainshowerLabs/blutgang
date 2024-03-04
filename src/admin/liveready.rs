@@ -61,15 +61,15 @@ async fn accept_readiness_request(
     }
 
     if *readiness_rx.borrow() == ReadinessState::Ready {
-        return Ok(hyper::Response::builder()
+        Ok(hyper::Response::builder()
             .status(200)
             .body(Full::new(Bytes::from("OK")))
-            .unwrap());
+            .unwrap())
     } else {
-        return Ok(hyper::Response::builder()
+        Ok(hyper::Response::builder()
             .status(503)
             .body(Full::new(Bytes::from("NOK")))
-            .unwrap());
+            .unwrap())
     }
 }
 
