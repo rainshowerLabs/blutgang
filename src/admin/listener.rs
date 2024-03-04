@@ -1,9 +1,9 @@
 use std::{
-        sync::{
+    net::SocketAddr,
+    sync::{
         Arc,
         RwLock,
     },
-    net::SocketAddr
 };
 
 use sled::Db;
@@ -53,7 +53,7 @@ macro_rules! accept_admin {
     };
 }
 
-async fn admin_api_server (
+async fn admin_api_server(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
@@ -94,7 +94,7 @@ async fn admin_api_server (
 // Also used for k8s liveness/readiness probes.
 //
 // Similar to what you'd find in main/balancer
-pub async fn listen_for_admin_requests (
+pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,

@@ -4,9 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    log_info,
-};
+use crate::log_info;
 
 use http_body_util::Full;
 use hyper_util_blutgang::rt::TokioIo;
@@ -16,9 +14,9 @@ use tokio::{
 };
 
 use hyper::{
+    body::Bytes,
     server::conn::http1,
     service::service_fn,
-    body::Bytes,
     Request,
 };
 
@@ -40,10 +38,7 @@ macro_rules! readiness {
             .serve_connection(
                 $io,
                 service_fn(|req| {
-                    let response = accept_readiness_request(
-                        req,
-                        Arc::clone($readiness_rx),
-                    );
+                    let response = accept_readiness_request(req, Arc::clone($readiness_rx));
                     response
                 }),
             )
@@ -78,7 +73,7 @@ async fn accept_readiness_request(
     }
 }
 
-async fn readiness_server (
+async fn readiness_server(
     readiness_rx: watch::Receiver<ReadinessState>,
     address: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -99,10 +94,7 @@ async fn readiness_server (
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            readiness!(
-                io,
-                &readiness_clone,
-            );
+            readiness!(io, &readiness_clone,);
         });
     }
 }
