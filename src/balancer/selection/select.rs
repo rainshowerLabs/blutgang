@@ -35,7 +35,7 @@ pub fn argsort(data: &[Rpc]) -> Vec<usize> {
     not(feature = "selection-random"),
     not(feature = "old-weighted-round-robin"),
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // Sort by latency
     let indices = argsort(list);
 
@@ -84,7 +84,7 @@ fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     feature = "selection-weighed-round-robin",
     feature = "old-weighted-round-robin",
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // Sort by latency
     let indices = argsort(list);
 
