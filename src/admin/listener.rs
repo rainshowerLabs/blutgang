@@ -1,7 +1,7 @@
-use std::sync::{
+use std::{sync::{
     Arc,
     RwLock,
-};
+}, net::SocketAddr};
 
 use sled::Db;
 
@@ -50,24 +50,16 @@ macro_rules! accept_admin {
     };
 }
 
-// Used for listening to admin requests as its own tokio task.
-//
-// Similar to what you'd find in main/balancer
-pub async fn listen_for_admin_requests(
+async fn admin_api_server (
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
+    address: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let address;
-    {
-        let config_guard = config.read().unwrap();
-        address = config_guard.admin.address;
-    }
-
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
-    log_info!("Bound admin to: {}", address);
+    log_info!("Bound admin API to: {}", address);
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;
@@ -93,4 +85,23 @@ pub async fn listen_for_admin_requests(
             );
         });
     }
+}
+
+// Used for listening to admin requests as its own tokio task.
+// Also used for k8s liveness/readiness probes.
+//
+// Similar to what you'd find in main/balancer
+pub async fn listen_for_admin_requests (
+    rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
+    cache: Arc<Db>,
+    config: Arc<RwLock<Settings>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let address;
+    {
+        let config_guard = config.read().unwrap();
+        address = config_guard.admin.address;
+    }
+
+    admin_api_server(rpc_list_rwlock, poverty_list_rwlock, cache, config, address).await
 }
