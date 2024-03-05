@@ -1,65 +1,45 @@
 use std::{
     convert::Infallible,
-    net::SocketAddr,
     sync::Arc,
 };
 
-use crate::log_info;
-
 use http_body_util::Full;
-use hyper_util_blutgang::rt::TokioIo;
+
 use tokio::{
-    net::TcpListener,
     sync::watch,
 };
 
 use hyper::{
     body::Bytes,
-    server::conn::http1,
-    service::service_fn,
-    Request,
 };
 
-#[derive(PartialEq)]
-enum ReadinessState {
+#[derive(PartialEq, Clone, Copy)]
+pub enum ReadinessState {
     Ready,
     Setup,
 }
 
 #[derive(PartialEq, Clone, Copy)]
-enum HealthState {
+pub enum HealthState {
     Healthy, // Everything nominal
     MissingRpcs, // Some RPCs are not following the head but otherwise ok
     Unhealhy, // Nothing works
 }
 
-#[macro_use]
-macro_rules! readiness {
-    (
-        $io:expr,
-        $readiness_rx:expr,
-    ) => {
-        // Bind the incoming connection to our service
-        if let Err(err) = http1::Builder::new()
-            // `service_fn` converts our function in a `Service`
-            .serve_connection(
-                $io,
-                service_fn(|req| {
-                    let response = accept_readiness_request(req, Arc::clone($readiness_rx));
-                    response
-                }),
-            )
-            .await
-        {
-            println!("error serving admin connection: {:?}", err);
-        }
-    };
+#[derive(PartialEq, Clone, Copy)]
+pub struct LiveReady {
+    readiness: ReadinessState,
+    health: HealthState,
 }
 
+pub type LivenessReceiver = watch::Receiver<LiveReady>;
+pub type LivenessSender = watch::Sender<LiveReady>;
+
 pub async fn accept_readiness_request(
-    readiness_rx: Arc<watch::Receiver<ReadinessState>>,
+    liveness_receiver: Arc<LivenessReceiver>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    if *readiness_rx.borrow() == ReadinessState::Ready {
+    let readiness = *liveness_receiver.borrow();
+    if readiness.readiness == ReadinessState::Ready {
         Ok(hyper::Response::builder()
             .status(200)
             .body(Full::new(Bytes::from("OK")))
@@ -73,11 +53,12 @@ pub async fn accept_readiness_request(
 }
 
 pub async fn accept_health_request(
-    health_endpoint_rx: Arc<watch::Receiver<HealthState>>,
+    liveness_receiver: Arc<LivenessReceiver>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let state = *health_endpoint_rx.borrow();
+    let health = *liveness_receiver.borrow();
+    let health = health.health; // schizo code
 
-    match state {
+    match health {
         HealthState::Healthy => {
             return Ok(hyper::Response::builder()
                 .status(200)
@@ -87,8 +68,8 @@ pub async fn accept_health_request(
         // todo: ermmmmm?
         HealthState::MissingRpcs => {
             return Ok(hyper::Response::builder()
-                .status(200)
-                .body(Full::new(Bytes::from("NOK")))
+                .status(202)
+                .body(Full::new(Bytes::from("RPC")))
                 .unwrap());
         },
         _ => {
