@@ -1,6 +1,10 @@
+use std::borrow::Borrow;
 use std::{
     convert::Infallible,
-    sync::Arc,
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 
 use http_body_util::Full;
@@ -32,8 +36,14 @@ pub struct LiveReady {
     health: HealthState,
 }
 
-pub type LivenessReceiver = mpsc::Receiver<LiveReady>;
-pub type LivenessSender = mpsc::Sender<LiveReady>;
+#[derive(PartialEq, Clone, Copy)]
+pub struct LiveReadyUpdate {
+    readiness: Option<ReadinessState>,
+    health: Option<HealthState>,
+}
+
+pub type LivenessReceiver = mpsc::Receiver<LiveReadyUpdate>;
+pub type LivenessSender = mpsc::Sender<LiveReadyUpdate>;
 
 pub async fn accept_readiness_request(
     liveness_receiver: Arc<LivenessReceiver>,
@@ -83,11 +93,16 @@ pub async fn accept_health_request(
 
 async fn update_liveness(
     liveness_receiver: Arc<LivenessReceiver>,
-    liveness_status: Arc<RwLock<>>
+    liveness_status: Arc<RwLock<LiveReady>>
 ) {
     loop {
          while let Some(incoming) = liveness_receiver.recv().await {
-            incoming
+            if incoming.readiness != None {
+                liveness_status.write().unwrap().readiness = incoming.readiness.unwrap();
+            }
+            if incoming.health != None {
+                liveness_status.write().unwrap().health = incoming.health.unwrap();
+            }
         }
     }
 }
