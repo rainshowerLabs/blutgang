@@ -6,7 +6,7 @@ use std::{
 use http_body_util::Full;
 
 use tokio::{
-    sync::watch,
+    sync::mpsc,
 };
 
 use hyper::{
@@ -32,13 +32,13 @@ pub struct LiveReady {
     health: HealthState,
 }
 
-pub type LivenessReceiver = watch::Receiver<LiveReady>;
-pub type LivenessSender = watch::Sender<LiveReady>;
+pub type LivenessReceiver = mpsc::Receiver<LiveReady>;
+pub type LivenessSender = mpsc::Sender<LiveReady>;
 
 pub async fn accept_readiness_request(
     liveness_receiver: Arc<LivenessReceiver>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let readiness = *liveness_receiver.borrow();
+    let readiness = liveness_receiver.recv();
     if readiness.readiness == ReadinessState::Ready {
         Ok(hyper::Response::builder()
             .status(200)
@@ -77,6 +77,17 @@ pub async fn accept_health_request(
                 .status(503)
                 .body(Full::new(Bytes::from("NOK")))
                 .unwrap());
+        }
+    }
+}
+
+async fn update_liveness(
+    liveness_receiver: Arc<LivenessReceiver>,
+    liveness_status: Arc<RwLock<>>
+) {
+    loop {
+         while let Some(incoming) = liveness_receiver.recv().await {
+            incoming
         }
     }
 }
