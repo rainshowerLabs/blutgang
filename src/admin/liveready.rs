@@ -15,14 +15,14 @@ use tokio::sync::{
 
 use hyper::body::Bytes;
 
-#[derive(PartialEq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
     Ready,
     #[default]
     Setup,
 }
 
-#[derive(PartialEq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum HealthState {
     #[default]
     Healthy, // Everything nominal
@@ -30,7 +30,7 @@ pub enum HealthState {
     Unhealhy,    // Nothing works
 }
 
-#[derive(PartialEq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct LiveReady {
     readiness: ReadinessState,
     health: HealthState,
@@ -183,4 +183,145 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
             continue;
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+   use super::*;
+   use tokio::sync::{mpsc, oneshot};
+
+   #[tokio::test]
+   async fn test_liveness_listener() {
+       let (tx, rx) = mpsc::channel(100);
+       let liveness_status = Arc::new(RwLock::new(LiveReady::default()));
+
+       // Spawn the listener task
+       let liveness_status_clone = liveness_status.clone();
+       let listener_task = tokio::spawn(liveness_listener(rx, liveness_status_clone));
+
+       // Send updates and verify the changes
+       let mut updates = vec![
+           LiveReadyUpdate::Readiness(ReadinessState::Ready),
+           LiveReadyUpdate::Health(HealthState::MissingRpcs),
+           LiveReadyUpdate::Health(HealthState::Unhealhy),
+       ];
+
+       for update in updates.drain(..) {
+           tx.send(update).await.unwrap();
+           let liveness = liveness_status.read().unwrap();
+           match update {
+               LiveReadyUpdate::Readiness(state) => assert_eq!(liveness.readiness, state),
+               LiveReadyUpdate::Health(state) => assert_eq!(liveness.health, state),
+           }
+       }
+
+       // Drop the sender to signal the listener task to stop
+       drop(tx);
+       listener_task.await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_liveness_request_processor() {
+       let (tx, rx) = mpsc::channel(100);
+       let liveness_status = Arc::new(RwLock::new(LiveReady::default()));
+
+       // Spawn the request processor task
+       let liveness_status_clone = liveness_status.clone();
+       let processor_task = tokio::spawn(liveness_request_processor(rx, liveness_status_clone));
+
+       // Send requests and verify the responses
+       let (tx1, rx1) = oneshot::channel();
+       tx.send(tx1).await.unwrap();
+       let response = rx1.await.unwrap();
+       assert_eq!(response, LiveReady::default());
+
+       *liveness_status.write().unwrap() = LiveReady {
+           readiness: ReadinessState::Ready,
+           health: HealthState::Healthy,
+       };
+
+       let (tx2, rx2) = oneshot::channel();
+       tx.send(tx2).await.unwrap();
+       let response = rx2.await.unwrap();
+       assert_eq!(
+           response,
+           LiveReady {
+               readiness: ReadinessState::Ready,
+               health: HealthState::Healthy
+           }
+       );
+
+       // Drop the sender to signal the processor task to stop
+       drop(tx);
+       processor_task.await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_accept_readiness_request() {
+       let (tx, rx) = mpsc::channel(100);
+
+       // Ready state
+       let liveness_status = Arc::new(RwLock::new(LiveReady {
+           readiness: ReadinessState::Ready,
+           health: HealthState::Healthy,
+       }));
+
+       let liveness_status_clone = liveness_status.clone();
+       let request_processor_task =
+           tokio::spawn(liveness_request_processor(rx, liveness_status_clone));
+
+       let response = accept_readiness_request(tx.clone()).await.unwrap();
+       assert_eq!(response.status(), 200);
+
+       // Setup state
+       *liveness_status.write().unwrap() = LiveReady {
+           readiness: ReadinessState::Setup,
+           health: HealthState::Healthy,
+       };
+
+       let response = accept_readiness_request(tx.clone()).await.unwrap();
+       assert_eq!(response.status(), 503);
+
+       drop(tx);
+       request_processor_task.await.unwrap();
+   }
+
+   #[tokio::test]
+   async fn test_accept_health_request() {
+       let (tx, rx) = mpsc::channel(100);
+
+       // Healthy state
+       let liveness_status = Arc::new(RwLock::new(LiveReady {
+           readiness: ReadinessState::Ready,
+           health: HealthState::Healthy,
+       }));
+
+       let liveness_status_clone = liveness_status.clone();
+       let request_processor_task =
+           tokio::spawn(liveness_request_processor(rx, liveness_status_clone));
+
+       let response = accept_health_request(tx.clone()).await.unwrap();
+       assert_eq!(response.status(), 200);
+
+       // MissingRpcs state
+       *liveness_status.write().unwrap() = LiveReady {
+           readiness: ReadinessState::Ready,
+           health: HealthState::MissingRpcs,
+       };
+
+       let response = accept_health_request(tx.clone()).await.unwrap();
+       assert_eq!(response.status(), 202);
+
+       // Unhealhy state
+       *liveness_status.write().unwrap() = LiveReady {
+           readiness: ReadinessState::Ready,
+           health: HealthState::Unhealhy,
+       };
+
+       let response = accept_health_request(tx.clone()).await.unwrap();
+       assert_eq!(response.status(), 503);
+
+       drop(tx);
+       request_processor_task.await.unwrap();
+   }
 }
