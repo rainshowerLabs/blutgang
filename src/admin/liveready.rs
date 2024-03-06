@@ -1,12 +1,19 @@
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    convert::Infallible,
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
+
+use http_body_util::Full;
 
 use tokio::sync::{
     mpsc,
     oneshot,
 };
+
+use hyper::body::Bytes;
 
 #[derive(PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
@@ -45,7 +52,35 @@ pub type LiveReadyRecv = oneshot::Receiver<LiveReady>;
 pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
-pub type LiveReadyRequesSnd = mpsc::Sender<LiveReadySnd>;
+pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
+
+// Macros to make returning statuses less ugly in code
+macro_rules! ok {
+    () => {
+        return Ok(hyper::Response::builder()
+            .status(200)
+            .body(Full::new(Bytes::from("OK")))
+            .unwrap())
+    };
+}
+
+macro_rules! partial_ok {
+    () => {
+        return Ok(hyper::Response::builder()
+            .status(202)
+            .body(Full::new(Bytes::from("RPC")))
+            .unwrap())
+    };
+}
+
+macro_rules! nok {
+    () => {
+        return Ok(hyper::Response::builder()
+            .status(503)
+            .body(Full::new(Bytes::from("NOK")))
+            .unwrap())
+    };
+}
 
 // Listen for liveness update messages and update the current status accordingly
 async fn liveness_listener(
@@ -66,11 +101,11 @@ async fn liveness_listener(
 
 // Receives requests about current status updates and returns the current liveness
 async fn liveness_request_processor(
-    mut request_receiver: LiveReadyRequestRecv,
+    mut liveness_request_receiver: LiveReadyRequestRecv,
     liveness_status: Arc<RwLock<LiveReady>>,
 ) {
     loop {
-        while let Some(incoming) = request_receiver.recv().await {
+        while let Some(incoming) = liveness_request_receiver.recv().await {
             let current_status = liveness_status.read().unwrap().clone();
             incoming.send(current_status);
         }
@@ -82,7 +117,7 @@ async fn liveness_request_processor(
 // Also handles incoming requests about the current status.
 async fn liveness_monitor(
     liveness_receiver: LiveReadyUpdateRecv,
-    request_receiver: LiveReadyRequestRecv,
+    liveness_request_receiver: LiveReadyRequestRecv,
 ) {
     let liveness_status = Arc::new(RwLock::new(LiveReady::default()));
 
@@ -94,5 +129,47 @@ async fn liveness_monitor(
     ));
 
     // Listens to incoming requests about the current liveness
-    liveness_request_processor(request_receiver, liveness_status).await;
+    liveness_request_processor(liveness_request_receiver, liveness_status).await;
+}
+
+pub async fn accept_readiness_request(
+    liveness_request_sender: LiveReadyRequestSnd,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    let (tx, rx) = oneshot::channel();
+
+    liveness_request_sender.send(tx);
+
+    let rax = match rx.await {
+        Ok(v) => v,
+        Err(_) => {
+            nok!();
+        }
+    };
+
+    if rax.readiness == ReadinessState::Ready {
+        return ok!();
+    }
+
+    nok!();
+}
+
+pub async fn accept_health_request(
+    liveness_request_sender: LiveReadyRequestSnd,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    let (tx, rx) = oneshot::channel();
+
+    liveness_request_sender.send(tx);
+
+    let rax = match rx.await {
+        Ok(v) => v,
+        Err(_) => {
+            nok!();
+        }
+    };
+
+    match rax.health {
+        HealthState::Healthy => ok!(),
+        HealthState::MissingRpcs => partial_ok!(),
+        HealthState::Unhealhy => nok!(),
+    }
 }
