@@ -57,7 +57,7 @@ pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
     () => {
-        return Ok(hyper::Response::builder()
+        Ok(hyper::Response::builder()
             .status(200)
             .body(Full::new(Bytes::from("OK")))
             .unwrap())
@@ -66,7 +66,7 @@ macro_rules! ok {
 
 macro_rules! partial_ok {
     () => {
-        return Ok(hyper::Response::builder()
+        Ok(hyper::Response::builder()
             .status(202)
             .body(Full::new(Bytes::from("RPC")))
             .unwrap())
@@ -75,7 +75,7 @@ macro_rules! partial_ok {
 
 macro_rules! nok {
     () => {
-        return Ok(hyper::Response::builder()
+        Ok(hyper::Response::builder()
             .status(503)
             .body(Full::new(Bytes::from("NOK")))
             .unwrap())
@@ -142,7 +142,7 @@ pub async fn accept_readiness_request(
     let rax = match rx.await {
         Ok(v) => v,
         Err(_) => {
-            nok!();
+            return nok!();
         }
     };
 
@@ -150,7 +150,7 @@ pub async fn accept_readiness_request(
         return ok!();
     }
 
-    nok!();
+    nok!()
 }
 
 pub async fn accept_health_request(
@@ -163,13 +163,13 @@ pub async fn accept_health_request(
     let rax = match rx.await {
         Ok(v) => v,
         Err(_) => {
-            nok!();
+            return nok!();
         }
     };
 
     match rax.health {
-        HealthState::Healthy => ok!(),
-        HealthState::MissingRpcs => partial_ok!(),
-        HealthState::Unhealhy => nok!(),
+        HealthState::Healthy => return ok!(),
+        HealthState::MissingRpcs => return partial_ok!(),
+        HealthState::Unhealhy => return nok!(),
     }
 }
