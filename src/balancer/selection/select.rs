@@ -2,7 +2,7 @@ use crate::Rpc;
 use std::time::SystemTime;
 
 // Generic entry point fn to select the next rpc and return its position
-pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+pub fn pick(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // If len is 1, return the only element
     if list.len() == 1 {
         return (list[0].clone(), Some(0));

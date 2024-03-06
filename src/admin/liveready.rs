@@ -48,7 +48,7 @@ pub type LiveReadyUpdateRecv = mpsc::Receiver<LiveReadyUpdate>;
 pub type LiveReadyUpdateSnd = mpsc::Sender<LiveReadyUpdate>;
 
 // These are used to request/return updates about health
-pub type LiveReadyRecv = oneshot::Receiver<LiveReady>;
+// pub type LiveReadyRecv = oneshot::Receiver<LiveReady>;
 pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;

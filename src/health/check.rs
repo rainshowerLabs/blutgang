@@ -114,12 +114,20 @@ async fn check(
 
     //todo: i dont like this but its whatever
 
-    if poverty_list.read().unwrap().is_empty() && last_liveness_sent == HealthState::Unhealthy {
+    if poverty_list.read().unwrap().is_empty() && last_liveness_sent != HealthState::Healthy {
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Healthy))
             .await;
         last_liveness_sent = HealthState::Healthy
-    } else if last_liveness_sent == HealthState::Healthy {
+    } else if !poverty_list.read().unwrap().is_empty()
+        && !rpc_list.read().unwrap().is_empty()
+        && last_liveness_sent != HealthState::MissingRpcs
+    {
+        let _ = liveness_tx
+            .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
+            .await;
+        last_liveness_sent = HealthState::MissingRpcs
+    } else if last_liveness_sent != HealthState::Unhealthy {
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
             .await;

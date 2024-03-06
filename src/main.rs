@@ -238,7 +238,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let dropped_inc = incoming_tx.clone();
             let dropped_rx = outgoing_rx.resubscribe();
             let dropped_sub_data = Arc::clone(&sub_data);
-            let dropped_liveness_tx = liveness_tx.clone();
 
             tokio::task::spawn(async move {
                 dropped_listener(
