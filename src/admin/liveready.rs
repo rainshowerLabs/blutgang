@@ -1,20 +1,12 @@
-use std::borrow::Borrow;
-use std::{
-    convert::Infallible,
-    sync::{
-        Arc,
-        RwLock,
-    },
+use std::sync::{
+    Arc,
+    RwLock,
 };
-
-use http_body_util::Full;
 
 use tokio::sync::{
     mpsc,
     oneshot,
 };
-
-use hyper::body::Bytes;
 
 #[derive(PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
