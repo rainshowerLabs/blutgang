@@ -185,7 +185,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
         let liveness_tx_health = liveness_tx.clone();
 
-
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
