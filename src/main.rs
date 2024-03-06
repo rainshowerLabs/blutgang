@@ -129,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // We need liveness status channels even if admin is unused
-    let (liveness_tx, liveness_rx) = mpsc::channel(16);
+    let (_liveness_tx, liveness_rx) = mpsc::channel(16);
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {

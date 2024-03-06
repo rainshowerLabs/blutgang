@@ -89,10 +89,10 @@ async fn liveness_listener(
 ) {
     loop {
         while let Some(incoming) = liveness_receiver.recv().await {
-            if incoming.readiness != None {
+            if incoming.readiness.is_some() {
                 liveness_status.write().unwrap().readiness = incoming.readiness.unwrap();
             }
-            if incoming.health != None {
+            if incoming.health.is_some() {
                 liveness_status.write().unwrap().health = incoming.health.unwrap();
             }
         }
@@ -106,8 +106,8 @@ async fn liveness_request_processor(
 ) {
     loop {
         while let Some(incoming) = liveness_request_receiver.recv().await {
-            let current_status = liveness_status.read().unwrap().clone();
-            incoming.send(current_status);
+            let current_status = *liveness_status.read().unwrap();
+            let _ = incoming.send(current_status);
         }
     }
 }
@@ -137,7 +137,7 @@ pub async fn accept_readiness_request(
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let (tx, rx) = oneshot::channel();
 
-    liveness_request_sender.send(tx);
+    let _ = liveness_request_sender.send(tx).await;
 
     let rax = match rx.await {
         Ok(v) => v,
@@ -158,7 +158,7 @@ pub async fn accept_health_request(
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let (tx, rx) = oneshot::channel();
 
-    liveness_request_sender.send(tx);
+    let _ = liveness_request_sender.send(tx).await;
 
     let rax = match rx.await {
         Ok(v) => v,
@@ -168,15 +168,15 @@ pub async fn accept_health_request(
     };
 
     match rax.health {
-        HealthState::Healthy => return ok!(),
-        HealthState::MissingRpcs => return partial_ok!(),
-        HealthState::Unhealhy => return nok!(),
+        HealthState::Healthy => ok!(),
+        HealthState::MissingRpcs => partial_ok!(),
+        HealthState::Unhealhy => nok!(),
     }
 }
 
 pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
     loop {
-        while let Some(_) = liveness_rx.recv().await {
+        while (liveness_rx.recv().await).is_some() {
             continue;
         }
     }

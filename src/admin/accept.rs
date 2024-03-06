@@ -143,7 +143,7 @@ pub async fn accept_admin_request(
     if tx.uri().path() != "/ready" {
         return accept_readiness_request(liveness_request_tx).await;
     } else if tx.uri().path() != "/healthz" {
-        accept_health_request(liveness_request_tx).await;
+        return accept_health_request(liveness_request_tx).await;
     }
 
     let mut tx = incoming_to_value(tx).await.unwrap();
