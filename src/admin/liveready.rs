@@ -55,52 +55,6 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequesSnd = mpsc::Sender<LiveReadySnd>;
 
-pub async fn accept_readiness_request(
-    liveness_receiver: Arc<LivenessReceiver>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let readiness = liveness_receiver.recv();
-    if readiness.readiness == ReadinessState::Ready {
-        Ok(hyper::Response::builder()
-            .status(200)
-            .body(Full::new(Bytes::from("OK")))
-            .unwrap())
-    } else {
-        Ok(hyper::Response::builder()
-            .status(503)
-            .body(Full::new(Bytes::from("NOK")))
-            .unwrap())
-    }
-}
-
-pub async fn accept_health_request(
-    liveness_receiver: Arc<LivenessReceiver>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let health = *liveness_receiver.borrow();
-    let health = health.health; // schizo code
-
-    match health {
-        HealthState::Healthy => {
-            return Ok(hyper::Response::builder()
-                .status(200)
-                .body(Full::new(Bytes::from("OK")))
-                .unwrap());
-        }
-        // todo: ermmmmm?
-        HealthState::MissingRpcs => {
-            return Ok(hyper::Response::builder()
-                .status(202)
-                .body(Full::new(Bytes::from("RPC")))
-                .unwrap());
-        }
-        _ => {
-            return Ok(hyper::Response::builder()
-                .status(503)
-                .body(Full::new(Bytes::from("NOK")))
-                .unwrap());
-        }
-    }
-}
-
 // Listen for liveness update messages and update the current status accordingly
 async fn liveness_listener(
     mut liveness_receiver: LiveReadyUpdateRecv,
