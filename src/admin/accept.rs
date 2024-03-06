@@ -1,9 +1,9 @@
 use crate::{
-    log_info,
     admin::liveready::{
-        accept_readiness_request,
         accept_health_request,
+        accept_readiness_request,
     },
+    log_info,
 };
 use http_body_util::Full;
 use hyper::{
