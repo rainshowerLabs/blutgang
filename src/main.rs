@@ -8,7 +8,11 @@ mod websocket;
 use crate::{
     admin::{
         listener::listen_for_admin_requests,
-        liveready::liveness_update_sink,
+        liveready::{
+            liveness_update_sink,
+            LiveReadyUpdate,
+            ReadinessState
+        },
     },
     balancer::{
         accept_http::{
@@ -129,7 +133,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
     // We need liveness status channels even if admin is unused
-    let (_liveness_tx, liveness_rx) = mpsc::channel(16);
+    let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
@@ -269,6 +273,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
+
+    // Send an update to change the state to ready
+    let _ = liveness_tx.send(LiveReadyUpdate::Readiness(ReadinessState::Ready)).await;
 
     // We start a loop to continuously accept incoming connections
     loop {

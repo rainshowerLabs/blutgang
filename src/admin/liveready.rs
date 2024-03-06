@@ -17,8 +17,8 @@ use hyper::body::Bytes;
 
 #[derive(PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
-    #[default]
     Ready,
+    #[default]
     Setup,
 }
 
@@ -37,9 +37,9 @@ pub struct LiveReady {
 }
 
 #[derive(PartialEq, Clone, Copy)]
-pub struct LiveReadyUpdate {
-    readiness: Option<ReadinessState>,
-    health: Option<HealthState>,
+pub enum LiveReadyUpdate {
+    Readiness(ReadinessState),
+    Health(HealthState),
 }
 
 // These 2 are used to send and receive updates related to the current
@@ -87,13 +87,15 @@ async fn liveness_listener(
     mut liveness_receiver: LiveReadyUpdateRecv,
     liveness_status: Arc<RwLock<LiveReady>>,
 ) {
-    loop {
-        while let Some(incoming) = liveness_receiver.recv().await {
-            if incoming.readiness.is_some() {
-                liveness_status.write().unwrap().readiness = incoming.readiness.unwrap();
+    while let Some(update) = liveness_receiver.recv().await {
+        match update {
+            LiveReadyUpdate::Readiness(state) => {
+                let mut liveness = liveness_status.write().unwrap();
+                liveness.readiness = state;
             }
-            if incoming.health.is_some() {
-                liveness_status.write().unwrap().health = incoming.health.unwrap();
+            LiveReadyUpdate::Health(state) => {
+                let mut liveness = liveness_status.write().unwrap();
+                liveness.health = state;
             }
         }
     }
@@ -174,6 +176,7 @@ pub async fn accept_health_request(
     }
 }
 
+// Just a sink used to immediately discard request in cases where admin is disabled
 pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
     loop {
         while (liveness_rx.recv().await).is_some() {
