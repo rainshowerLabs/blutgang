@@ -11,7 +11,7 @@ use crate::{
         liveready::{
             liveness_update_sink,
             LiveReadyUpdate,
-            ReadinessState
+            ReadinessState,
         },
     },
     balancer::{
@@ -275,7 +275,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Send an update to change the state to ready
-    let _ = liveness_tx.send(LiveReadyUpdate::Readiness(ReadinessState::Ready)).await;
+    let _ = liveness_tx
+        .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+        .await;
 
     // We start a loop to continuously accept incoming connections
     loop {
