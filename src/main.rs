@@ -183,12 +183,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let liveness_tx_health = liveness_tx.clone();
+
 
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 poverty_list_health,
                 finalized_tx,
+                liveness_tx_health,
                 &named_blocknumbers_health,
                 &config_health,
             )
@@ -236,6 +239,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let dropped_inc = incoming_tx.clone();
             let dropped_rx = outgoing_rx.resubscribe();
             let dropped_sub_data = Arc::clone(&sub_data);
+            let dropped_liveness_tx = liveness_tx.clone();
 
             tokio::task::spawn(async move {
                 dropped_listener(

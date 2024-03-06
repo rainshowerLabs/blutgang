@@ -19,6 +19,11 @@ use crate::{
     Rpc,
     Settings,
     SubscriptionData,
+    admin::liveready::{
+        LiveReadyUpdateSnd,
+        LiveReadyUpdate,
+        HealthState,
+    },
 };
 use tokio::sync::broadcast;
 
@@ -48,6 +53,7 @@ pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
+    liveness_tx: LiveReadyUpdateSnd, 
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<(), HealthError> {
@@ -57,7 +63,7 @@ pub async fn health_check(
         let supress_rpc_check = config.read().unwrap().supress_rpc_check;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, &ttl, supress_rpc_check).await?;
+        check(&rpc_list, &poverty_list, &ttl, &liveness_tx, supress_rpc_check).await?;
         get_safe_block(
             &rpc_list,
             &finalized_tx,
@@ -73,6 +79,7 @@ async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
+    liveness_tx: &LiveReadyUpdateSnd,
     supress_rpc_check: bool,
 ) -> Result<(), HealthError> {
     if !supress_rpc_check {
@@ -93,6 +100,12 @@ async fn check(
     let poverty_heads = head_check(poverty_list, *ttl).await?;
 
     escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
+
+    //todo: i dont like this but its whatever
+
+    if poverty_list.read().unwrap().is_empty() {
+        let _ = liveness_tx.send(LiveReadyUpdate::Health(HealthState::Unhealhy)).await;
+    }
 
     if !supress_rpc_check {
         println!("OK!");
