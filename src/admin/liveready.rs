@@ -187,14 +187,14 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::Rpc;
-use tokio::time::Duration;
-    use tokio::time::sleep;
-use super::*;
     use tokio::sync::{
         mpsc,
         oneshot,
     };
+    use tokio::time::sleep;
+    use tokio::time::Duration;
 
     #[tokio::test]
     async fn test_liveness_listener_updates_status() {
@@ -399,10 +399,7 @@ use super::*;
 
     #[tokio::test]
     async fn test_health_state_transitions() {
-        let rpc_list = Arc::new(RwLock::new(vec![
-            Rpc::default(),
-            Rpc::default(),
-        ]));
+        let rpc_list = Arc::new(RwLock::new(vec![Rpc::default(), Rpc::default()]));
         let poverty_list = Arc::new(RwLock::new(Vec::new()));
         let (update_snd, update_recv) = mpsc::channel(10);
         let liveness_status = Arc::new(RwLock::new(LiveReady::default()));
@@ -416,18 +413,27 @@ use super::*;
         // Force add RPCs to poverty list and send health update
         let mut rpcs_in_poverty = rpc_list.write().unwrap().drain(..).collect::<Vec<_>>();
         poverty_list.write().unwrap().append(&mut rpcs_in_poverty);
-        update_snd.send(LiveReadyUpdate::Health(HealthState::Unhealthy)).await.unwrap();
+        update_snd
+            .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
+            .await
+            .unwrap();
 
         // Check for Unhealthy status
         sleep(Duration::from_millis(50)).await; // Allow for processing
-        assert_eq!(liveness_status.read().unwrap().health, HealthState::Unhealthy);
+        assert_eq!(
+            liveness_status.read().unwrap().health,
+            HealthState::Unhealthy
+        );
         assert!(rpc_list.read().unwrap().is_empty());
         assert_eq!(poverty_list.read().unwrap().len(), 2);
 
         // Remove RPCs from poverty list, simulate recovery, and send health update
         let mut recovered_rpcs = poverty_list.write().unwrap().drain(..).collect::<Vec<_>>();
         rpc_list.write().unwrap().append(&mut recovered_rpcs);
-        update_snd.send(LiveReadyUpdate::Health(HealthState::Healthy)).await.unwrap();
+        update_snd
+            .send(LiveReadyUpdate::Health(HealthState::Healthy))
+            .await
+            .unwrap();
 
         // Check for Healthy status
         sleep(Duration::from_millis(50)).await; // Allow for processing
@@ -437,23 +443,36 @@ use super::*;
 
         // Reverse the process: simulate RPCs failing again and moving back to poverty list
         let mut rpcs_in_poverty_again = rpc_list.write().unwrap().drain(..).collect::<Vec<_>>();
-        poverty_list.write().unwrap().append(&mut rpcs_in_poverty_again);
-        update_snd.send(LiveReadyUpdate::Health(HealthState::Unhealthy)).await.unwrap();
+        poverty_list
+            .write()
+            .unwrap()
+            .append(&mut rpcs_in_poverty_again);
+        update_snd
+            .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
+            .await
+            .unwrap();
 
         // Check for Unhealthy status again
         sleep(Duration::from_millis(50)).await; // Allow for processing
-        assert_eq!(liveness_status.read().unwrap().health, HealthState::Unhealthy);
+        assert_eq!(
+            liveness_status.read().unwrap().health,
+            HealthState::Unhealthy
+        );
         assert!(rpc_list.read().unwrap().is_empty());
         assert_eq!(poverty_list.read().unwrap().len(), 2);
 
         // Recover again and verify
         let mut recovered_rpcs_again = poverty_list.write().unwrap().drain(..).collect::<Vec<_>>();
         rpc_list.write().unwrap().append(&mut recovered_rpcs_again);
-        update_snd.send(LiveReadyUpdate::Health(HealthState::Healthy)).await.unwrap();
+        update_snd
+            .send(LiveReadyUpdate::Health(HealthState::Healthy))
+            .await
+            .unwrap();
 
         // Final check for Healthy status
         sleep(Duration::from_millis(50)).await; // Allow for processing
         assert_eq!(liveness_status.read().unwrap().health, HealthState::Healthy);
         assert_eq!(rpc_list.read().unwrap().len(), 2);
         assert!(poverty_list.read().unwrap().is_empty());
-    }}
+    }
+}
