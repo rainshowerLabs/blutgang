@@ -173,3 +173,11 @@ pub async fn accept_health_request(
         HealthState::Unhealhy => return nok!(),
     }
 }
+
+pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
+    loop {
+        while let Some(_) = liveness_rx.recv().await {
+            continue;
+        }
+    }
+}

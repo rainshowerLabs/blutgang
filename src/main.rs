@@ -6,7 +6,10 @@ mod rpc;
 mod websocket;
 
 use crate::{
-    admin::listener::listen_for_admin_requests,
+    admin::{
+        listener::listen_for_admin_requests,
+        liveready::liveness_update_sink,
+    },
     balancer::{
         accept_http::{
             accept_request,
@@ -125,6 +128,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let finalized_rx_arc = Arc::new(finalized_rx.clone());
     let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
 
+    // We need liveness status channels even if admin is unused
+    let (liveness_tx, liveness_rx) = mpsc::channel(16);
+
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
@@ -138,9 +144,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 poverty_list_admin,
                 cache_admin,
                 config_admin,
+                liveness_rx,
             )
             .await;
         });
+    } else {
+        // dont want to deal with potentially dropped channels if admin is disabled?
+        // create a sink to immediately drop all messages you receive!
+        tokio::task::spawn(liveness_update_sink(liveness_rx));
     }
 
     // Spawn a thread for the head cache
