@@ -1,5 +1,6 @@
 use crate::{
     admin::liveready::{
+        LiveReadyUpdateSnd,
         accept_health_request,
         accept_readiness_request,
     },
@@ -137,11 +138,12 @@ pub async fn accept_admin_request(
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
+    liveness_request_tx: LiveReadyUpdateSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     if tx.uri().path() != "/ready" {
-        return accept_readiness_request(readiness_rx).await;
+        return accept_readiness_request(liveness_request_tx).await;
     } else if tx.uri().path() != "/healthz" {
-        accept_health_request(health_endpoint_rx).await;
+        accept_health_request(liveness_request_tx).await;
     }
 
     let mut tx = incoming_to_value(tx).await.unwrap();

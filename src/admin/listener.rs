@@ -9,7 +9,14 @@ use std::{
 use sled::Db;
 
 use crate::{
-    admin::accept::accept_admin_request,
+    admin::{
+        accept::accept_admin_request,
+        liveready::{
+            LiveReadyUpdateRecv,
+            LiveReadyUpdateSnd,
+            liveness_monitor,
+        }
+    },
     log_info,
     Rpc,
     Settings,
@@ -20,7 +27,7 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util_blutgang::rt::TokioIo;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::mpsc};
 
 macro_rules! accept_admin {
     (
@@ -29,6 +36,7 @@ macro_rules! accept_admin {
         $poverty_list_rwlock:expr,
         $cache:expr,
         $config:expr,
+        $liveness_request_tx:expr,
     ) => {
         // Bind the incoming connection to our service
         if let Err(err) = http1::Builder::new()
@@ -42,6 +50,7 @@ macro_rules! accept_admin {
                         Arc::clone($poverty_list_rwlock),
                         Arc::clone($cache),
                         Arc::clone($config),
+                        $liveness_request_tx.clone(),
                     );
                     response
                 }),
@@ -59,6 +68,7 @@ async fn admin_api_server(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
     address: SocketAddr,
+    liveness_request_tx: LiveReadyUpdateSnd,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
@@ -76,6 +86,7 @@ async fn admin_api_server(
         let poverty_list_rwlock_clone = Arc::clone(&poverty_list_rwlock);
         let cache_clone = Arc::clone(&cache);
         let config_clone = Arc::clone(&config);
+        let liveness_request_tx_clone = liveness_request_tx.clone();
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
@@ -85,6 +96,7 @@ async fn admin_api_server(
                 &poverty_list_rwlock_clone,
                 &cache_clone,
                 &config_clone,
+                &liveness_request_tx_clone,
             );
         });
     }
@@ -99,6 +111,7 @@ pub async fn listen_for_admin_requests(
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
+    liveness_receiver: LiveReadyUpdateRecv,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let address;
     {
@@ -106,5 +119,9 @@ pub async fn listen_for_admin_requests(
         address = config_guard.admin.address;
     }
 
-    admin_api_server(rpc_list_rwlock, poverty_list_rwlock, cache, config, address).await
+    // Spawn thread for monitoring the current liveness status of Blutgang
+    let (liveness_request_tx, liveness_request_rx) = mpsc::channel(16);
+    tokio::spawn(liveness_monitor(liveness_receiver, liveness_request_rx));
+
+    admin_api_server(rpc_list_rwlock, poverty_list_rwlock, cache, config, address, liveness_request_tx).await
 }
