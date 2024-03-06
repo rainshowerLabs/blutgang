@@ -12,10 +12,10 @@ use crate::{
     admin::{
         accept::accept_admin_request,
         liveready::{
-            LiveReadyUpdateRecv,
-            LiveReadyUpdateSnd,
             liveness_monitor,
-        }
+            LiveReadyRequestSnd,
+            LiveReadyUpdateRecv,
+        },
     },
     log_info,
     Rpc,
@@ -27,7 +27,10 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util_blutgang::rt::TokioIo;
-use tokio::{net::TcpListener, sync::mpsc};
+use tokio::{
+    net::TcpListener,
+    sync::mpsc,
+};
 
 macro_rules! accept_admin {
     (
@@ -68,7 +71,7 @@ async fn admin_api_server(
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
     address: SocketAddr,
-    liveness_request_tx: LiveReadyUpdateSnd,
+    liveness_request_tx: LiveReadyRequestSnd,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
@@ -123,5 +126,13 @@ pub async fn listen_for_admin_requests(
     let (liveness_request_tx, liveness_request_rx) = mpsc::channel(16);
     tokio::spawn(liveness_monitor(liveness_receiver, liveness_request_rx));
 
-    admin_api_server(rpc_list_rwlock, poverty_list_rwlock, cache, config, address, liveness_request_tx).await
+    admin_api_server(
+        rpc_list_rwlock,
+        poverty_list_rwlock,
+        cache,
+        config,
+        address,
+        liveness_request_tx,
+    )
+    .await
 }

@@ -115,7 +115,7 @@ async fn liveness_request_processor(
 // Monitor for new liveness updates and update the statuses accordingly.
 //
 // Also handles incoming requests about the current status.
-pub (in crate::r#admin) async fn liveness_monitor(
+pub(in crate::r#admin) async fn liveness_monitor(
     liveness_receiver: LiveReadyUpdateRecv,
     liveness_request_receiver: LiveReadyRequestRecv,
 ) {
