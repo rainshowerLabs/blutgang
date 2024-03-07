@@ -30,13 +30,13 @@ pub enum HealthState {
     Unhealthy,   // Nothing works
 }
 
-#[derive(PartialEq, Clone, Copy, Default)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct LiveReady {
     readiness: ReadinessState,
     health: HealthState,
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum LiveReadyUpdate {
     Readiness(ReadinessState),
     Health(HealthState),

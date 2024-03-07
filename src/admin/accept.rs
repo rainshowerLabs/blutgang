@@ -140,9 +140,9 @@ pub async fn accept_admin_request(
     config: Arc<RwLock<Settings>>,
     liveness_request_tx: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    if tx.uri().path() != "/ready" {
+    if tx.uri().path() == "/ready" {
         return accept_readiness_request(liveness_request_tx).await;
-    } else if tx.uri().path() != "/health" {
+    } else if tx.uri().path() == "/health" {
         return accept_health_request(liveness_request_tx).await;
     }
 

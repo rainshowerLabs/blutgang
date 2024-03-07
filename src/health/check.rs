@@ -25,17 +25,20 @@ use crate::{
     Settings,
     SubscriptionData,
 };
-use tokio::sync::broadcast;
 
-use std::println;
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Duration,
 };
-use std::time::Duration;
 
 use tokio::{
-    sync::mpsc,
+    sync::{
+        broadcast,
+        mpsc,
+    },
     time::{
         sleep,
         timeout,
@@ -57,23 +60,22 @@ pub async fn health_check(
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<(), HealthError> {
-    let mut last_liveness_sent = HealthState::Unhealthy;
-
     loop {
         let health_check_ttl = config.read().unwrap().health_check_ttl;
         let ttl = config.read().unwrap().ttl;
         let supress_rpc_check = config.read().unwrap().supress_rpc_check;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        last_liveness_sent = check(
+        
+        check(
             &rpc_list,
             &poverty_list,
             &ttl,
             &liveness_tx,
             supress_rpc_check,
-            last_liveness_sent,
         )
         .await?;
+
         get_safe_block(
             &rpc_list,
             &finalized_tx,
@@ -91,8 +93,7 @@ async fn check(
     ttl: &u128,
     liveness_tx: &LiveReadyUpdateSnd,
     supress_rpc_check: bool,
-    mut last_liveness_sent: HealthState,
-) -> Result<HealthState, HealthError> {
+) -> Result<(), HealthError> {
     if !supress_rpc_check {
         print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
     }
@@ -113,32 +114,30 @@ async fn check(
     escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
     //todo: i dont like this but its whatever
-
-    if poverty_list.read().unwrap().is_empty() && last_liveness_sent != HealthState::Healthy {
+    if poverty_list.read().unwrap().is_empty(){
+        log_info!("sending Healthy");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Healthy))
             .await;
-        last_liveness_sent = HealthState::Healthy
     } else if !poverty_list.read().unwrap().is_empty()
         && !rpc_list.read().unwrap().is_empty()
-        && last_liveness_sent != HealthState::MissingRpcs
     {
+        log_wrn!("sending MissingRpcs");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
             .await;
-        last_liveness_sent = HealthState::MissingRpcs
-    } else if last_liveness_sent != HealthState::Unhealthy {
+    } else {
+        log_wrn!("sending Unhealthy");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
             .await;
-        last_liveness_sent = HealthState::Unhealthy;
     }
 
     if !supress_rpc_check {
         println!("OK!");
     }
 
-    Ok(last_liveness_sent)
+    Ok(())
 }
 
 // Check what heads are reported by each RPC
