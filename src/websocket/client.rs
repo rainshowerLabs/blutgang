@@ -197,8 +197,10 @@ pub async fn ws_conn(
 
                     let rax = match unsafe { from_str(&mut ws_message) } {
                         Ok(rax) => rax,
-                        Err(e) => {
-                            log_wrn!("Couldn't deserialize ws_conn response: {}", e);
+                        Err(_e) => {
+                            #[cfg(feature = "debug-verbose")]
+                            log_wrn!("Couldn't deserialize ws_conn response: {}", _e);
+                            
                             continue;
                         }
                     };
