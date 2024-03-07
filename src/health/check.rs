@@ -260,9 +260,6 @@ fn escape_poverty(
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
     //todo: i dont like this but its whatever
-    println!("poverty_list {:?}", poverty_list_guard);
-    println!("rpc_list {:?}", rpc_list_guard);
-
     let to_send;
     if poverty_list_guard.is_empty() {
         to_send = LiveReadyUpdate::Health(HealthState::Healthy);
