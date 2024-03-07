@@ -111,22 +111,10 @@ async fn check(
     // Do a head check over the current poverty list to see if any nodes are back to normal
     let poverty_heads = head_check(poverty_list, *ttl).await?;
 
-    escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
+    let to_send = escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
-    //todo: i dont like this but its whatever
-    if poverty_list.read().unwrap().is_empty() {
-        let _ = liveness_tx
-            .send(LiveReadyUpdate::Health(HealthState::Healthy))
-            .await;
-    } else if !poverty_list.read().unwrap().is_empty() && !rpc_list.read().unwrap().is_empty() {
-        let _ = liveness_tx
-            .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
-            .await;
-    } else {
-        let _ = liveness_tx
-            .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
-            .await;
-    }
+    // Send the current status of nodes to the liveness monitor
+    let _ = liveness_tx.send(to_send).await;
 
     if !supress_rpc_check {
         println!("OK!");
@@ -237,12 +225,14 @@ fn make_poverty(
 }
 
 // Go over the `poverty_list` to see if any nodes are back to normal
+//
+// Update liveness statuses when done
 fn escape_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_heads: Vec<HeadResult>,
     agreed_head: u64,
-) -> Result<(), HealthError> {
+) -> Result<crate::LiveReadyUpdate, HealthError> {
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
@@ -269,7 +259,23 @@ fn escape_poverty(
     // Only retain erroring RPCs
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
-    Ok(())
+    //todo: i dont like this but its whatever
+    println!("poverty_list {:?}", poverty_list_guard);
+    println!("rpc_list {:?}", rpc_list_guard);
+
+    let to_send;
+    if poverty_list_guard.is_empty() {
+        to_send = LiveReadyUpdate::Health(HealthState::Healthy);
+    } else if !poverty_list_guard.is_empty() && !rpc_list_guard.is_empty() {
+        to_send = LiveReadyUpdate::Health(HealthState::MissingRpcs);
+    } else {
+        to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
+    }
+
+    drop(poverty_list_guard);
+    drop(rpc_list_guard);
+
+    Ok(to_send)
 }
 
 // Remove the RPC that dropped out ws_conn and add it to the poverty list
