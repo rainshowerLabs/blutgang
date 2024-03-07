@@ -115,19 +115,16 @@ async fn check(
 
     //todo: i dont like this but its whatever
     if poverty_list.read().unwrap().is_empty(){
-        log_info!("sending Healthy");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Healthy))
             .await;
     } else if !poverty_list.read().unwrap().is_empty()
         && !rpc_list.read().unwrap().is_empty()
     {
-        log_wrn!("sending MissingRpcs");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
             .await;
     } else {
-        log_wrn!("sending Unhealthy");
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Unhealthy))
             .await;
