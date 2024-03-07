@@ -10,7 +10,6 @@ use crate::{
     },
     log_err,
     log_info,
-    log_wrn,
     rpc::types::Rpc,
     websocket::{
         error::WsError,
@@ -200,7 +199,7 @@ pub async fn ws_conn(
                         Err(_e) => {
                             #[cfg(feature = "debug-verbose")]
                             log_wrn!("Couldn't deserialize ws_conn response: {}", _e);
-                            
+
                             continue;
                         }
                     };

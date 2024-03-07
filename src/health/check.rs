@@ -66,7 +66,7 @@ pub async fn health_check(
         let supress_rpc_check = config.read().unwrap().supress_rpc_check;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        
+
         check(
             &rpc_list,
             &poverty_list,
@@ -114,13 +114,11 @@ async fn check(
     escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
 
     //todo: i dont like this but its whatever
-    if poverty_list.read().unwrap().is_empty(){
+    if poverty_list.read().unwrap().is_empty() {
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::Healthy))
             .await;
-    } else if !poverty_list.read().unwrap().is_empty()
-        && !rpc_list.read().unwrap().is_empty()
-    {
+    } else if !poverty_list.read().unwrap().is_empty() && !rpc_list.read().unwrap().is_empty() {
         let _ = liveness_tx
             .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
             .await;
