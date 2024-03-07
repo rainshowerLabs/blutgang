@@ -272,9 +272,6 @@ fn escape_poverty(
         to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
     }
 
-    drop(poverty_list_guard);
-    drop(rpc_list_guard);
-
     Ok(to_send)
 }
 
