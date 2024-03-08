@@ -29,18 +29,32 @@ pub fn log_statsd(tags: &[str], message: &str) {
 // }
 
 #[cfg(feature = "prometheusd")]
-pub fn gather_metrics() -> Result<String, prometheus::Error> {
+pub fn gather_metrics() -> Result<serde_json::Value, serde_json::Error> {
     use crate::log_info;
+    use metrics_prometheus::*;
+    use serde_json::*;
     use prometheus::gather;
+    use prometheus::Gauge;
+    let recorder = metrics_prometheus::install();
+    //TODO: abstract this
+    recorder.register_metric(Gauge::new("dummy_gauge", "1.0").unwrap());
     let report = prometheus::TextEncoder::new()
-        .encode_to_string(&prometheus::default_registry().gather())?
-        .trim()
-        .to_string();
-    log_info!("Prometheus metrics: {}", report);
-    Ok(report)
+        .encode_to_string(&recorder.registry().gather());
+    let result = serde_json::Value::String(report.unwrap());
+    // let result = serde_json::Value::String(String::from_utf8(report)?).into();
+    log_info!("Prometheus metrics: {:?}", result);
+    Ok(result)
     // gather::gather(&prometheus::gather(), &mut buffer).unwrap();
     // let output = String::from_utf8(buffer).unwrap();
     // println!("{}", output);
+}
+
+
+//TODO: json format
+#[cfg(feature = "prometheusd")]
+pub fn format_metrics() {
+    let report = gather_metrics();
+        
 }
 
 // #[cfg(feature = "prometheusd")]
@@ -237,4 +251,21 @@ macro_rules! dogstatd_err {
         }
         println!(concat!("\x1b[31mErr:\x1b[0m ", $fmt))
     };
+}
+
+#[cfg(feature = "prometheusd")]
+#[cfg(test)]
+mod tests{
+//TODO: remove this after tests
+//sorry, im too lazy to make proper tests for this
+    use super::*;
+    use prometheus::proto::Gauge;
+#[tokio::test]
+async fn test_prometheus_log() {
+    let gauge = metrics::describe_gauge!("1.0", "dummy gauge");
+    let report = gather_metrics().unwrap();
+    let expected = "prometheus_metrics";
+    assert_eq!(report, expected);
+    }
+
 }

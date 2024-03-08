@@ -41,9 +41,11 @@ tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 futures-util = "0.3.29"
 systemd = { version = "0.10.0", optional = true }
 dogstatsd = { version = "0.11.1", optional = true }
-metrics-prometheus = {version = "0.6.0", optional = true}
+metrics-prometheus = { version = "0.6.0", optional = true }
 metrics-exporter-statsd = "0.7.0"
 prometheus = "0.13.3"
+tracing-test = "0.2.4"
+metrics = "0.22.1"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
@@ -66,4 +68,5 @@ selection-weighed-round-robin = [] # default algo
 selection-random = [] # optional random algo
 old-weighted-round-robin = [] # old algo, does not account for max per second
 systemd = ["dep:systemd"]
+metrics-prometheus = ["dep:metrics-prometheus"]
 # add your own below
