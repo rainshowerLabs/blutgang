@@ -7,6 +7,20 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 
+use std::borrow::Borrow;
+
+use atomic_refcell::AtomicRefCell;
+use once_cell::sync::Lazy;
+use prometheus::Registry;
+use prometheus_metric_storage::StorageRegistry;
+
+//Some goofy Rust stuff
+static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
+    let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
+    StorageRegistry::new(registry)
+});
+
+
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
     use systemd::journal;
@@ -28,20 +42,43 @@ pub fn log_statsd(tags: &[str], message: &str) {
 //         .build_and_install();
 // }
 
+
+//#[cfg(feature = "prometheusd")]
+pub fn get_storage_registry() -> &'static StorageRegistry {
+    &METRICS_REGISTRY
+}
+
+//#[cfg(feature = "prometheusd")]
+pub fn get_registry() -> &'static Registry {
+    get_storage_registry().borrow().registry()
+    
+}
+
+
 #[cfg(feature = "prometheusd")]
+pub fn recorder_init()  -> Result<metrics_prometheus::Recorder, prometheus::Error> { 
+    use metrics_prometheus::*;
+    let recorder = metrics_prometheus::install();
+    Ok(recorder)
+         
+ }
+
+
+//#[cfg(feature = "prometheusd")]
 pub fn gather_metrics() -> Result<serde_json::Value, serde_json::Error> {
     use crate::log_info;
     use metrics_prometheus::*;
     use serde_json::*;
     use prometheus::gather;
     use prometheus::Gauge;
-    let recorder = metrics_prometheus::install();
+    let recorder = recorder_init().unwrap();  
     //TODO: abstract this
-    recorder.register_metric(Gauge::new("dummy_gauge", "1.0").unwrap());
+    // recorder.register_metric(Gauge::new("dummy_gauge", "1.0").unwrap());
     let report = prometheus::TextEncoder::new()
         .encode_to_string(&recorder.registry().gather());
+ //   let result = json!()
     let result = serde_json::Value::String(report.unwrap());
-    // let result = serde_json::Value::String(String::from_utf8(report)?).into();
+
     log_info!("Prometheus metrics: {:?}", result);
     Ok(result)
     // gather::gather(&prometheus::gather(), &mut buffer).unwrap();
@@ -51,10 +88,10 @@ pub fn gather_metrics() -> Result<serde_json::Value, serde_json::Error> {
 
 
 //TODO: json format
-#[cfg(feature = "prometheusd")]
+//#[cfg(feature = "prometheusd")]
 pub fn format_metrics() {
-    let report = gather_metrics();
-        
+    let report = gather_metrics().unwrap();
+//    let type = report.get("TYPE").unwrap();   
 }
 
 // #[cfg(feature = "prometheusd")]
@@ -256,13 +293,14 @@ macro_rules! dogstatd_err {
 #[cfg(feature = "prometheusd")]
 #[cfg(test)]
 mod tests{
+use std::any::Any;
+
 //TODO: remove this after tests
 //sorry, im too lazy to make proper tests for this
     use super::*;
     use prometheus::proto::Gauge;
 #[tokio::test]
 async fn test_prometheus_log() {
-    let gauge = metrics::describe_gauge!("1.0", "dummy gauge");
     let report = gather_metrics().unwrap();
     let expected = "prometheus_metrics";
     assert_eq!(report, expected);
