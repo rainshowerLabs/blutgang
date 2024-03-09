@@ -7,18 +7,24 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 
-
-
-
 use once_cell::sync::Lazy;
 use prometheus::Registry;
-use prometheus_metric_storage::StorageRegistry;
+use prometheus_metric_storage::{MetricStorage, StorageRegistry};
 
 //Some goofy Rust stuff
 static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
     let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
     StorageRegistry::new(registry)
 });
+
+#[derive(MetricStorage, Clone, Debug)]
+#[metric(subsystem = "rpc")]
+pub struct RpcMetrics {
+    #[metric(labels("path", "method", "status"), help = "Total number of requests")]
+    requests_complete: prometheus::IntCounterVec,
+    #[metric(labels("path", "method"), help = "Duration of requests")]
+    duration: prometheus::HistogramVec,
+}
 
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
@@ -30,16 +36,6 @@ pub fn log_journald(level: u32, message: &str) {
 pub fn log_statsd(tags: &[str], message: &str) {
     unimplemented!()
 }
-
-// #[cfg(feature = "prometheusd")]
-// pub fn log_prometheus(metric: &str) {
-//     use metrics_prometheus::Recorder;
-//     use prometheus::Gauge;
-//     let _metric = prometheus::Gauge::new(format!("{metric}"), "help").unwrap();
-//     let recorder = Recorder::builder()
-//         .with_metric(_metric.clone())
-//         .build_and_install();
-// }
 
 #[cfg(feature = "prometheusd")]
 pub fn get_storage_registry() -> &'static StorageRegistry {
@@ -66,17 +62,10 @@ pub fn gather_metrics() -> Result<serde_json::Value, serde_json::Error> {
     use prometheus::Gauge;
     use serde_json::*;
     let recorder = recorder_init().unwrap();
-    //TODO: abstract this
-    // recorder.register_metric(Gauge::new("dummy_gauge", "1.0").unwrap());
     let report = prometheus::TextEncoder::new().encode_to_string(&recorder.registry().gather());
-    //   let result = json!()
     let result = serde_json::Value::String(report.unwrap());
-
     log_info!("Prometheus metrics: {:?}", result);
     Ok(result)
-    // gather::gather(&prometheus::gather(), &mut buffer).unwrap();
-    // let output = String::from_utf8(buffer).unwrap();
-    // println!("{}", output);
 }
 
 //TODO: json format
@@ -86,64 +75,10 @@ pub fn format_metrics() {
     //    let type = report.get("TYPE").unwrap();
 }
 
-// #[cfg(feature = "prometheusd")]
-// use crate::config::error::ConfigError;
-// use prometheus::{proto::{Metric, MetricType, MetricFamily, LabelPair}, Encoder, Result};
-// use std::{collections::HashMap, io::Write};
 #[cfg(feature = "prometheusd")]
 pub fn encode_metrics() {
     let report = gather_metrics();
-
-    // let mut buffer = vec![];
-    // encoder.encode(&metric_families, &mut buffer).unwrap();
-    // let output = String::from_utf8(buffer).unwrap();
 }
-
-// #[cfg(feature = "prometheusd")]
-// #[derive(Debug, Default)]
-// pub struct JsonEncoder;
-// #[cfg(feature = "prometheusd")]
-// impl Encoder for JsonEncoder {
-//     fn encode<W: Write>(&self, metric_families: &[MetricFamily], writer: &mut W) -> Result<()> {
-//         let mut encoded : HashMap<String, f64> = HashMap::new();
-//         for metric_family in metric_families {
-//             let name = metric_family.get_name();
-//             let metric_type = metric_family.get_field_type();
-//             for metric in metric_family.get_metric() {
-//                 match metric_type {
-//                     MetricType::COUNTER => {
-//                 encoded.entry(metric).and_modify;
-//                 metric.get_counter().get_value();
-
-//                     },
-//                     MetricType::GAUGE => {
-//                 encoded.entry(name.to_string(), metric);
-//                 metric.get_gauge().get_value();
-
-//                     },
-//                     MetricType::HISTOGRAM => {
-//                         let histogram = metric.get_histogram();
-//                         encoded.insert(name.to_string(), histogram.get_sample_sum());
-//                     },
-//                     _ => {
-//                         eprintln!("Unsupported metric type: {:?}", metric_type);
-//                     },
-//                 }
-//             }
-//         }
-//         match serde_json::to_string(&encoded) {
-//             Ok(_) => {
-//                 writer.write_all(encoded.as_bytes())?;
-//             },
-//             Err(e) => eprintln!("Failed to encode metric as JSON! Error : {}", e.to_string())
-//         }
-//         Ok(())
-//     }
-
-//     fn format_type(&self) -> &str {
-//         "json"
-//     }
-// }
 
 #[cfg(feature = "dogstatd")]
 pub fn log_dogstatsd(tags: &[str], message: &str) {
