@@ -1,11 +1,9 @@
 use crate::rpc::error::RpcError;
+use crate::config::{system::{RpcMetrics, get_storage_registry, get_registry, encode}};
 use reqwest::Client;
 use url::Url;
 
-use serde_json::{
-    json,
-    Value,
-};
+use serde_json::{json, Value};
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
@@ -45,7 +43,7 @@ pub struct Rpc {
 // For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
 // as input, we output: https://eth-mainnet.g.alchemy.com/
 fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
-    let parsed_url = Url::parse(&url)?;
+    let parsed_url = Url::parse(url)?;
 
     // Build a new URL with the scheme, host, and port (if any), but without the path or query
     let sanitized = Url::parse(&format!(
@@ -112,9 +110,11 @@ impl Rpc {
 
     // Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
+        let path = self.url.clone();
+        let method = tx["method"].as_str().unwrap_or("unknown");
+        let start = std::time::Instant::now();        
         #[cfg(feature = "debug-verbose")]
         println!("Sending request: {}", tx.clone());
-
         let response = match self.client.post(&self.url).json(&tx).send().await {
             Ok(response) => response,
             Err(err) => {
@@ -123,7 +123,15 @@ impl Rpc {
                 ))
             }
         };
-
+        #[cfg(feature = "prometheusd")]
+        {
+        let metric = RpcMetrics::inst(get_storage_registry()).unwrap();   
+        let status = response.status().as_u16();
+        //RpcMetrics::requests_complete(&metric, &path, &method, &status, );
+        let a = response.text().await.unwrap();
+        //println!("prometheusd: {:?}", metric.clone());
+        return Ok(a);
+        }
         #[cfg(feature = "debug-verbose")]
         {
             let a = response.text().await.unwrap();
@@ -183,6 +191,8 @@ impl Rpc {
     // Update the latency of the last n calls.
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
+        #[cfg(feature = "prometheusd")]
+        let metric = RpcMetrics::inst(get_storage_registry()).unwrap();  
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
@@ -190,8 +200,14 @@ impl Rpc {
 
         // Update latency
         self.status.latency_data.push(latest);
-        self.status.latency =
-            self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
+        let avg = self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
+        self.status.latency = avg;
+        #[cfg(feature = "prometheusd")]
+        RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
+        #[cfg(feature = "prometheusd")]      
+        println!("prometheus metrics latency {}", encode(get_registry()));
+
+
     }
 }
 
