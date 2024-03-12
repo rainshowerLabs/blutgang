@@ -21,6 +21,7 @@ use tokio::sync::mpsc::{
 };
 //Some goofy Rust stuff
 // #[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
     let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
     StorageRegistry::new(registry)
@@ -50,6 +51,7 @@ pub struct RpcMetrics {
     #[metric(labels("path", "method"), help = "latency of rpc calls")]
     duration: prometheus::HistogramVec,
 }
+// #[cfg(feature = "prometheusd")]
 // #[cfg(feature = "prometheusd")]
 impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
@@ -83,9 +85,11 @@ pub fn log_journald(level: u32, message: &str) {
 }
 
 // #[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub fn get_storage_registry() -> &'static StorageRegistry {
     &METRICS_REGISTRY
 }
+// #[cfg(feature = "prometheusd")]
 // #[cfg(feature = "prometheusd")]
 pub fn get_registry() -> &'static Registry {
     get_storage_registry().registry()
@@ -171,8 +175,11 @@ macro_rules! prometheusd_latency {
             }
         }
         };
-
 }
+
+
+
+
 #[cfg(test)]
 mod tests {
 
@@ -188,4 +195,4 @@ mod tests {
         // assert_eq!(report, expected);
         unimplemented!();
     }
-}
+}        

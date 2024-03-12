@@ -2,7 +2,6 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
 use url::Url;
-use crate::config::system::{RpcMetrics, get_storage_registry, encode, get_registry};
 use serde_json::{
     json,
     Value,
@@ -46,6 +45,7 @@ pub struct Rpc {
 // For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
 // as input, we output: https://eth-mainnet.g.alchemy.com/
 fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
+    let parsed_url = Url::parse(url)?;
     let parsed_url = Url::parse(url)?;
 
     // Build a new URL with the scheme, host, and port (if any), but without the path or query
