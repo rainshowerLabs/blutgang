@@ -15,9 +15,12 @@ use prometheus_metric_storage::{
 };
 
 use std::time::Duration;
-use tokio::sync::mpsc::{
-    UnboundedReceiver,
-    UnboundedSender,
+use tokio::sync::{
+    mpsc::{
+        UnboundedReceiver,
+        UnboundedSender,
+    },
+    Notify,
 };
 //Some goofy Rust stuff
 // #[cfg(feature = "prometheusd")]
@@ -26,21 +29,37 @@ static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
     let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
     StorageRegistry::new(registry)
 });
+
 // Canidate for metrics storage
 // #[cfg(feature = "prometheusd")]
 type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
 // #[cfg(feature = "prometheusd")]
-type _MetricsRegistry = Lazy<StorageRegistry>;
-
-pub struct MetricSender {
-    pub sender: UnboundedSender<RpcMetrics>,
+type RegistryServer = Lazy<StorageRegistry>;
+type RegistryClient = Lazy<StorageRegistry>;
+pub type MetricSender = UnboundedSender<RpcMetrics>;
+pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
+struct RegistryChannel {
+    registry: Lazy<StorageRegistry>,
+    notify: Notify,
 }
 
-pub struct MetricReceiver {
-    pub receiver: UnboundedReceiver<RpcMetrics>,
-}
+//WIP for a session typed pattern
+// See: https://stanford-cs242.github.io/f19/lectures/09-1-session-types.html
+// pub trait HasDualMetrics {
+//     type DualMetrics;
+// }
+// impl HasDualMetrics for MetricSender {
+//     type DualMetrics = MetricReceiver;
+// }
+
+// impl HasDualMetrics for MetricReceiver {
+//     type DualMetrics = MetricSender;
+// }
+// Pub struct DualMetricsChannel <T: HasDualMetrics> {}
+// impl DualMetricsChannel<MetricSender> {}
+// impl DualMetricsChannel<MetricReceiver> {}
 
 // #[cfg(feature = "prometheusd")]
 #[derive(MetricStorage, Clone, Debug)]
@@ -93,6 +112,23 @@ pub fn get_storage_registry() -> &'static StorageRegistry {
 // #[cfg(feature = "prometheusd")]
 pub fn get_registry() -> &'static Registry {
     get_storage_registry().registry()
+}
+
+//TODO: should (Sender, Reciver) be wrapped in Result, Error?
+pub fn registry_channel() -> (MetricSender, MetricReceiver) {
+    let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
+        RegistryChannel {
+            registry: Lazy::new(|| {
+                let registry =
+                    Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+                        .unwrap();
+                StorageRegistry::new(registry)
+            }),
+            notify: Notify::new(),
+        }
+    });
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    (tx, rx)
 }
 
 #[macro_export]
@@ -177,9 +213,6 @@ macro_rules! prometheusd_latency {
         };
 }
 
-
-
-
 #[cfg(test)]
 mod tests {
 
@@ -195,4 +228,4 @@ mod tests {
         // assert_eq!(report, expected);
         unimplemented!();
     }
-}        
+}

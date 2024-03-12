@@ -1,12 +1,16 @@
 
-use crate::rpc::error::RpcError;
+use crate::{
+    rpc::error::RpcError,
+};
+use crate::log_info;
+use crate::config::system::{encode, get_registry, get_storage_registry,  registry_channel, RpcMetrics};
 use reqwest::Client;
-use url::Url;
 use serde_json::{
     json,
     Value,
 };
-
+use url::Url;
+ 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
 pub struct Status {
@@ -45,7 +49,7 @@ pub struct Rpc {
 // For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
 // as input, we output: https://eth-mainnet.g.alchemy.com/
 fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
-    let parsed_url = Url::parse(url)?;
+    let _parsed_url = Url::parse(url)?;
     let parsed_url = Url::parse(url)?;
 
     // Build a new URL with the scheme, host, and port (if any), but without the path or query
@@ -206,10 +210,11 @@ impl Rpc {
         let avg =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
+        //TODO: try this with channel
         #[cfg(feature = "prometheusd")]
         RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
         #[cfg(feature = "prometheusd")]
-        println!("prometheus metrics latency {}", encode(get_registry()));
+        log_info!("prometheus metrics latency {}", encode(get_registry()));
     }
 }
 
