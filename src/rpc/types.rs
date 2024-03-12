@@ -3,7 +3,7 @@ use crate::{
     rpc::error::RpcError,
 };
 use crate::log_info;
-use crate::config::system::{encode, get_registry, get_storage_registry,  registry_channel, RpcMetrics};
+use crate::config::system::{encode, get_registry, get_storage_registry,  RegistryChannel, RpcMetrics};
 use reqwest::Client;
 use serde_json::{
     json,

@@ -40,7 +40,7 @@ type RegistryServer = Lazy<StorageRegistry>;
 type RegistryClient = Lazy<StorageRegistry>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
-struct RegistryChannel {
+pub struct RegistryChannel {
     registry: Lazy<StorageRegistry>,
     notify: Notify,
 }
@@ -114,8 +114,15 @@ pub fn get_registry() -> &'static Registry {
     get_storage_registry().registry()
 }
 
-//TODO: should (Sender, Reciver) be wrapped in Result, Error?
-pub fn registry_channel() -> (MetricSender, MetricReceiver) {
+impl RegistryChannel {
+    pub fn registry(&self) -> &Lazy<StorageRegistry> {
+        &self.registry
+    }
+    pub fn notify(&self) -> &Notify {
+        &self.notify
+    }
+    //TODO: should (Sender, Reciver) be wrapped in Result, Error?
+    pub fn registry_channel() -> (MetricSender, MetricReceiver) {
     let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
         RegistryChannel {
             registry: Lazy::new(|| {
@@ -129,6 +136,16 @@ pub fn registry_channel() -> (MetricSender, MetricReceiver) {
     });
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
     (tx, rx)
+    }
+
+    pub fn encode_channel(&self) -> String {
+        use prometheus::Encoder;
+        let encoder = prometheus::TextEncoder::new();
+        let mut buffer = vec![];
+        encoder.encode(&self.registry.gather(), &mut buffer).unwrap();
+        String::from_utf8(buffer).unwrap()
+    }
+
 }
 
 #[macro_export]
