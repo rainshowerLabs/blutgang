@@ -1,16 +1,13 @@
-
-use crate::{
-    rpc::error::RpcError,
-};
+use crate::config::system::{encode, get_registry, get_storage_registry, RpcMetrics, RegistryChannel};
 use crate::log_info;
-use crate::config::system::{encode, get_registry, get_storage_registry,  RegistryChannel, RpcMetrics};
+use crate::rpc::error::RpcError;
 use reqwest::Client;
 use serde_json::{
     json,
     Value,
 };
 use url::Url;
- 
+
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
 pub struct Status {
@@ -117,9 +114,6 @@ impl Rpc {
 
     // Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
-        let _path = self.url.clone();
-        let _method = tx["method"].as_str().unwrap_or("unknown");
-        let _start = std::time::Instant::now();
         #[cfg(feature = "debug-verbose")]
         println!("Sending request: {}", tx.clone());
         let response = match self.client.post(&self.url).json(&tx).send().await {
@@ -130,15 +124,6 @@ impl Rpc {
                 ))
             }
         };
-        #[cfg(feature = "prometheusd")]
-        {
-            let metric = RpcMetrics::init(get_storage_registry()).unwrap();
-            let status = response.status().as_u16();
-            //RpcMetrics::requests_complete(&metric, &path, &method, &status, );
-            let a = response.text().await.unwrap();
-            //println!("prometheusd: {:?}", metric.clone());
-            return Ok(a);
-        }
         #[cfg(feature = "debug-verbose")]
         {
             let a = response.text().await.unwrap();

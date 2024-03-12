@@ -123,29 +123,30 @@ impl RegistryChannel {
     }
     //TODO: should (Sender, Reciver) be wrapped in Result, Error?
     pub fn registry_channel() -> (MetricSender, MetricReceiver) {
-    let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
-        RegistryChannel {
-            registry: Lazy::new(|| {
-                let registry =
-                    Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-                        .unwrap();
-                StorageRegistry::new(registry)
-            }),
-            notify: Notify::new(),
-        }
-    });
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    (tx, rx)
+        let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
+            RegistryChannel {
+                registry: Lazy::new(|| {
+                    let registry =
+                        Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+                            .unwrap();
+                    StorageRegistry::new(registry)
+                }),
+                notify: Notify::new(),
+            }
+        });
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        (tx, rx)
     }
 
     pub fn encode_channel(&self) -> String {
         use prometheus::Encoder;
         let encoder = prometheus::TextEncoder::new();
         let mut buffer = vec![];
-        encoder.encode(&self.registry.gather(), &mut buffer).unwrap();
+        encoder
+            .encode(&self.registry.gather(), &mut buffer)
+            .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-
 }
 
 #[macro_export]
