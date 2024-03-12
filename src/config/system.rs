@@ -6,18 +6,41 @@ pub const MAGIC: u32 = 0xb153;
 // Version consts, dont impact functionality
 pub const VERSION_STR: &str = "Blutgang 0.3.2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
-
+use atomic_refcell::AtomicRefCell;
 use once_cell::sync::Lazy;
 use prometheus::Registry;
-use prometheus_metric_storage::{MetricStorage, StorageRegistry};
-use std::time::Duration;
+use prometheus_metric_storage::{
+    MetricStorage,
+    StorageRegistry,
+};
 
+use std::time::Duration;
+use tokio::sync::mpsc::{
+    UnboundedReceiver,
+    UnboundedSender,
+};
 //Some goofy Rust stuff
 // #[cfg(feature = "prometheusd")]
 static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
     let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
     StorageRegistry::new(registry)
 });
+// Canidate for metrics storage
+// #[cfg(feature = "prometheusd")]
+type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
+
+//Canidate for metrics storage
+// #[cfg(feature = "prometheusd")]
+type _MetricsRegistry = Lazy<StorageRegistry>;
+
+pub struct MetricSender {
+    pub sender: UnboundedSender<RpcMetrics>,
+}
+
+pub struct MetricReceiver {
+    pub receiver: UnboundedReceiver<RpcMetrics>,
+}
+
 // #[cfg(feature = "prometheusd")]
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
@@ -29,7 +52,7 @@ pub struct RpcMetrics {
 }
 // #[cfg(feature = "prometheusd")]
 impl RpcMetrics {
-    pub fn inst(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
+    pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
     }
     pub fn requests_complete(&self, path: &str, method: &str, status: &u16, duration: Duration) {

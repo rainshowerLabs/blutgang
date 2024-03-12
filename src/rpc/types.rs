@@ -1,9 +1,12 @@
+
 use crate::rpc::error::RpcError;
-use crate::config::system::{encode, get_registry, get_storage_registry, RpcMetrics};
 use reqwest::Client;
 use url::Url;
-
-use serde_json::{json, Value};
+use crate::config::system::{RpcMetrics, get_storage_registry, encode, get_registry};
+use serde_json::{
+    json,
+    Value,
+};
 
 // All as floats so we have an easier time getting averages, stats and terminology copied from flood.
 #[derive(Debug, Clone, Default)]
@@ -125,7 +128,7 @@ impl Rpc {
         };
         #[cfg(feature = "prometheusd")]
         {
-            let metric = RpcMetrics::inst(get_storage_registry()).unwrap();
+            let metric = RpcMetrics::init(get_storage_registry()).unwrap();
             let status = response.status().as_u16();
             //RpcMetrics::requests_complete(&metric, &path, &method, &status, );
             let a = response.text().await.unwrap();
@@ -192,7 +195,7 @@ impl Rpc {
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
         #[cfg(feature = "prometheusd")]
-        let metric = RpcMetrics::inst(get_storage_registry()).unwrap();
+        let metric = RpcMetrics::init(get_storage_registry()).unwrap();
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
