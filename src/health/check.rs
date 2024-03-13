@@ -261,10 +261,14 @@ fn escape_poverty(
 
     //todo: i dont like this but its whatever
     let to_send;
-    if poverty_list_guard.is_empty() {
+    let is_pov_empty = poverty_list_guard.is_empty();
+    let is_rpc_empty = rpc_list_guard.is_empty();
+    if !is_rpc_empty && is_pov_empty {
         to_send = LiveReadyUpdate::Health(HealthState::Healthy);
-    } else if !poverty_list_guard.is_empty() && !rpc_list_guard.is_empty() {
+    } else if !is_pov_empty && !is_rpc_empty {
         to_send = LiveReadyUpdate::Health(HealthState::MissingRpcs);
+    } else if is_rpc_empty {
+        to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
     } else {
         to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
     }
