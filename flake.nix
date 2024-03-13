@@ -44,6 +44,7 @@
             openssl
             systemd
             clang
+            gdb
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
