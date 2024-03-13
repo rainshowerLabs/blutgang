@@ -1,4 +1,12 @@
-use crate::config::system::{encode, get_registry, get_storage_registry, RpcMetrics, RegistryChannel};
+use crate::config::system::{
+    encode,
+    get_registry,
+    get_storage_registry,
+    MetricReceiver,
+    MetricSender,
+    RegistryChannel,
+    RpcMetrics,
+};
 use crate::log_info;
 use crate::rpc::error::RpcError;
 use reqwest::Client;
@@ -196,6 +204,10 @@ impl Rpc {
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
         //TODO: try this with channel
+        // #[cfg(feature = "prometheusd")]
+        // let (mut rx, mut tx) = RegistryChannel::registry_channel();
+        // #[cfg(feature = "prometheusd")]
+        // RegistryChannel::push_metrics(rx, tx);
         #[cfg(feature = "prometheusd")]
         RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
         #[cfg(feature = "prometheusd")]

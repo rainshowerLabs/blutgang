@@ -40,6 +40,7 @@ type RegistryServer = Lazy<StorageRegistry>;
 type RegistryClient = Lazy<StorageRegistry>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
+
 pub struct RegistryChannel {
     registry: Lazy<StorageRegistry>,
     notify: Notify,
@@ -104,17 +105,51 @@ pub fn log_journald(level: u32, message: &str) {
 }
 
 // #[cfg(feature = "prometheusd")]
-// #[cfg(feature = "prometheusd")]
 pub fn get_storage_registry() -> &'static StorageRegistry {
     &METRICS_REGISTRY
 }
-// #[cfg(feature = "prometheusd")]
 // #[cfg(feature = "prometheusd")]
 pub fn get_registry() -> &'static Registry {
     get_storage_registry().registry()
 }
 
+// #[cfg(feature = "prometheusd")]
+pub struct RpcMetricsReciever {
+    inner: UnboundedReceiver<RpcMetrics>,
+    name: &'static str,
+    metrics: Option<RpcMetrics>,
+}
+// #[cfg(feature = "prometheusd")]
+impl std::fmt::Debug for RpcMetricsReciever {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RpcMetricsReciever").finish()
+    }
+}
+// #[cfg(feature = "prometheusd")]
+pub struct RpcMetricsSender {
+    inner: UnboundedSender<RpcMetrics>,
+    name: &'static str,
+    metrics: Option<RpcMetrics>,
+}
+// #[cfg(feature = "prometheusd")]
+impl std::fmt::Debug for RpcMetricsSender {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("RpcMetricsSender").finish()
+    }
+}
+
+// #[cfg(feature = "prometheusd")]
 impl RegistryChannel {
+    // pub fn new() -> Self {
+    //     let registry = Lazy::new(|| {
+    //         let registry = Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+    //             .unwrap();
+    //         StorageRegistry::new(registry)
+    //     });
+    //     let notify = Notify::new();
+    //     RegistryChannel { registry, notify }
+    // }
+
     pub fn registry(&self) -> &Lazy<StorageRegistry> {
         &self.registry
     }
@@ -122,19 +157,30 @@ impl RegistryChannel {
         &self.notify
     }
     //TODO: should (Sender, Reciver) be wrapped in Result, Error?
-    pub fn registry_channel() -> (MetricSender, MetricReceiver) {
-        let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
-            RegistryChannel {
-                registry: Lazy::new(|| {
-                    let registry =
-                        Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-                            .unwrap();
-                    StorageRegistry::new(registry)
-                }),
-                notify: Notify::new(),
-            }
-        });
+    pub fn channel(name: &'static str) -> (RpcMetricsSender, RpcMetricsReciever) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        //TODO: Move registry init to somewhere else
+        // let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
+        //     RegistryChannel {
+        //         registry: Lazy::new(|| {
+        //             let registry =
+        //                 Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+        //                     .unwrap();
+        //             StorageRegistry::new(registry)
+        //         }),
+        //         notify: Notify::new(),
+        //     }
+        // });
+        let tx = RpcMetricsSender {
+            inner: tx,
+            name,
+            metrics: None,
+        };
+        let rx = RpcMetricsReciever {
+            inner: rx,
+            name,
+            metrics: None,
+        };
         (tx, rx)
     }
 
@@ -146,6 +192,19 @@ impl RegistryChannel {
             .encode(&self.registry.gather(), &mut buffer)
             .unwrap();
         String::from_utf8(buffer).unwrap()
+    }
+
+    pub fn push_metrics(
+        &self,
+        rx: MetricReceiver,
+        tx: MetricSender,
+        path: &str,
+        method: &str,
+        dt: f64,
+    ) {
+        let mut registry = self.registry();
+
+        self.notify.notify_one();
     }
 }
 
@@ -212,24 +271,25 @@ macro_rules! log_err {
     };
 }
 
-#[macro_export]
-macro_rules! prometheusd_latency {
-        ($fmt:expr, $($arg:tt)*) => {
-        let rpc_path = format!($fmt, $($arg)*);
-        // #[cfg(feature = "prometheusd")]
-        {
-            use $crate::config::system::RpcMetrics;
-            use $crate::config::system::get_storage_registry;
-            let registry = get_storage_registry();
-            let metric = RpcMetrics::inst(registry).unwrap();
-            let start = std::time::Instant::now();
-            move |status: u16| {
-                let duration = start.elapsed();
-                metric.requests_complete(duration);
-            }
-        }
-        };
-}
+//WIP: macros
+// #[macro_export]
+// macro_rules! prometheusd_latency {
+//         ($fmt:expr, $($arg:tt)*) => {
+//         let rpc_path = format!($fmt, $($arg)*);
+//         // #[cfg(feature = "prometheusd")]
+//         {
+//             use $crate::config::system::RpcMetrics;
+//             use $crate::config::system::get_storage_registry;
+//             let registry = get_storage_registry();
+//             let metric = RpcMetrics::inst(registry).unwrap();
+//             let start = std::time::Instant::now();
+//             move |status: u16| {
+//                 let duration = start.elapsed();
+//                 metric.requests_complete(duration);
+//             }
+//         }
+//         };
+// }
 
 #[cfg(test)]
 mod tests {
