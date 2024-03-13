@@ -130,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
     let finalized_rx_arc = Arc::new(finalized_rx.clone());
-    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let rpc_poverty_list = Arc::new(RwLock::new(config.read().unwrap().poverty_list.clone()));
 
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);

@@ -549,6 +549,7 @@ impl Settings {
 
         Settings {
             rpc_list,
+            poverty_list: Vec::new(),
             is_ws: false,
             do_clear: clear,
             address,
