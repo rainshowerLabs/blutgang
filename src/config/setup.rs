@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 #[derive(Debug)]
 enum StartingLatencyResp {
     Ok(Rpc),
-    Error(ConfigError),
+    Error(Rpc, ConfigError),
 }
 
 // Get the average latency for a RPC
@@ -25,7 +25,7 @@ async fn set_starting_latency(
         match rpc.block_number().await {
             Ok(_) => {}
             Err(e) => {
-                tx.send(StartingLatencyResp::Error(e.into())).await?;
+                tx.send(StartingLatencyResp::Error(rpc, e.into())).await?;
                 return Err(ConfigError::RpcError(
                     "Error awaiting block_number!".to_string(),
                 ));
@@ -49,12 +49,13 @@ async fn set_starting_latency(
 // Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
 pub async fn sort_by_latency(
     mut rpc_list: Vec<Rpc>,
+    mut poverty_list: Vec<Rpc>,
     ma_length: f64,
-) -> Result<Vec<Rpc>, ConfigError> {
+) -> Result<(Vec<Rpc>, Vec<Rpc>), ConfigError> {
     // Return empty vec if we dont supply any RPCs
     if rpc_list.is_empty() {
         log_err!("No RPCs supplied!");
-        return Ok(Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     }
 
     let (tx, mut rx) = mpsc::channel(rpc_list.len());
@@ -75,8 +76,9 @@ pub async fn sort_by_latency(
     while let Some(rpc) = rx.recv().await {
         let rpc = match rpc {
             StartingLatencyResp::Ok(rax) => rax,
-            StartingLatencyResp::Error(e) => {
-                log_err!("{}", e);
+            StartingLatencyResp::Error(rax, e) => {
+                log_err!("Adding to poverty list: {}", e);
+                poverty_list.push(rax);
                 continue;
             }
         };
@@ -86,7 +88,7 @@ pub async fn sort_by_latency(
     // Sort the RPCs by latency
     sorted_rpc_list.sort_by(|a, b| a.status.latency.partial_cmp(&b.status.latency).unwrap());
 
-    Ok(sorted_rpc_list)
+    Ok((sorted_rpc_list, poverty_list))
 }
 
 // #[cfg(test)]

@@ -59,6 +59,7 @@ impl Debug for AdminSettings {
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
+    pub poverty_list: Vec<Rpc>,
     pub is_ws: bool,
     pub do_clear: bool,
     pub address: SocketAddr,
@@ -76,6 +77,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rpc_list: Vec::new(),
+            poverty_list: Vec::new(),
             is_ws: true,
             do_clear: false,
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
@@ -386,9 +388,10 @@ impl Settings {
             }
         };
 
+        let mut poverty_list = Vec::new();
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            rpc_list = match sort_by_latency(rpc_list, ma_length).await {
+            (rpc_list, poverty_list) = match sort_by_latency(rpc_list, poverty_list, ma_length).await {
                 Ok(rax) => rax,
                 Err(e) => {
                     panic!("{:?}", e);
@@ -398,6 +401,7 @@ impl Settings {
 
         Settings {
             rpc_list,
+            poverty_list,
             is_ws,
             do_clear,
             address,
