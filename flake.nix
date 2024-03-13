@@ -43,6 +43,7 @@
             pkg-config
             openssl
             systemd
+            clang
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
