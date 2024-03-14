@@ -12,7 +12,7 @@ ma_length = 100
 sort_on_startup = true
 # Enable health checking
 health_check = true
-# Enable header checking
+# Enable content type header checking
 header_check = true
 # Acceptable time to wait for a response in ms
 ttl = 30

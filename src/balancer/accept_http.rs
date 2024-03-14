@@ -284,8 +284,10 @@ async fn forward_body(
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
 ) {
+    // Check if body has application/json
+    //
+    // Can be toggled via the config. Should be on if we want blutgang to be JSON-RPC compliant.
     if params.header_check {
-        // Check if body has application/json
         if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
             return (
                 Ok(hyper::Response::builder()
