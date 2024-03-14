@@ -7,14 +7,17 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use once_cell::sync::Lazy;
 use prometheus::Registry;
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
+use simd_json::Object;
 
 use std::time::Duration;
+use std::collections::hash_map::HashMap;
 use tokio::sync::{
     mpsc::{
         UnboundedReceiver,
@@ -38,8 +41,8 @@ type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 // #[cfg(feature = "prometheusd")]
 type RegistryServer = Lazy<StorageRegistry>;
 type RegistryClient = Lazy<StorageRegistry>;
-pub type MetricSender = UnboundedSender<RpcMetrics>;
-pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
+pub type MetricSender = Sender<RpcMetrics>;
+pub type MetricReceiver = Receiver<RpcMetrics>;
 
 pub struct RegistryChannel {
     registry: Lazy<StorageRegistry>,
@@ -63,7 +66,7 @@ pub struct RegistryChannel {
 // impl DualMetricsChannel<MetricReceiver> {}
 
 // #[cfg(feature = "prometheusd")]
-#[derive(MetricStorage, Clone, Debug)]
+#[derive(MetricStorage, Clone, )]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
@@ -87,6 +90,7 @@ impl RpcMetrics {
     pub fn push_latency(&self, path: &str, method: &str, dt: f64) {
         self.duration.with_label_values(&[path, method]).observe(dt)
     }
+
 }
 
 //  #[cfg(feature = "prometheusd")]
@@ -97,6 +101,35 @@ pub fn encode(registry: &prometheus::Registry) -> String {
     encoder.encode(&registry.gather(), &mut buffer).unwrap();
     String::from_utf8(buffer).unwrap()
 }
+
+// pub fn parse_metrics(report: String) -> String {
+//         let mut latency_buffer : HashMap<String, u32> = HashMap::new();
+//         let mut method = String::new();
+//         let mut path = String::new();
+//         let mut sum = 0.0;
+//         let mut count = 0;
+//         for line in report.lines() {
+//             let parts: Vec<_> = line.split_whitespace().collect();
+//             if parts.len() == 4 {
+//                 let latency_edge = parts[2].split(',').find(|&x| x.starts_with("le=")).unwrap_or("");
+//                 let le_value = latency_edge.trim_start_matches("le=\"").trim_end_matches('"');
+//                 let count_value: u32 = parts[3].parse().unwrap_or(0);
+//                 if method.is_empty() && path.is_empty() {
+//                     let method_part = parts[2].split(',').find(|&x| x.starts_with("method=")).unwrap_or("");
+//                     method = method_part.trim_start_matches("method=\"").trim_end_matches('"').to_string();
+//                     let path_part = parts[2].split(',').find(|&x| x.starts_with("path=")).unwrap_or("");
+//                     path = path_part.trim_start_matches("path=\"").trim_end_matches('"').to_string();
+//                 }
+//                 latency_buffer.insert(le_value.to_string(), count_value);
+//             } else if line.starts_with("blutgang_rpc_duration_sum") {
+//             sum = line.split_whitespace().last().unwrap().parse().unwrap_or(0.0);
+//             } else if line.starts_with("blutgang_rpc_duration_count") {
+//                 count = line.split_whitespace().last().unwrap().parse().unwrap_or(0);
+//                             }
+//         }
+//         let parsed_metrics = String::from("path: ") + &path + ", method: " + &method + ", latency sum: " + &sum.to_string() + ", count: " + &count.to_string() + ", latency edge: " + latency_buffer.)
+// }
+
 
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
@@ -115,7 +148,7 @@ pub fn get_registry() -> &'static Registry {
 
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
-    inner: UnboundedReceiver<RpcMetrics>,
+    inner: Receiver<RpcMetrics>,
     name: &'static str,
     metrics: Option<RpcMetrics>,
 }
@@ -127,7 +160,7 @@ impl std::fmt::Debug for RpcMetricsReciever {
 }
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsSender {
-    inner: UnboundedSender<RpcMetrics>,
+    inner: Sender<RpcMetrics>,
     name: &'static str,
     metrics: Option<RpcMetrics>,
 }
@@ -140,37 +173,33 @@ impl std::fmt::Debug for RpcMetricsSender {
 
 // #[cfg(feature = "prometheusd")]
 impl RegistryChannel {
-    // pub fn new() -> Self {
-    //     let registry = Lazy::new(|| {
-    //         let registry = Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-    //             .unwrap();
-    //         StorageRegistry::new(registry)
-    //     });
-    //     let notify = Notify::new();
-    //     RegistryChannel { registry, notify }
-    // }
+    pub fn new() -> Self {                          
+            RegistryChannel {
+                registry: Lazy::new(|| {
+                    let registry =
+                        Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+                            .unwrap();
+                    StorageRegistry::new(registry)
+                }),
+                notify: Notify::new(),
+            }
+        }
 
-    pub fn registry(&self) -> &Lazy<StorageRegistry> {
+
+    pub fn get_storage_registry(&self) -> &Lazy<StorageRegistry> {
         &self.registry
+    }
+
+    pub fn get_registry(&self) -> &Registry {
+        &self.get_storage_registry().registry()                    
     }
     pub fn notify(&self) -> &Notify {
         &self.notify
     }
     //TODO: should (Sender, Reciver) be wrapped in Result, Error?
+    //TODO: compare crossbeam_channel to mpsc 
     pub fn channel(name: &'static str) -> (RpcMetricsSender, RpcMetricsReciever) {
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        //TODO: Move registry init to somewhere else
-        // let _ch: Lazy<RegistryChannel> = Lazy::new(|| {
-        //     RegistryChannel {
-        //         registry: Lazy::new(|| {
-        //             let registry =
-        //                 Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-        //                     .unwrap();
-        //             StorageRegistry::new(registry)
-        //         }),
-        //         notify: Notify::new(),
-        //     }
-        // });
+        let (tx, rx) = unbounded();
         let tx = RpcMetricsSender {
             inner: tx,
             name,
@@ -193,19 +222,22 @@ impl RegistryChannel {
             .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-
-    pub fn push_metrics(
-        &self,
-        rx: MetricReceiver,
-        tx: MetricSender,
+        pub fn push_metrics(
+        metric: RpcMetrics,
         path: &str,
         method: &str,
         dt: f64,
+        mut rx: RpcMetricsReciever,
+        tx: RpcMetricsSender,
     ) {
-        let mut registry = self.registry();
-
-        self.notify.notify_one();
+            let send = tx.inner.send(metric);
+            let recv = rx.inner.recv();
+            if let Ok(_) = send {
+                rx.metrics = Some(recv.unwrap());
+                rx.metrics.unwrap().push_latency(path, method, dt);
+            }
     }
+
 }
 
 #[macro_export]

@@ -193,6 +193,10 @@ impl Rpc {
     pub fn update_latency(&mut self, latest: f64) {
         #[cfg(feature = "prometheusd")]
         let metric = RpcMetrics::init(get_storage_registry()).unwrap();
+        #[cfg(feature = "prometheusd")]
+        let metric_channel = RegistryChannel::new();
+        #[cfg(feature = "prometheusd")]
+        let (mut tx, mut rx) = RegistryChannel::channel("prometheus latency demo");
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
@@ -203,15 +207,15 @@ impl Rpc {
         let avg =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
-        //TODO: try this with channel
-        // #[cfg(feature = "prometheusd")]
-        // let (mut rx, mut tx) = RegistryChannel::registry_channel();
-        // #[cfg(feature = "prometheusd")]
-        // RegistryChannel::push_metrics(rx, tx);
         #[cfg(feature = "prometheusd")]
-        RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
+        RegistryChannel::push_metrics(metric.clone(), &self.url, &self.name, avg, rx, tx, );
+        // Non-channel version
+        // #[cfg(feature = "prometheusd")]
+        // RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
         #[cfg(feature = "prometheusd")]
-        log_info!("prometheus metrics latency {}", encode(get_registry()));
+        let report = RegistryChannel::encode_channel(&metric_channel);
+        #[cfg(feature = "prometheusd")]
+        log_info!("Prometheus metrics: {}", report);            
     }
 }
 
