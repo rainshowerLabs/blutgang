@@ -59,10 +59,12 @@ impl Debug for AdminSettings {
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub rpc_list: Vec<Rpc>,
+    pub poverty_list: Vec<Rpc>,
     pub is_ws: bool,
     pub do_clear: bool,
     pub address: SocketAddr,
     pub health_check: bool,
+    pub header_check: bool,
     pub ttl: u128,
     pub expected_block_time: u64,
     pub supress_rpc_check: bool,
@@ -76,10 +78,12 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             rpc_list: Vec::new(),
+            poverty_list: Vec::new(),
             is_ws: true,
             do_clear: false,
             address: "127.0.0.1:3000".parse::<SocketAddr>().unwrap(),
             health_check: false,
+            header_check: true,
             ttl: 1000,
             expected_block_time: 12500,
             supress_rpc_check: true,
@@ -167,6 +171,11 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing health_check toggle!")
             .as_bool()
             .expect("\x1b[31mErr:\x1b[0m Could not parse health_check as bool!");
+        let header_check = blutgang_table
+            .get("header_check")
+            .expect("\x1b[31mErr:\x1b[0m Missing header_check toggle!")
+            .as_bool()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse header_check as bool!");
         let ttl = blutgang_table
             .get("ttl")
             .expect("\x1b[31mErr:\x1b[0m Missing ttl!")
@@ -386,9 +395,10 @@ impl Settings {
             }
         };
 
+        let mut poverty_list = Vec::new();
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            rpc_list = match sort_by_latency(rpc_list, ma_length).await {
+            (rpc_list, poverty_list) = match sort_by_latency(rpc_list, poverty_list, ma_length).await {
                 Ok(rax) => rax,
                 Err(e) => {
                     panic!("{:?}", e);
@@ -398,10 +408,12 @@ impl Settings {
 
         Settings {
             rpc_list,
+            poverty_list,
             is_ws,
             do_clear,
             address,
             health_check,
+            header_check,
             ttl,
             expected_block_time,
             max_retries,
@@ -490,6 +502,7 @@ impl Settings {
             .flush_every_ms(Some(flush_every_ms));
 
         let health_check = matches.get_occurrences::<String>("health_check").is_some();
+        let header_check = matches.get_occurrences::<String>("header_check").is_some();
 
         let ttl = matches
             .get_one::<String>("ttl")
@@ -545,10 +558,12 @@ impl Settings {
 
         Settings {
             rpc_list,
+            poverty_list: Vec::new(),
             is_ws: false,
             do_clear: clear,
             address,
             health_check,
+            header_check,
             ttl,
             supress_rpc_check,
             expected_block_time,

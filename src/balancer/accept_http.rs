@@ -114,6 +114,7 @@ impl ConnectionParams {
 struct RequestParams {
     ttl: u128,
     max_retries: u32,
+    header_check: bool,
 }
 
 #[derive(Debug)]
@@ -284,14 +285,18 @@ async fn forward_body(
     Option<usize>,
 ) {
     // Check if body has application/json
-    if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
-        return (
-            Ok(hyper::Response::builder()
-                .status(400)
-                .body(Full::new(Bytes::from("Improper content-type header")))
-                .unwrap()),
-            None,
-        );
+    //
+    // Can be toggled via the config. Should be on if we want blutgang to be JSON-RPC compliant.
+    if params.header_check {
+        if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
+            return (
+                Ok(hyper::Response::builder()
+                    .status(400)
+                    .body(Full::new(Bytes::from("Improper content-type header")))
+                    .unwrap()),
+                None,
+            );
+        }
     }
 
     // Convert incoming body to serde value
@@ -421,6 +426,7 @@ pub async fn accept_request(
         RequestParams {
             ttl: config_guard.ttl,
             max_retries: config_guard.max_retries,
+            header_check: config_guard.header_check,
         }
     };
 
