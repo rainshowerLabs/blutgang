@@ -433,7 +433,7 @@ pub async fn accept_request(
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    let (response, rpc_position) = forward_body(
+    (response, rpc_position) = forward_body(
         tx,
         &connection_params.rpc_list_rwlock,
         &connection_params.channels.finalized_rx,
