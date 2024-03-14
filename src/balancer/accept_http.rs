@@ -10,13 +10,26 @@ use crate::{
             CacheArgs,
         },
         selection::select::pick,
-    }, cache_error, config, log_err, log_info, log_wrn, no_rpc_available, print_cache_error, rpc::types::Rpc, rpc_response, timed_out, websocket::{
+    },
+    cache_error,
+    log_err,
+    log_info,
+    log_wrn,
+    no_rpc_available,
+    print_cache_error,
+    rpc::types::Rpc,
+    rpc_response,
+    timed_out,
+    websocket::{
         server::serve_websocket,
         types::{
             IncomingResponse,
             SubscriptionData,
         },
-    }, NamedBlocknumbers, Settings, WsconnMessage
+    },
+    NamedBlocknumbers,
+    Settings,
+    WsconnMessage,
 };
 
 use tokio::sync::{
@@ -101,6 +114,7 @@ impl ConnectionParams {
 struct RequestParams {
     ttl: u128,
     max_retries: u32,
+    header_check: bool,
 }
 
 #[derive(Debug)]
@@ -266,12 +280,11 @@ async fn forward_body(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     cache: Arc<Db>,
     params: RequestParams,
-    config: &Arc<RwLock<Settings>>
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
 ) {
-    if config.read().unwrap().header_check {
+    if params.header_check {
         // Check if body has application/json
         if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
             return (
@@ -411,6 +424,7 @@ pub async fn accept_request(
         RequestParams {
             ttl: config_guard.ttl,
             max_retries: config_guard.max_retries,
+            header_check: config_guard.header_check,
         }
     };
 
@@ -427,7 +441,6 @@ pub async fn accept_request(
         &connection_params.head_cache,
         connection_params.cache,
         params,
-        &connection_params.config,
     )
     .await;
     let time = time.elapsed();
