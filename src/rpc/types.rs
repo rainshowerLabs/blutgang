@@ -208,14 +208,14 @@ impl Rpc {
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
         #[cfg(feature = "prometheusd")]
-        RegistryChannel::push_metrics(metric.clone(), &self.url, &self.name, avg, rx, tx, );
+        RegistryChannel::push_metrics(metric.clone(), &self.url, &self.name, avg, rx, tx);
         // Non-channel version
         // #[cfg(feature = "prometheusd")]
         // RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
         #[cfg(feature = "prometheusd")]
         let report = RegistryChannel::encode_channel(&metric_channel);
         #[cfg(feature = "prometheusd")]
-        log_info!("Prometheus metrics: {}", report);            
+        log_info!("Prometheus metrics: {}", report);
     }
 }
 

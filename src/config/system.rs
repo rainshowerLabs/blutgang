@@ -7,7 +7,11 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.2 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{
+    unbounded,
+    Receiver,
+    Sender,
+};
 use once_cell::sync::Lazy;
 use prometheus::Registry;
 use prometheus_metric_storage::{
@@ -16,8 +20,8 @@ use prometheus_metric_storage::{
 };
 use simd_json::Object;
 
-use std::time::Duration;
 use std::collections::hash_map::HashMap;
+use std::time::Duration;
 use tokio::sync::{
     mpsc::{
         UnboundedReceiver,
@@ -66,7 +70,7 @@ pub struct RegistryChannel {
 // impl DualMetricsChannel<MetricReceiver> {}
 
 // #[cfg(feature = "prometheusd")]
-#[derive(MetricStorage, Clone, )]
+#[derive(MetricStorage, Clone)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
@@ -90,7 +94,6 @@ impl RpcMetrics {
     pub fn push_latency(&self, path: &str, method: &str, dt: f64) {
         self.duration.with_label_values(&[path, method]).observe(dt)
     }
-
 }
 
 //  #[cfg(feature = "prometheusd")]
@@ -129,7 +132,6 @@ pub fn encode(registry: &prometheus::Registry) -> String {
 //         }
 //         let parsed_metrics = String::from("path: ") + &path + ", method: " + &method + ", latency sum: " + &sum.to_string() + ", count: " + &count.to_string() + ", latency edge: " + latency_buffer.)
 // }
-
 
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
@@ -173,31 +175,30 @@ impl std::fmt::Debug for RpcMetricsSender {
 
 // #[cfg(feature = "prometheusd")]
 impl RegistryChannel {
-    pub fn new() -> Self {                          
-            RegistryChannel {
-                registry: Lazy::new(|| {
-                    let registry =
-                        Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-                            .unwrap();
-                    StorageRegistry::new(registry)
-                }),
-                notify: Notify::new(),
-            }
+    pub fn new() -> Self {
+        RegistryChannel {
+            registry: Lazy::new(|| {
+                let registry =
+                    Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
+                        .unwrap();
+                StorageRegistry::new(registry)
+            }),
+            notify: Notify::new(),
         }
-
+    }
 
     pub fn get_storage_registry(&self) -> &Lazy<StorageRegistry> {
         &self.registry
     }
 
     pub fn get_registry(&self) -> &Registry {
-        &self.get_storage_registry().registry()                    
+        &self.get_storage_registry().registry()
     }
     pub fn notify(&self) -> &Notify {
         &self.notify
     }
     //TODO: should (Sender, Reciver) be wrapped in Result, Error?
-    //TODO: compare crossbeam_channel to mpsc 
+    //TODO: compare crossbeam_channel to mpsc
     pub fn channel(name: &'static str) -> (RpcMetricsSender, RpcMetricsReciever) {
         let (tx, rx) = unbounded();
         let tx = RpcMetricsSender {
@@ -222,7 +223,7 @@ impl RegistryChannel {
             .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-        pub fn push_metrics(
+    pub fn push_metrics(
         metric: RpcMetrics,
         path: &str,
         method: &str,
@@ -230,14 +231,13 @@ impl RegistryChannel {
         mut rx: RpcMetricsReciever,
         tx: RpcMetricsSender,
     ) {
-            let send = tx.inner.send(metric);
-            let recv = rx.inner.recv();
-            if let Ok(_) = send {
-                rx.metrics = Some(recv.unwrap());
-                rx.metrics.unwrap().push_latency(path, method, dt);
-            }
+        let send = tx.inner.send(metric);
+        let recv = rx.inner.recv();
+        if let Ok(_) = send {
+            rx.metrics = Some(recv.unwrap());
+            rx.metrics.unwrap().push_latency(path, method, dt);
+        }
     }
-
 }
 
 #[macro_export]
