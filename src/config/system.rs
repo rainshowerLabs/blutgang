@@ -27,7 +27,7 @@ macro_rules! log_info {
     ($fmt:expr) => {
         #[cfg(feature = "journald")]
         {
-            use crate::config::system::log_journald;
+            use $crate::config::system::log_journald;
             log_journald(6, $fmt);
         }
         println!(concat!("\x1b[35mInfo:\x1b[0m ", $fmt))
@@ -48,7 +48,7 @@ macro_rules! log_wrn {
     ($fmt:expr) => {
         #[cfg(feature = "journald")]
         {
-            use crate::config::system::log_journald;
+            use $crate::config::system::log_journald;
             log_journald(4, $fmt);
         }
         println!(concat!("\x1b[93mWrn:\x1b[0m ", $fmt))
@@ -69,7 +69,7 @@ macro_rules! log_err {
     ($fmt:expr) => {
         #[cfg(feature = "journald")]
         {
-            use crate::config::system::log_journald;
+            use $crate::config::system::log_journald;
             log_journald(3, $fmt);
         }
         println!(concat!("\x1b[31mErr:\x1b[0m ", $fmt))
