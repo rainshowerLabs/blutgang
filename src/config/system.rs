@@ -94,13 +94,13 @@ impl RpcMetrics {
 }
 
 //  #[cfg(feature = "prometheusd")]
-pub fn encode(registry: &prometheus::Registry) -> String {
-    use prometheus::Encoder;
-    let encoder = prometheus::TextEncoder::new();
-    let mut buffer = vec![];
-    encoder.encode(&registry.gather(), &mut buffer).unwrap();
-    String::from_utf8(buffer).unwrap()
-}
+// pub fn encode(registry: &prometheus::Registry) -> String {
+//     use prometheus::Encoder;
+//     let encoder = prometheus::TextEncoder::new();
+//     let mut buffer = vec![];
+//     encoder.encode(&registry.gather(), &mut buffer).unwrap();
+//     String::from_utf8(buffer).unwrap()
+// }
 
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
@@ -109,13 +109,13 @@ pub fn log_journald(level: u32, message: &str) {
 }
 
 // #[cfg(feature = "prometheusd")]
-pub fn get_storage_registry() -> &'static StorageRegistry {
-    &METRICS_REGISTRY
-}
-// #[cfg(feature = "prometheusd")]
-pub fn get_registry() -> &'static Registry {
-    get_storage_registry().registry()
-}
+// pub fn get_storage_registry() -> &'static StorageRegistry {
+//     &METRICS_REGISTRY
+// }
+// // #[cfg(feature = "prometheusd")]
+// pub fn get_registry() -> &'static Registry {
+//     get_storage_registry().registry()
+// }
 
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
@@ -208,6 +208,19 @@ impl RegistryChannel {
         }
     }
 }
+
+// #[macro_export]
+// macro_rules! log_prometheus  {
+//     ($fmt:expr, $($arg:tt)*) => {
+//     let path = format!($fmt, $($arg)*);
+//      #[cfg(feature = "prometheusd")]
+//      {
+//         use $crate::config::system::{RpcMetrics, RegistryChannel};
+
+//          }
+//      }
+//     };
+// }_
 
 #[macro_export]
 macro_rules! log_info {
