@@ -43,8 +43,6 @@ type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
 // #[cfg(feature = "prometheusd")]
-type RegistryServer = Lazy<StorageRegistry>;
-type RegistryClient = Lazy<StorageRegistry>;
 pub type MetricSender = Sender<RpcMetrics>;
 pub type MetricReceiver = Receiver<RpcMetrics>;
 
@@ -79,7 +77,6 @@ pub struct RpcMetrics {
     duration: prometheus::HistogramVec,
 }
 // #[cfg(feature = "prometheusd")]
-// #[cfg(feature = "prometheusd")]
 impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
@@ -105,34 +102,6 @@ pub fn encode(registry: &prometheus::Registry) -> String {
     String::from_utf8(buffer).unwrap()
 }
 
-// pub fn parse_metrics(report: String) -> String {
-//         let mut latency_buffer : HashMap<String, u32> = HashMap::new();
-//         let mut method = String::new();
-//         let mut path = String::new();
-//         let mut sum = 0.0;
-//         let mut count = 0;
-//         for line in report.lines() {
-//             let parts: Vec<_> = line.split_whitespace().collect();
-//             if parts.len() == 4 {
-//                 let latency_edge = parts[2].split(',').find(|&x| x.starts_with("le=")).unwrap_or("");
-//                 let le_value = latency_edge.trim_start_matches("le=\"").trim_end_matches('"');
-//                 let count_value: u32 = parts[3].parse().unwrap_or(0);
-//                 if method.is_empty() && path.is_empty() {
-//                     let method_part = parts[2].split(',').find(|&x| x.starts_with("method=")).unwrap_or("");
-//                     method = method_part.trim_start_matches("method=\"").trim_end_matches('"').to_string();
-//                     let path_part = parts[2].split(',').find(|&x| x.starts_with("path=")).unwrap_or("");
-//                     path = path_part.trim_start_matches("path=\"").trim_end_matches('"').to_string();
-//                 }
-//                 latency_buffer.insert(le_value.to_string(), count_value);
-//             } else if line.starts_with("blutgang_rpc_duration_sum") {
-//             sum = line.split_whitespace().last().unwrap().parse().unwrap_or(0.0);
-//             } else if line.starts_with("blutgang_rpc_duration_count") {
-//                 count = line.split_whitespace().last().unwrap().parse().unwrap_or(0);
-//                             }
-//         }
-//         let parsed_metrics = String::from("path: ") + &path + ", method: " + &method + ", latency sum: " + &sum.to_string() + ", count: " + &count.to_string() + ", latency edge: " + latency_buffer.)
-// }
-
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
     use systemd::journal;
@@ -150,7 +119,7 @@ pub fn get_registry() -> &'static Registry {
 
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
-    inner: Receiver<RpcMetrics>,
+    inner: MetricReceiver,
     name: &'static str,
     metrics: Option<RpcMetrics>,
 }
@@ -162,7 +131,7 @@ impl std::fmt::Debug for RpcMetricsReciever {
 }
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsSender {
-    inner: Sender<RpcMetrics>,
+    inner: MetricSender,
     name: &'static str,
     metrics: Option<RpcMetrics>,
 }
@@ -223,7 +192,7 @@ impl RegistryChannel {
             .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-    pub fn push_metrics(
+    pub fn push_latency(
         metric: RpcMetrics,
         path: &str,
         method: &str,
