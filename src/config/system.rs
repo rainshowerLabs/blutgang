@@ -27,6 +27,7 @@ use tokio::sync::{
         UnboundedReceiver,
         UnboundedSender,
     },
+    oneshot,
     Notify,
 };
 //Some goofy Rust stuff
@@ -46,6 +47,7 @@ type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 pub type MetricSender = Sender<RpcMetrics>;
 pub type MetricReceiver = Receiver<RpcMetrics>;
 
+#[derive(Debug)]
 pub struct RegistryChannel {
     registry: Lazy<StorageRegistry>,
     notify: Notify,
@@ -68,7 +70,7 @@ pub struct RegistryChannel {
 // impl DualMetricsChannel<MetricReceiver> {}
 
 // #[cfg(feature = "prometheusd")]
-#[derive(MetricStorage, Clone)]
+#[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
@@ -142,6 +144,19 @@ impl std::fmt::Debug for RpcMetricsSender {
     }
 }
 
+#[derive(Debug)]
+enum MetricsCommand {
+    Flush(RegistryChannel),
+    Channel(RpcMetricsSender, RpcMetricsReciever),
+    Push(RpcMetrics, RegistryChannel),
+}
+
+#[derive(Debug)]
+enum MetricsSenderCommand {
+    AdminMsg(oneshot::Sender<RpcMetrics>),
+    StatsMsg(oneshot::Sender<RpcMetrics>),
+}
+
 // #[cfg(feature = "prometheusd")]
 impl RegistryChannel {
     pub fn new() -> Self {
@@ -182,6 +197,12 @@ impl RegistryChannel {
         };
         (tx, rx)
     }
+
+    // pub fn flush(&self, tx: RpcMetricsSender) {
+    //     log_info!("Flushing metrics");
+    //     let command = MetricsCommand::Flush(self.clone());
+    //     tx.inner.send(command).unwrap();
+    // }
 
     pub fn encode_channel(&self) -> String {
         use prometheus::Encoder;

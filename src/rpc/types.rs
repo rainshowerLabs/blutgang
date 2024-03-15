@@ -192,8 +192,8 @@ impl Rpc {
         #[cfg(feature = "prometheusd")]
         let metric_channel = RegistryChannel::new();
         #[cfg(feature = "prometheusd")]
-        let metric = RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel))
-            .unwrap();
+        let metric =
+            RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
         #[cfg(feature = "prometheusd")]
         let (mut tx, mut rx) = RegistryChannel::channel("prometheus latency demo");
         // If we have data >= to ma_length, remove the first one in line
