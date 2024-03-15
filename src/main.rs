@@ -6,7 +6,14 @@ mod rpc;
 mod websocket;
 
 use crate::{
-    admin::listener::listen_for_admin_requests,
+    admin::{
+        listener::listen_for_admin_requests,
+        liveready::{
+            liveness_update_sink,
+            LiveReadyUpdate,
+            ReadinessState,
+        },
+    },
     balancer::{
         accept_http::{
             accept_request,
@@ -123,7 +130,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
     let finalized_rx_arc = Arc::new(finalized_rx.clone());
-    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let rpc_poverty_list = Arc::new(RwLock::new(config.read().unwrap().poverty_list.clone()));
+
+    // We need liveness status channels even if admin is unused
+    let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
@@ -138,9 +148,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 poverty_list_admin,
                 cache_admin,
                 config_admin,
+                liveness_rx,
             )
             .await;
         });
+    } else {
+        // dont want to deal with potentially dropped channels if admin is disabled?
+        // create a sink to immediately drop all messages you receive!
+        tokio::task::spawn(liveness_update_sink(liveness_rx));
     }
 
     // Spawn a thread for the head cache
@@ -168,12 +183,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let liveness_tx_health = liveness_tx.clone();
 
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 poverty_list_health,
                 finalized_tx,
+                liveness_tx_health,
                 &named_blocknumbers_health,
                 &config_health,
             )
@@ -258,6 +275,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
+
+    // Send an update to change the state to ready
+    let _ = liveness_tx
+        .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+        .await;
 
     // We start a loop to continuously accept incoming connections
     loop {

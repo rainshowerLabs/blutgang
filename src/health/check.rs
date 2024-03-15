@@ -1,4 +1,9 @@
 use crate::{
+    admin::liveready::{
+        HealthState,
+        LiveReadyUpdate,
+        LiveReadyUpdateSnd,
+    },
     health::{
         error::HealthError,
         safe_block::{
@@ -20,17 +25,20 @@ use crate::{
     Settings,
     SubscriptionData,
 };
-use tokio::sync::broadcast;
 
-use std::println;
-use std::sync::{
-    Arc,
-    RwLock,
+use std::{
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Duration,
 };
-use std::time::Duration;
 
 use tokio::{
-    sync::mpsc,
+    sync::{
+        broadcast,
+        mpsc,
+    },
     time::{
         sleep,
         timeout,
@@ -48,6 +56,7 @@ pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
     finalized_tx: tokio::sync::watch::Sender<u64>,
+    liveness_tx: LiveReadyUpdateSnd,
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     config: &Arc<RwLock<Settings>>,
 ) -> Result<(), HealthError> {
@@ -57,7 +66,16 @@ pub async fn health_check(
         let supress_rpc_check = config.read().unwrap().supress_rpc_check;
 
         sleep(Duration::from_millis(health_check_ttl)).await;
-        check(&rpc_list, &poverty_list, &ttl, supress_rpc_check).await?;
+
+        check(
+            &rpc_list,
+            &poverty_list,
+            &ttl,
+            &liveness_tx,
+            supress_rpc_check,
+        )
+        .await?;
+
         get_safe_block(
             &rpc_list,
             &finalized_tx,
@@ -73,6 +91,7 @@ async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: &u128,
+    liveness_tx: &LiveReadyUpdateSnd,
     supress_rpc_check: bool,
 ) -> Result<(), HealthError> {
     if !supress_rpc_check {
@@ -92,7 +111,10 @@ async fn check(
     // Do a head check over the current poverty list to see if any nodes are back to normal
     let poverty_heads = head_check(poverty_list, *ttl).await?;
 
-    escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
+    let to_send = escape_poverty(rpc_list, poverty_list, poverty_heads, agreed_head)?;
+
+    // Send the current status of nodes to the liveness monitor
+    let _ = liveness_tx.send(to_send).await;
 
     if !supress_rpc_check {
         println!("OK!");
@@ -203,12 +225,14 @@ fn make_poverty(
 }
 
 // Go over the `poverty_list` to see if any nodes are back to normal
+//
+// Update liveness statuses when done
 fn escape_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_heads: Vec<HeadResult>,
     agreed_head: u64,
-) -> Result<(), HealthError> {
+) -> Result<crate::LiveReadyUpdate, HealthError> {
     // Check if any nodes made it 🗣️🔥🔥🔥
     let mut poverty_list_guard = poverty_list.write().unwrap();
     let mut rpc_list_guard = rpc_list.write().unwrap();
@@ -235,7 +259,21 @@ fn escape_poverty(
     // Only retain erroring RPCs
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
 
-    Ok(())
+    //todo: i dont like this but its whatever
+    let to_send;
+    let is_pov_empty = poverty_list_guard.is_empty();
+    let is_rpc_empty = rpc_list_guard.is_empty();
+    if !is_rpc_empty && is_pov_empty {
+        to_send = LiveReadyUpdate::Health(HealthState::Healthy);
+    } else if !is_pov_empty && !is_rpc_empty {
+        to_send = LiveReadyUpdate::Health(HealthState::MissingRpcs);
+    } else if is_rpc_empty {
+        to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
+    } else {
+        to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
+    }
+
+    Ok(to_send)
 }
 
 // Remove the RPC that dropped out ws_conn and add it to the poverty list
