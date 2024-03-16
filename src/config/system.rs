@@ -7,11 +7,11 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.3 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
-use crossbeam_channel::{
-    unbounded,
-    Receiver,
-    Sender,
-};
+// use crossbeam_channel::{
+//     unbounded,
+//     Receiver,
+//     Sender,
+// };
 use once_cell::sync::Lazy;
 use prometheus::Registry;
 use prometheus_metric_storage::{
@@ -20,12 +20,14 @@ use prometheus_metric_storage::{
 };
 use simd_json::Object;
 
-use std::collections::hash_map::HashMap;
+
+use std::{collections::hash_map::HashMap, future::IntoFuture};
 use std::time::Duration;
 use tokio::sync::{
     mpsc::{
         UnboundedReceiver,
         UnboundedSender,
+        unbounded_channel
     },
     oneshot,
     Notify,
@@ -44,8 +46,8 @@ type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
 // #[cfg(feature = "prometheusd")]
-pub type MetricSender = Sender<RpcMetrics>;
-pub type MetricReceiver = Receiver<RpcMetrics>;
+pub type MetricSender = UnboundedSender<RpcMetrics>;
+pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
 #[derive(Debug)]
 pub struct RegistryChannel {
@@ -184,7 +186,7 @@ impl RegistryChannel {
     //TODO: should (Sender, Reciver) be wrapped in Result, Error?
     //TODO: compare crossbeam_channel to mpsc
     pub fn channel(name: &'static str) -> (RpcMetricsSender, RpcMetricsReciever) {
-        let (tx, rx) = unbounded();
+        let (tx, rx) = unbounded_channel();
         let tx = RpcMetricsSender {
             inner: tx,
             name,
@@ -213,7 +215,8 @@ impl RegistryChannel {
             .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-    pub fn push_latency(
+}
+pub async fn push_latency(
         metric: RpcMetrics,
         path: &str,
         method: &str,
@@ -224,11 +227,10 @@ impl RegistryChannel {
         let send = tx.inner.send(metric);
         let recv = rx.inner.recv();
         if let Ok(_) = send {
-            rx.metrics = Some(recv.unwrap());
+            rx.metrics = Some(recv.await.unwrap());
             rx.metrics.unwrap().push_latency(path, method, dt);
         }
     }
-}
 
 // #[macro_export]
 // macro_rules! log_prometheus  {

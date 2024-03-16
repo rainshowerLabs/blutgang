@@ -3,6 +3,7 @@ use crate::config::system::{
     MetricSender,
     RegistryChannel,
     RpcMetrics,
+    push_latency,
 };
 use crate::log_info;
 use crate::rpc::error::RpcError;
@@ -207,7 +208,9 @@ impl Rpc {
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
         #[cfg(feature = "prometheusd")]
-        RegistryChannel::push_latency(metric.clone(), &self.url, &self.name, avg, rx, tx);
+        push_latency(metric.clone(), &self.url, &self.name, avg, rx, tx);
+
+        // RegistryChannel::push_latency(metric.clone(), &self.url, &self.name, avg, rx, tx);
         // Non-channel version
         // #[cfg(feature = "prometheusd")]
         // RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
