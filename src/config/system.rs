@@ -7,24 +7,20 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.3 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
-
+use crate::Rpc;
 use futures::FutureExt;
-// use crossbeam_channel::{
-//     unbounded,
-//     Receiver,
-//     Sender,
-// };
 use once_cell::sync::Lazy;
 use prometheus::Registry;
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
-use simd_json::Object;
+use thiserror::Error;
 
 use std::{
     collections::hash_map::HashMap,
     future::IntoFuture,
+    sync::{Arc, RwLock},
     time::Duration,
 };
 use tokio::sync::{
@@ -42,8 +38,9 @@ use tokio::sync::{
 // type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 pub type MetricSender = UnboundedSender<RpcMetrics>;
+#[cfg(feature = "prometheusd")]
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
 #[derive(Debug)]
@@ -67,8 +64,21 @@ pub struct RegistryChannel {
 // Pub struct DualMetricsChannel <T: HasDualMetrics> {}
 // impl DualMetricsChannel<MetricSender> {}
 // impl DualMetricsChannel<MetricReceiver> {}
-
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
+#[derive(Debug, Error)]
+pub enum MetricsError {
+    #[error(transparent)]
+    WSError(#[from] crate::websocket::error::WsError),
+    #[error(transparent)]
+    RPCError(#[from] crate::rpc::error::RpcError),
+}
+#[cfg(feature = "prometheusd")]
+impl From<MetricsError> for String {
+    fn from(error: MetricsError) -> Self {
+    error.to_string()
+    }
+}
+#[cfg(feature = "prometheusd")]
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
@@ -77,7 +87,7 @@ pub struct RpcMetrics {
     #[metric(labels("path", "method"), help = "latency of rpc calls")]
     duration: prometheus::HistogramVec,
 }
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
@@ -100,45 +110,47 @@ pub fn log_journald(level: u32, message: &str) {
     journal::print(level, message);
 }
 
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
     inner: MetricReceiver,
     pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 impl std::fmt::Debug for RpcMetricsReciever {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("RpcMetricsReciever").finish()
     }
 }
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 pub struct RpcMetricsSender {
     inner: MetricSender,
     pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 impl std::fmt::Debug for RpcMetricsSender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("RpcMetricsSender").finish()
     }
 }
-
+#[cfg(feature = "prometheusd")]
 #[derive(Debug)]
-enum MetricsCommand<'a> { 
+pub enum MetricsCommand<'a> { 
     Flush(&'a RegistryChannel),
     Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
     Push(&'a RpcMetrics, &'a RegistryChannel),
+    Pull(&'a RpcMetrics, &'a RegistryChannel),
 }
 
+#[cfg(feature = "prometheusd")]
 #[derive(Debug)]
-enum MetricsSenderCommand {
+pub enum MetricChannelCommand {
     AdminMsg(oneshot::Sender<RpcMetrics>),
     StatsMsg(oneshot::Sender<RpcMetrics>),
 }
 
-// #[cfg(feature = "prometheusd")]
+#[cfg(feature = "prometheusd")]
 impl RegistryChannel {
     pub fn new() -> Self {
         RegistryChannel {
@@ -179,11 +191,14 @@ impl RegistryChannel {
         (tx, rx)
     }
 
-    // pub fn flush(&self, tx: RpcMetricsSender) {
-    //     log_info!("Flushing metrics");
-    //     let command = MetricsCommand::Flush(self.clone());
-    //     tx.inner.send(command).unwrap();
-    // }
+    pub fn on_flush(&self, tx: RpcMetricsSender) {
+        use crate::log_info;
+        let command = MetricsCommand::Flush(self);
+        log_info!("Flushing metrics");
+        let command = MetricsCommand::Flush(self.clone());
+        // tx.inner.send().unwrap();
+        self.notify.notify_one();
+    }
 
     pub fn encode_channel(&self) -> String {
         use prometheus::Encoder;
@@ -211,6 +226,7 @@ impl RegistryChannel {
         let send = tx.inner.send(metrics);
         let recv = rx.inner.recv();
     }
+
 }
 
 #[macro_export]
@@ -295,6 +311,26 @@ macro_rules! log_err {
 //         }
 //         };
 // }
+//
+pub mod test_mocks {
+    use super::*;
+    //borrowed from admin
+    fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
+        Arc::new(RwLock::new(vec![Rpc::new(
+            "http://example.com".to_string(),
+            None,
+            5,
+            1000,
+            0.5,
+        )]))
+    }
+
+    pub struct MockMetrics {
+        pub rpc_list : Arc<RwLock<Vec<Rpc>>>,
+        pub requests: HashMap<String, u64>,
+        pub duration: HashMap<String, f64>,
+    }
+} 
 
 #[cfg(test)]
 mod tests {
