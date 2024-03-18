@@ -1,9 +1,9 @@
 use crate::config::system::{
+    push_latency,
     MetricReceiver,
     MetricSender,
     RegistryChannel,
     RpcMetrics,
-    push_latency,
 };
 use crate::log_info;
 use crate::rpc::error::RpcError;
@@ -188,15 +188,13 @@ impl Rpc {
     // Update the latency of the last n calls.
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
-        // #[cfg(feature = "prometheusd")]
-        // let metric = RpcMetrics::init(get_storage_registry()).unwrap();
         #[cfg(feature = "prometheusd")]
         let metric_channel = RegistryChannel::new();
         #[cfg(feature = "prometheusd")]
         let metric =
             RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
         #[cfg(feature = "prometheusd")]
-        let (mut tx, mut rx) = RegistryChannel::channel("prometheus latency demo");
+        let (mut tx, mut rx) = RegistryChannel::channel("Rpc latency ");
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);

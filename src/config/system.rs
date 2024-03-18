@@ -20,14 +20,16 @@ use prometheus_metric_storage::{
 };
 use simd_json::Object;
 
-
-use std::{collections::hash_map::HashMap, future::IntoFuture};
 use std::time::Duration;
+use std::{
+    collections::hash_map::HashMap,
+    future::IntoFuture,
+};
 use tokio::sync::{
     mpsc::{
+        unbounded_channel,
         UnboundedReceiver,
         UnboundedSender,
-        unbounded_channel
     },
     oneshot,
     Notify,
@@ -124,7 +126,7 @@ pub fn log_journald(level: u32, message: &str) {
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
     inner: MetricReceiver,
-    name: &'static str,
+    pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
 // #[cfg(feature = "prometheusd")]
@@ -136,7 +138,7 @@ impl std::fmt::Debug for RpcMetricsReciever {
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsSender {
     inner: MetricSender,
-    name: &'static str,
+    pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
 // #[cfg(feature = "prometheusd")]
@@ -217,20 +219,20 @@ impl RegistryChannel {
     }
 }
 pub async fn push_latency(
-        metric: RpcMetrics,
-        path: &str,
-        method: &str,
-        dt: f64,
-        mut rx: RpcMetricsReciever,
-        tx: RpcMetricsSender,
-    ) {
-        let send = tx.inner.send(metric);
-        let recv = rx.inner.recv();
-        if let Ok(_) = send {
-            rx.metrics = Some(recv.await.unwrap());
-            rx.metrics.unwrap().push_latency(path, method, dt);
-        }
+    metric: RpcMetrics,
+    path: &str,
+    method: &str,
+    dt: f64,
+    mut rx: RpcMetricsReciever,
+    tx: RpcMetricsSender,
+) {
+    let send = tx.inner.send(metric);
+    let recv = rx.inner.recv();
+    if let Ok(_) = send {
+        rx.metrics = Some(recv.await.unwrap());
+        rx.metrics.unwrap().push_latency(path, method, dt);
     }
+}
 
 // #[macro_export]
 // macro_rules! log_prometheus  {

@@ -144,7 +144,7 @@ pub async fn create_ws_vec(
 
     ws_handles
 }
-
+//TODO: figure if metric is registered
 pub async fn ws_conn(
     rpc: Rpc,
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
