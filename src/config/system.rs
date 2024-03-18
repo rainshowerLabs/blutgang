@@ -7,6 +7,8 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.3 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
+
+use futures::FutureExt;
 // use crossbeam_channel::{
 //     unbounded,
 //     Receiver,
@@ -20,10 +22,10 @@ use prometheus_metric_storage::{
 };
 use simd_json::Object;
 
-use std::time::Duration;
 use std::{
     collections::hash_map::HashMap,
     future::IntoFuture,
+    time::Duration,
 };
 use tokio::sync::{
     mpsc::{
@@ -34,17 +36,10 @@ use tokio::sync::{
     oneshot,
     Notify,
 };
-//Some goofy Rust stuff
-// #[cfg(feature = "prometheusd")]
-// #[cfg(feature = "prometheusd")]
-static METRICS_REGISTRY: Lazy<StorageRegistry> = Lazy::new(|| {
-    let registry = Registry::new_custom(Some("blutgang".to_string()), None).unwrap();
-    StorageRegistry::new(registry)
-});
 
 // Canidate for metrics storage
-// #[cfg(feature = "prometheusd")]
-type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
+// // #[cfg(feature = "prometheusd")]
+// type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
 // #[cfg(feature = "prometheusd")]
@@ -99,29 +94,11 @@ impl RpcMetrics {
     }
 }
 
-//  #[cfg(feature = "prometheusd")]
-// pub fn encode(registry: &prometheus::Registry) -> String {
-//     use prometheus::Encoder;
-//     let encoder = prometheus::TextEncoder::new();
-//     let mut buffer = vec![];
-//     encoder.encode(&registry.gather(), &mut buffer).unwrap();
-//     String::from_utf8(buffer).unwrap()
-// }
-
 #[cfg(feature = "journald")]
 pub fn log_journald(level: u32, message: &str) {
     use systemd::journal;
     journal::print(level, message);
 }
-
-// #[cfg(feature = "prometheusd")]
-// pub fn get_storage_registry() -> &'static StorageRegistry {
-//     &METRICS_REGISTRY
-// }
-// // #[cfg(feature = "prometheusd")]
-// pub fn get_registry() -> &'static Registry {
-//     get_storage_registry().registry()
-// }
 
 // #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
@@ -149,10 +126,10 @@ impl std::fmt::Debug for RpcMetricsSender {
 }
 
 #[derive(Debug)]
-enum MetricsCommand {
-    Flush(RegistryChannel),
-    Channel(RpcMetricsSender, RpcMetricsReciever),
-    Push(RpcMetrics, RegistryChannel),
+enum MetricsCommand<'a> { 
+    Flush(&'a RegistryChannel),
+    Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
+    Push(&'a RpcMetrics, &'a RegistryChannel),
 }
 
 #[derive(Debug)]
@@ -217,35 +194,24 @@ impl RegistryChannel {
             .unwrap();
         String::from_utf8(buffer).unwrap()
     }
-}
-pub async fn push_latency(
-    metric: RpcMetrics,
-    path: &str,
-    method: &str,
-    dt: f64,
-    mut rx: RpcMetricsReciever,
-    tx: RpcMetricsSender,
-) {
-    let send = tx.inner.send(metric);
-    let recv = rx.inner.recv();
-    if let Ok(_) = send {
-        rx.metrics = Some(recv.await.unwrap());
-        rx.metrics.unwrap().push_latency(path, method, dt);
+
+    pub fn on_push(&self, path: &str, method: &str, status: u16, dt: f64, metrics: RpcMetrics, mut rx: RpcMetricsReciever, tx: RpcMetricsSender) {
+        let command = MetricsCommand::Push(&metrics, self);
+        self.notify.notify_one();
+        metrics.requests.with_label_values(&[path, method, &status.to_string(), ]).inc();
+        metrics.duration.with_label_values(&[path, method]).observe(dt);
+        let send = tx.inner.send(metrics);
+        let recv = rx.inner.recv();
+    }
+
+    pub fn on_push_latency(&self, path: &str, method: &str, dt: f64, metrics: RpcMetrics, mut rx: RpcMetricsReciever, tx: RpcMetricsSender) {
+        let command = MetricsCommand::Push(&metrics, self);
+        self.notify.notify_one();
+        metrics.duration.with_label_values(&[path, method]).observe(dt);
+        let send = tx.inner.send(metrics);
+        let recv = rx.inner.recv();
     }
 }
-
-// #[macro_export]
-// macro_rules! log_prometheus  {
-//     ($fmt:expr, $($arg:tt)*) => {
-//     let path = format!($fmt, $($arg)*);
-//      #[cfg(feature = "prometheusd")]
-//      {
-//         use $crate::config::system::{RpcMetrics, RegistryChannel};
-
-//          }
-//      }
-//     };
-// }_
 
 #[macro_export]
 macro_rules! log_info {

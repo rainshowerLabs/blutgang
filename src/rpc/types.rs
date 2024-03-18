@@ -1,5 +1,4 @@
 use crate::config::system::{
-    push_latency,
     MetricReceiver,
     MetricSender,
     RegistryChannel,
@@ -206,12 +205,7 @@ impl Rpc {
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
         #[cfg(feature = "prometheusd")]
-        push_latency(metric.clone(), &self.url, &self.name, avg, rx, tx);
-
-        // RegistryChannel::push_latency(metric.clone(), &self.url, &self.name, avg, rx, tx);
-        // Non-channel version
-        // #[cfg(feature = "prometheusd")]
-        // RpcMetrics::push_latency(&metric, &self.url, &self.name, avg);
+        RegistryChannel::on_push_latency(&metric_channel, &self.name, &self.url, avg, metric.clone(), rx, tx);
         #[cfg(feature = "prometheusd")]
         let report = RegistryChannel::encode_channel(&metric_channel);
         #[cfg(feature = "prometheusd")]
