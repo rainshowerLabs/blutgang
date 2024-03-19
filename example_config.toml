@@ -12,7 +12,8 @@ ma_length = 100
 sort_on_startup = true
 # Enable health checking
 health_check = true
-# Enable content type header checking
+# Enable content type header checking. Set this to `true` if you want
+# Blutgang to be JSON-RPC compliant.
 header_check = true
 # Acceptable time to wait for a response in ms
 ttl = 30
@@ -57,7 +58,7 @@ compression = false
 # Print DB profile when dropped. Doesn't do anything for now.
 print_profile = false
 # Frequency of flushes in ms
-flush_every_ms = 24000
+flush_every_ms = 240
 
 # Add separate RPCs as TOML tables
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
