@@ -209,7 +209,7 @@ impl Rpc {
         #[cfg(feature = "prometheusd")]
         let report = RegistryChannel::encode_channel(&metric_channel);
         #[cfg(feature = "prometheusd")]
-        log_info!("Prometheus metrics: {}", report);
+        log_info!("Prometheus metrics: {}", report.unwrap());
     }
 }
 

@@ -7,6 +7,7 @@ pub const MAGIC: u32 = 0xb153;
 pub const VERSION_STR: &str = "Blutgang 0.3.3 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
+use url::ParseError;
 use crate::Rpc;
 use futures::FutureExt;
 use once_cell::sync::Lazy;
@@ -200,14 +201,17 @@ impl RegistryChannel {
         self.notify.notify_one();
     }
 
-    pub fn encode_channel(&self) -> String {
+    pub fn encode_channel(&self) -> Result<String, ParseError> {
         use prometheus::Encoder;
         let encoder = prometheus::TextEncoder::new();
         let mut buffer = vec![];
         encoder
             .encode(&self.registry.gather(), &mut buffer)
             .unwrap();
-        String::from_utf8(buffer).unwrap()
+        let report = String::from_utf8(buffer.clone()).expect("Failed to parse prometheus report");
+        buffer.clear();
+        Ok(report)          
+            
     }
 
     pub fn on_push(&self, path: &str, method: &str, status: u16, dt: f64, metrics: RpcMetrics, mut rx: RpcMetricsReciever, tx: RpcMetricsSender) {
