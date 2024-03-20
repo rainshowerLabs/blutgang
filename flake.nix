@@ -45,6 +45,7 @@
             systemd
             clang
             gdb
+            python311Packages.requests
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
