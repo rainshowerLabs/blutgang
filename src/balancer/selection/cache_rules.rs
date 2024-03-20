@@ -10,7 +10,6 @@ pub fn cache_method(rx: &str) -> bool {
     return false;
 
     // all of the below cannot be cached properly
-    // `null` should never be in a proper request
     let blacklist = [
         "latest",
         "eth_blockNumber",
@@ -20,7 +19,6 @@ pub fn cache_method(rx: &str) -> bool {
         "pending",
         "eth_subscribe",
         "eth_unsubscribe",
-        "null",
     ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method

@@ -44,6 +44,8 @@ use serde_json::Value;
 #[cfg(not(feature = "xxhash"))]
 use blake3::hash;
 
+use memchr::memmem;
+
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
 #[cfg(feature = "xxhash")]
@@ -199,7 +201,7 @@ macro_rules! get_response {
                 //
                 // If a cached response returns null, remove it from the DB and querry
                 // a node for a proper response.
-                if cached["method"] == Value::Null {
+                if memmem::find(&rax, "null}".as_bytes()).is_some() {
                     let _ = $cache.remove($tx_hash.as_bytes());
                     fetch_from_rpc!(
                         $tx,
