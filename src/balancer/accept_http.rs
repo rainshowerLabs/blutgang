@@ -194,71 +194,21 @@ macro_rules! get_response {
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
 
-                cached["id"] = $id.into();
-                cached.to_string()
+                // TODO: This is a temp fix to mitigate DB corruption issues.
+                // This worsens performance by quite a bit and should not be left as is.
+                //
+                // If a cached response returns null, remove it from the DB and querry
+                // a node for a proper response.
+                if cached["method"] == Value::Null {
+                    let _ = $cache.remove($tx_hash.as_bytes());
+                    fetch_from_rpc!($tx, $id, $rpc_list_rwlock, $rpc_position, $cache, $tx_hash, $finalized_rx, $named_numbers, $head_cache, $ttl, $max_retries)
+                } else {
+                    cached["id"] = $id.into();
+                    cached.to_string()
+                }
             },
             Ok(None) => {
-                // Kinda jank but set the id back to what it was before
-                $tx["id"] = $id.into();
-
-                // Loop until we get a response
-                let mut rx;
-                let mut retries = 0;
-                loop {
-                    // Get the next Rpc in line.
-                    let mut rpc;
-                    {
-                        let mut rpc_list = $rpc_list_rwlock.write().unwrap();
-                        (rpc, $rpc_position) = pick(&mut rpc_list);
-                    }
-                    log_info!("Forwarding to: {}", rpc.name);
-
-                    // Check if we have any RPCs in the list, if not return error
-                    if $rpc_position == None {
-                        return (no_rpc_available!(), None);
-                    }
-
-                    // Send the request. And return a timeout if it takes too long
-                    //
-                    // Check if it contains any errors or if its `latest` and insert it if it isn't
-                    match timeout(
-                        Duration::from_millis($ttl.try_into().unwrap()),
-                        rpc.send_request($tx.clone()),
-                    )
-                    .await
-                    {
-                        Ok(rxa) => {
-                            rx = rxa.unwrap();
-                            break;
-                        },
-                        Err(_) => {
-                            log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
-                            rpc.update_latency($ttl as f64);
-                            retries += 1;
-                        },
-                    };
-
-                    if retries == $max_retries {
-                        return (timed_out!(), $rpc_position,);
-                    }
-                }
-
-                let cache_args = CacheArgs {
-                    finalized_rx: $finalized_rx,
-                    named_numbers: $named_numbers,
-                    cache: $cache,
-                    head_cache: $head_cache,
-                };
-
-                // Don't cache responses that contain errors or missing trie nodes
-                cache_querry(
-                    &mut rx,
-                    $tx,
-                    $tx_hash,
-                    &cache_args,
-                );
-
-                rx
+                fetch_from_rpc!($tx, $id, $rpc_list_rwlock, $rpc_position, $cache, $tx_hash, $finalized_rx, $named_numbers, $head_cache, $ttl, $max_retries)
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
@@ -268,6 +218,72 @@ macro_rules! get_response {
             }
         }
     };
+}
+
+macro_rules! fetch_from_rpc {
+    ($tx:expr, $id:expr, $rpc_list_rwlock:expr, $rpc_position:expr, $cache:expr, $tx_hash:expr, $finalized_rx:expr, $named_numbers:expr, $head_cache:expr, $ttl:expr, $max_retries:expr) => {{
+        // Kinda jank but set the id back to what it was before
+        $tx["id"] = $id.into();
+
+        // Loop until we get a response
+        let mut rx;
+        let mut retries = 0;
+        loop {
+            // Get the next Rpc in line.
+            let mut rpc;
+            {
+                let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                (rpc, $rpc_position) = pick(&mut rpc_list);
+            }
+            log_info!("Forwarding to: {}", rpc.name);
+
+            // Check if we have any RPCs in the list, if not return error
+            if $rpc_position == None {
+                return (no_rpc_available!(), None);
+            }
+
+            // Send the request. And return a timeout if it takes too long
+            //
+            // Check if it contains any errors or if its `latest` and insert it if it isn't
+            match timeout(
+                Duration::from_millis($ttl.try_into().unwrap()),
+                rpc.send_request($tx.clone()),
+            )
+            .await
+            {
+                Ok(rxa) => {
+                    rx = rxa.unwrap();
+                    break;
+                },
+                Err(_) => {
+                    log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                    rpc.update_latency($ttl as f64);
+                    retries += 1;
+                },
+            };
+
+            if retries == $max_retries {
+                return (timed_out!(), $rpc_position,);
+            }
+        }
+
+        let cache_args = CacheArgs {
+            finalized_rx: $finalized_rx,
+            named_numbers: $named_numbers,
+            cache: $cache,
+            head_cache: $head_cache,
+        };
+
+        // Don't cache responses that contain errors or missing trie nodes
+        cache_querry(
+            &mut rx,
+            $tx,
+            $tx_hash,
+            &cache_args,
+        );
+
+        rx
+    }};
 }
 
 // Pick RPC and send request to it. In case the result is cached,
