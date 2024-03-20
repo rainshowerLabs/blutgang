@@ -50,12 +50,12 @@ pub async fn serve_websocket(
     let (mut websocket_sink, mut websocket_stream) = websocket.split();
 
     // Create channels for message send/receiving
-    #[cfg(feature = "prometheusd")]
-    let metric_channel = RegistryChannel::new();
-    #[cfg(feature = "prometheusd")]
-    let metric = RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
-    #[cfg(feature = "prometheusd")]
-    let (metric_tx, mut metric_rx) = RegistryChannel::channel("ws server");
+    // #[cfg(feature = "prometheusd")]
+    // let metric_channel = RegistryChannel::new();
+    // #[cfg(feature = "prometheusd")]
+    // let metric = RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
+    // #[cfg(feature = "prometheusd")]
+    // let (metric_tx, mut metric_rx) = RegistryChannel::channel("ws server");
     let (tx, mut rx) = mpsc::unbounded_channel::<RequestResult>();
 
     // Generate an id for our user
@@ -65,8 +65,8 @@ pub async fn serve_websocket(
 
     // Add the user to the sink map
     log_info!("Adding user {} to sink map", user_id);
-    #[cfg(feature = "prometheusd")]
-    log_info!("Prometheus metrics on {}", metric_tx.name);
+    // #[cfg(feature = "prometheusd")]
+    // log_info!("Prometheus metrics on {}", metric_tx.name);
 
     let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);

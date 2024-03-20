@@ -1,10 +1,19 @@
+#[cfg(feature = "prometheusd")]
+use crate::config::system::{
+    MetricChannelCommand,
+    MetricReceiver,
+    MetricSender,
+    MetricsCommand,
+    MetricsError,
+    RegistryChannel,
+    RpcMetrics,
+    RpcMetricsSender,
+};
 use crate::{
     admin::error::AdminError,
     Rpc,
     Settings,
 };
-#[cfg(feature = "prometheusd")]
-use crate::config::system::{MetricsError, RegistryChannel, MetricReceiver, MetricSender, RpcMetrics, MetricChannelCommand, RpcMetricsSender, MetricsCommand};
 
 use std::{
     sync::{
@@ -134,7 +143,10 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 }
 
 #[cfg(feature = "prometheusd")]
-async fn admin_flush_metrics(channel: &RegistryChannel, tx: RpcMetricsSender) -> Result<(), MetricsError> {
+async fn admin_flush_metrics(
+    channel: &RegistryChannel,
+    tx: RpcMetricsSender,
+) -> Result<(), MetricsError> {
     let dt = Instant::now();
 
     let command = MetricsCommand::Flush(channel);

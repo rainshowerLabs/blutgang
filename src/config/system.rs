@@ -6,12 +6,10 @@ pub const MAGIC: u32 = 0xb153;
 // Version consts, dont impact functionality
 pub const VERSION_STR: &str = "Blutgang 0.3.3 Garreg Mach";
 pub const TAGLINE: &str = "`Now there's a way forward.`";
-use atomic_refcell::AtomicRefCell;
-use url::ParseError;
 use crate::Rpc;
-use futures::{channel::mpsc, FutureExt};
+
 use once_cell::sync::Lazy;
-use prometheus::{proto::MetricType, Registry};
+
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
@@ -19,19 +17,22 @@ use prometheus_metric_storage::{
 use thiserror::Error;
 
 use std::{
-    collections::hash_map::HashMap, future::IntoFuture, ops::Deref, sync::{Arc, RwLock}, time::Duration
+    collections::hash_map::HashMap,
+    sync::{
+        Arc,
+        RwLock,
+    },
+    time::Duration,
 };
 use tokio::sync::{
     mpsc::{
-        channel,
         unbounded_channel,
         UnboundedReceiver,
         UnboundedSender,
     },
     oneshot,
-    Notify,  
+    Notify,
 };
-
 
 //Canidate for metrics storage
 //#[cfg(feature = "prometheusd")]
@@ -56,11 +57,11 @@ pub enum MetricsError {
 // #[cfg(feature = "prometheusd")]
 impl From<MetricsError> for String {
     fn from(error: MetricsError) -> Self {
-    error.to_string()
+        error.to_string()
     }
 }
 // #[cfg(feature = "prometheusd")]
-#[derive(MetricStorage, Clone, Debug, )]
+#[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
@@ -115,12 +116,26 @@ impl std::fmt::Debug for RpcMetricsSender {
 }
 // #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
-pub enum MetricsCommand<'a> { 
+pub enum MetricsCommand<'a> {
     Flush(&'a RegistryChannel),
     Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
     PushLatency(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, f64),
-    PushRequest(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, &'a u16, Duration),
-    PushError(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, &'a u16, Duration),
+    PushRequest(
+        &'a RpcMetrics,
+        &'a RegistryChannel,
+        &'a str,
+        &'a str,
+        &'a u16,
+        Duration,
+    ),
+    PushError(
+        &'a RpcMetrics,
+        &'a RegistryChannel,
+        &'a str,
+        &'a str,
+        &'a u16,
+        Duration,
+    ),
     Push(&'a RpcMetrics, &'a RegistryChannel),
     Pull(&'a RpcMetrics, &'a RegistryChannel),
 }
@@ -135,18 +150,21 @@ pub enum MetricChannelCommand {
 //#[cfg(feature = "prometheusd")]
 pub async fn metrics_update_sink(mut metrics_rx: RpcMetricsReciever) {
     loop {
-        while(metrics_rx.inner.recv().await.is_some()) {
+        while metrics_rx.inner.recv().await.is_some() {
             continue;
         }
     }
 }
 //#[cfg(feature = "prometheusd")]
-pub async fn listen_for_metrics(metric: RpcMetrics, metrics_tx: RpcMetricsSender) {
+pub async fn listen_for_metrics(_metric: RpcMetrics, _metrics_tx: RpcMetricsSender) {
     unimplemented!()
     // let mut tx.inner.
 }
 
-pub async fn metrics_listener(mut metrics_rx: RpcMetricsReciever, metrics_status: Arc<RwLock<RpcMetrics>>){
+pub async fn metrics_listener(
+    mut metrics_rx: RpcMetricsReciever,
+    metrics_status: Arc<RwLock<RpcMetrics>>,
+) {
     while let Some(update) = metrics_rx.inner.recv().await {
         //TODO: match for metrics type, latency, errors, requests
         //match metric {
@@ -157,26 +175,53 @@ pub async fn metrics_listener(mut metrics_rx: RpcMetricsReciever, metrics_status
     }
 }
 
-async fn metrics_processor(mut metrics_rx: RpcMetricsReciever, metrics_status: Arc<RwLock<RpcMetrics>>, path: &str, method: &str, status: &u16, duration: Duration){
+async fn metrics_processor(
+    mut metrics_rx: RpcMetricsReciever,
+    metrics_status: Arc<RwLock<RpcMetrics>>,
+    path: &str,
+    method: &str,
+    status: &u16,
+    duration: Duration,
+) {
     loop {
-    while let Some(incoming) = metrics_rx.inner.recv().await {
-        let mut current_metrics = metrics_status.read().unwrap();
-        let _ = incoming.requests_complete(path, method, status, duration);
-    }
+        while let Some(incoming) = metrics_rx.inner.recv().await {
+            let _current_metrics = metrics_status.read().unwrap();
+            incoming.requests_complete(path, method, status, duration);
+        }
     }
 }
 
+// async fn metrics_encoder(mut metrics_rx: RpcMetricsReciever) -> String {
+//     let encoder = prometheus::TextEncoder::new();
+//     let mut buffer = vec![];
+//     encoder.encode().unwrap();
+// }
 
-pub async fn metrics_monitor(mut metrics_rx: RpcMetricsReciever, mut metrics_tx: RpcMetricsSender, storage_registry: StorageRegistry) {
+pub async fn metrics_monitor(metrics_rx: RpcMetricsReciever, storage_registry: StorageRegistry) {
     //TODO: figure ownership mess here
-    let metrics_status = Arc::new(RwLock::new(RpcMetrics::instance(&storage_registry).unwrap().to_owned()));
+    let metrics_status = Arc::new(RwLock::new(
+        RpcMetrics::instance(&storage_registry).unwrap().to_owned(),
+    ));
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
-    //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;   
+    //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;
+}
+
+pub async fn metrics_channel() -> (RpcMetricsSender, RpcMetricsReciever) {
+    let (tx, rx) = unbounded_channel();
+    let tx = RpcMetricsSender {
+        inner: tx,
+        metrics: None,
+    };
+    let rx = RpcMetricsReciever {
+        inner: rx,
+        metrics: None,
+    };
+    (tx, rx)
 }
 
 //#[cfg(feature = "prometheusd")]
-// pub async fn spawn_metrics_channel(metrics_status: Arc<RwLock<Vec<Rpc>>>, mut rx: MetricReceiver) {        
+// pub async fn spawn_metrics_channel(metrics_status: Arc<RwLock<Vec<Rpc>>>, mut rx: MetricReceiver) {
 //     use crate::log_info;
 //     let (tx, rx) = unbounded_channel();
 //     let tx = RpcMetricsSender {
@@ -194,7 +239,6 @@ pub async fn metrics_monitor(mut metrics_rx: RpcMetricsReciever, mut metrics_tx:
 //     metrics: RpcMetrics,
 //     rx: RpcMetricsReciever,
 // }
-
 
 #[macro_export]
 macro_rules! log_info {
@@ -293,11 +337,11 @@ pub mod test_mocks {
     }
 
     pub struct MockMetrics {
-        pub rpc_list : Arc<RwLock<Vec<Rpc>>>,
+        pub rpc_list: Arc<RwLock<Vec<Rpc>>>,
         pub requests: HashMap<String, u64>,
         pub duration: HashMap<String, f64>,
     }
-} 
+}
 
 #[cfg(test)]
 mod tests {

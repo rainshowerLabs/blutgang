@@ -25,6 +25,11 @@ use crate::{
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
+        system::{
+            metrics_channel,
+            metrics_monitor,
+            RpcMetrics,
+        },
         types::Settings,
     },
     health::{
@@ -135,6 +140,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
+    #[cfg(feature = "prometheusd")]
+    {
+        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let registry = RpcMetrics::init(&storage_registry);
+        tokio::task::spawn(metrics_monitor(metrics_rx, storage_registry));
+    }
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
