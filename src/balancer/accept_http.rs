@@ -44,8 +44,6 @@ use serde_json::Value;
 #[cfg(not(feature = "xxhash"))]
 use blake3::hash;
 
-use memchr::memmem;
-
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
 #[cfg(feature = "xxhash")]
@@ -196,30 +194,8 @@ macro_rules! get_response {
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
 
-                // TODO: This is a temp fix to mitigate DB corruption issues.
-                // This worsens performance by quite a bit and should not be left as is.
-                //
-                // If a cached response returns null, remove it from the DB and querry
-                // a node for a proper response.
-                if memmem::find(&rax, "null}".as_bytes()).is_some() {
-                    let _ = $cache.remove($tx_hash.as_bytes());
-                    fetch_from_rpc!(
-                        $tx,
-                        $id,
-                        $rpc_list_rwlock,
-                        $rpc_position,
-                        $cache,
-                        $tx_hash,
-                        $finalized_rx,
-                        $named_numbers,
-                        $head_cache,
-                        $ttl,
-                        $max_retries
-                    )
-                } else {
-                    cached["id"] = $id.into();
-                    cached.to_string()
-                }
+                cached["id"] = $id.into();
+                cached.to_string()
             }
             Ok(None) => {
                 fetch_from_rpc!(
