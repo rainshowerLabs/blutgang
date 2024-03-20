@@ -187,13 +187,13 @@ impl Rpc {
     // Update the latency of the last n calls.
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
-        #[cfg(feature = "prometheusd")]
-        let metric_channel = RegistryChannel::new();
-        #[cfg(feature = "prometheusd")]
-        let metric =
-            RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
-        #[cfg(feature = "prometheusd")]
-        let (mut tx, mut rx) = RegistryChannel::channel("Rpc latency ");
+        // #[cfg(feature = "prometheusd")]
+        // let metric_channel = RegistryChannel::new();
+        // #[cfg(feature = "prometheusd")]
+        // let metric =
+        //     RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
+        // #[cfg(feature = "prometheusd")]
+        // let (mut tx, mut rx) = RegistryChannel::channel("Rpc latency ");
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
             self.status.latency_data.remove(0);
@@ -204,12 +204,12 @@ impl Rpc {
         let avg =
             self.status.latency_data.iter().sum::<f64>() / self.status.latency_data.len() as f64;
         self.status.latency = avg;
-        #[cfg(feature = "prometheusd")]
-        RegistryChannel::on_push_latency(&metric_channel, &self.name, &self.url, avg, metric.clone(), rx, tx);
-        #[cfg(feature = "prometheusd")]
-        let report = RegistryChannel::encode_channel(&metric_channel);
-        #[cfg(feature = "prometheusd")]
-        log_info!("Prometheus metrics: {}", report.unwrap());
+        // #[cfg(feature = "prometheusd")]
+        // RegistryChannel::on_push_latency(&metric_channel, &self.name, &self.url, avg, metric.clone(), rx, tx);
+        // #[cfg(feature = "prometheusd")]
+        // let report = RegistryChannel::encode_channel(&metric_channel);
+        // #[cfg(feature = "prometheusd")]
+        // log_info!("Prometheus metrics: {}", report.unwrap());
     }
 }
 

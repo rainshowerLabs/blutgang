@@ -9,9 +9,9 @@ pub const TAGLINE: &str = "`Now there's a way forward.`";
 use atomic_refcell::AtomicRefCell;
 use url::ParseError;
 use crate::Rpc;
-use futures::FutureExt;
+use futures::{channel::mpsc, FutureExt};
 use once_cell::sync::Lazy;
-use prometheus::Registry;
+use prometheus::{proto::MetricType, Registry};
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
@@ -19,29 +19,24 @@ use prometheus_metric_storage::{
 use thiserror::Error;
 
 use std::{
-    collections::hash_map::HashMap,
-    future::IntoFuture,
-    sync::{Arc, RwLock},
-    time::Duration,
+    collections::hash_map::HashMap, future::IntoFuture, ops::Deref, sync::{Arc, RwLock}, time::Duration
 };
 use tokio::sync::{
     mpsc::{
+        channel,
         unbounded_channel,
         UnboundedReceiver,
         UnboundedSender,
     },
     oneshot,
-    Notify,
+    Notify,  
 };
 
-// Canidate for metrics storage
-// // #[cfg(feature = "prometheusd")]
-// type MetricsRegistry = AtomicRefCell<Lazy<StorageRegistry>>;
 
 //Canidate for metrics storage
-#[cfg(feature = "prometheusd")]
+//#[cfg(feature = "prometheusd")]
 pub type MetricSender = UnboundedSender<RpcMetrics>;
-#[cfg(feature = "prometheusd")]
+//#[cfg(feature = "prometheusd")]
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
 #[derive(Debug)]
@@ -50,22 +45,7 @@ pub struct RegistryChannel {
     notify: Notify,
 }
 
-//WIP for a session typed pattern
-// See: https://stanford-cs242.github.io/f19/lectures/09-1-session-types.html
-// pub trait HasDualMetrics {
-//     type DualMetrics;
-// }
-// impl HasDualMetrics for MetricSender {
-//     type DualMetrics = MetricReceiver;
-// }
-
-// impl HasDualMetrics for MetricReceiver {
-//     type DualMetrics = MetricSender;
-// }
-// Pub struct DualMetricsChannel <T: HasDualMetrics> {}
-// impl DualMetricsChannel<MetricSender> {}
-// impl DualMetricsChannel<MetricReceiver> {}
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 #[derive(Debug, Error)]
 pub enum MetricsError {
     #[error(transparent)]
@@ -73,14 +53,14 @@ pub enum MetricsError {
     #[error(transparent)]
     RPCError(#[from] crate::rpc::error::RpcError),
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 impl From<MetricsError> for String {
     fn from(error: MetricsError) -> Self {
     error.to_string()
     }
 }
-#[cfg(feature = "prometheusd")]
-#[derive(MetricStorage, Clone, Debug)]
+// #[cfg(feature = "prometheusd")]
+#[derive(MetricStorage, Clone, Debug, )]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
@@ -88,7 +68,7 @@ pub struct RpcMetrics {
     #[metric(labels("path", "method"), help = "latency of rpc calls")]
     duration: prometheus::HistogramVec,
 }
-#[cfg(feature = "prometheusd")]
+//#[cfg(feature = "prometheusd")]
 impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
@@ -111,127 +91,110 @@ pub fn log_journald(level: u32, message: &str) {
     journal::print(level, message);
 }
 
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsReciever {
     inner: MetricReceiver,
-    pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 impl std::fmt::Debug for RpcMetricsReciever {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("RpcMetricsReciever").finish()
     }
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub struct RpcMetricsSender {
     inner: MetricSender,
-    pub name: &'static str,
     metrics: Option<RpcMetrics>,
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 impl std::fmt::Debug for RpcMetricsSender {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("RpcMetricsSender").finish()
     }
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
 pub enum MetricsCommand<'a> { 
     Flush(&'a RegistryChannel),
     Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
+    PushLatency(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, f64),
+    PushRequest(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, &'a u16, Duration),
+    PushError(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, &'a u16, Duration),
     Push(&'a RpcMetrics, &'a RegistryChannel),
     Pull(&'a RpcMetrics, &'a RegistryChannel),
 }
 
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
 pub enum MetricChannelCommand {
     AdminMsg(oneshot::Sender<RpcMetrics>),
     StatsMsg(oneshot::Sender<RpcMetrics>),
 }
 
-#[cfg(feature = "prometheusd")]
-impl RegistryChannel {
-    pub fn new() -> Self {
-        RegistryChannel {
-            registry: Lazy::new(|| {
-                let registry =
-                    Registry::new_custom(Some("blutgang_metrics_channel".to_string()), None)
-                        .unwrap();
-                StorageRegistry::new(registry)
-            }),
-            notify: Notify::new(),
+//#[cfg(feature = "prometheusd")]
+pub async fn metrics_update_sink(mut metrics_rx: RpcMetricsReciever) {
+    loop {
+        while(metrics_rx.inner.recv().await.is_some()) {
+            continue;
         }
     }
-
-    pub fn get_storage_registry(&self) -> &Lazy<StorageRegistry> {
-        &self.registry
-    }
-
-    pub fn get_registry(&self) -> &Registry {
-        &self.get_storage_registry().registry()
-    }
-    pub fn notify(&self) -> &Notify {
-        &self.notify
-    }
-    //TODO: should (Sender, Reciver) be wrapped in Result, Error?
-    //TODO: compare crossbeam_channel to mpsc
-    pub fn channel(name: &'static str) -> (RpcMetricsSender, RpcMetricsReciever) {
-        let (tx, rx) = unbounded_channel();
-        let tx = RpcMetricsSender {
-            inner: tx,
-            name,
-            metrics: None,
-        };
-        let rx = RpcMetricsReciever {
-            inner: rx,
-            name,
-            metrics: None,
-        };
-        (tx, rx)
-    }
-
-    pub fn on_flush(&self, tx: RpcMetricsSender) {
-        use crate::log_info;
-        let command = MetricsCommand::Flush(self);
-        log_info!("Flushing metrics");
-        let command = MetricsCommand::Flush(self.clone());
-        // tx.inner.send().unwrap();
-        self.notify.notify_one();
-    }
-
-    pub fn encode_channel(&self) -> Result<String, ParseError> {
-        use prometheus::Encoder;
-        let encoder = prometheus::TextEncoder::new();
-        let mut buffer = vec![];
-        encoder
-            .encode(&self.registry.gather(), &mut buffer)
-            .unwrap();
-        let report = String::from_utf8(buffer.clone()).expect("Failed to parse prometheus report");
-        buffer.clear();
-        Ok(report)          
-            
-    }
-
-    pub fn on_push(&self, path: &str, method: &str, status: u16, dt: f64, metrics: RpcMetrics, mut rx: RpcMetricsReciever, tx: RpcMetricsSender) {
-        let command = MetricsCommand::Push(&metrics, self);
-        self.notify.notify_one();
-        metrics.requests.with_label_values(&[path, method, &status.to_string(), ]).inc();
-        metrics.duration.with_label_values(&[path, method]).observe(dt);
-        let send = tx.inner.send(metrics);
-        let recv = rx.inner.recv();
-    }
-
-    pub fn on_push_latency(&self, path: &str, method: &str, dt: f64, metrics: RpcMetrics, mut rx: RpcMetricsReciever, tx: RpcMetricsSender) {
-        let command = MetricsCommand::Push(&metrics, self);
-        self.notify.notify_one();
-        metrics.duration.with_label_values(&[path, method]).observe(dt);
-        let send = tx.inner.send(metrics);
-        let recv = rx.inner.recv();
-    }
-
 }
+//#[cfg(feature = "prometheusd")]
+pub async fn listen_for_metrics(metric: RpcMetrics, metrics_tx: RpcMetricsSender) {
+    unimplemented!()
+    // let mut tx.inner.
+}
+
+pub async fn metrics_listener(mut metrics_rx: RpcMetricsReciever, metrics_status: Arc<RwLock<RpcMetrics>>){
+    while let Some(update) = metrics_rx.inner.recv().await {
+        //TODO: match for metrics type, latency, errors, requests
+        //match metric {
+        //MetricsType::Latency => {
+        //}
+        let mut metrics = metrics_status.write().unwrap();
+        *metrics = update;
+    }
+}
+
+async fn metrics_processor(mut metrics_rx: RpcMetricsReciever, metrics_status: Arc<RwLock<RpcMetrics>>, path: &str, method: &str, status: &u16, duration: Duration){
+    loop {
+    while let Some(incoming) = metrics_rx.inner.recv().await {
+        let mut current_metrics = metrics_status.read().unwrap();
+        let _ = incoming.requests_complete(path, method, status, duration);
+    }
+    }
+}
+
+
+pub async fn metrics_monitor(mut metrics_rx: RpcMetricsReciever, mut metrics_tx: RpcMetricsSender, storage_registry: StorageRegistry) {
+    //TODO: figure ownership mess here
+    let metrics_status = Arc::new(RwLock::new(RpcMetrics::instance(&storage_registry).unwrap().to_owned()));
+    let metrics_stat_listener = metrics_status.clone();
+    tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
+    //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;   
+}
+
+//#[cfg(feature = "prometheusd")]
+// pub async fn spawn_metrics_channel(metrics_status: Arc<RwLock<Vec<Rpc>>>, mut rx: MetricReceiver) {        
+//     use crate::log_info;
+//     let (tx, rx) = unbounded_channel();
+//     let tx = RpcMetricsSender {
+//         inner: tx,
+//         metrics: None,
+//     };
+//     let rx = RpcMetricsReciever {
+//         inner: rx,
+//         metrics: None,
+//     };
+//     tokio::spawn();
+//     }
+
+// struct MetricsChannel {
+//     metrics: RpcMetrics,
+//     rx: RpcMetricsReciever,
+// }
+
 
 #[macro_export]
 macro_rules! log_info {
