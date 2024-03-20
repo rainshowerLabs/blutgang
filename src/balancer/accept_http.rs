@@ -223,7 +223,19 @@ macro_rules! get_response {
 }
 
 macro_rules! fetch_from_rpc {
-    ($tx:expr, $id:expr, $rpc_list_rwlock:expr, $rpc_position:expr, $cache:expr, $tx_hash:expr, $finalized_rx:expr, $named_numbers:expr, $head_cache:expr, $ttl:expr, $max_retries:expr) => {{
+    (
+        $tx:expr,
+        $id:expr,
+        $rpc_list_rwlock:expr,
+        $rpc_position:expr,
+        $cache:expr,
+        $tx_hash:expr,
+        $finalized_rx:expr,
+        $named_numbers:expr,
+        $head_cache:expr,
+        $ttl:expr,
+        $max_retries:expr
+    ) => {{
         // Kinda jank but set the id back to what it was before
         $tx["id"] = $id.into();
 
