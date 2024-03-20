@@ -201,14 +201,38 @@ macro_rules! get_response {
                 // a node for a proper response.
                 if cached["method"] == Value::Null {
                     let _ = $cache.remove($tx_hash.as_bytes());
-                    fetch_from_rpc!($tx, $id, $rpc_list_rwlock, $rpc_position, $cache, $tx_hash, $finalized_rx, $named_numbers, $head_cache, $ttl, $max_retries)
+                    fetch_from_rpc!(
+                        $tx,
+                        $id,
+                        $rpc_list_rwlock,
+                        $rpc_position,
+                        $cache,
+                        $tx_hash,
+                        $finalized_rx,
+                        $named_numbers,
+                        $head_cache,
+                        $ttl,
+                        $max_retries
+                    )
                 } else {
                     cached["id"] = $id.into();
                     cached.to_string()
                 }
-            },
+            }
             Ok(None) => {
-                fetch_from_rpc!($tx, $id, $rpc_list_rwlock, $rpc_position, $cache, $tx_hash, $finalized_rx, $named_numbers, $head_cache, $ttl, $max_retries)
+                fetch_from_rpc!(
+                    $tx,
+                    $id,
+                    $rpc_list_rwlock,
+                    $rpc_position,
+                    $cache,
+                    $tx_hash,
+                    $finalized_rx,
+                    $named_numbers,
+                    $head_cache,
+                    $ttl,
+                    $max_retries
+                )
             }
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg

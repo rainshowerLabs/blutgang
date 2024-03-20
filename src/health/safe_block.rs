@@ -99,7 +99,7 @@ pub async fn get_safe_block(
             let reported_finalized = match result {
                 Ok(Ok(response)) => response,
                 Err(_) => 0,
-                Ok(Err(_)) => 0,                 
+                Ok(Err(_)) => 0,
             };
 
             // Send the result to the main thread through the channel
