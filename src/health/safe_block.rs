@@ -225,6 +225,7 @@ pub async fn subscribe_to_new_heads(
             }
             Ok(None) => {
                 // Handle the case where the channel is closed
+                log_err!("newHeads channel closed.");
                 panic!("FATAL: Channel closed in newHeads subscription.");
             }
             Err(_) => {
@@ -232,7 +233,13 @@ pub async fn subscribe_to_new_heads(
                 {
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
                     nn_rwlock.latest = 0;
-                    incoming_tx.send(WsconnMessage::Reconnect()).unwrap();
+                    match incoming_tx.send(WsconnMessage::Reconnect()) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            log_err!("WS incoming channel closed.");
+                            panic!("FATAL: WS module failed trying to reinitialize! Please restart Blutgang!");
+                        },
+                    }
                 }
                 log_wrn!("Timeout in newHeads subscription, possible connection failiure or missed block.");
                 let node_id = match sub_data.get_node_from_id(&subscription_id) {
