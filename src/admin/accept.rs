@@ -1,4 +1,11 @@
-use crate::log_info;
+use crate::{
+    admin::liveready::{
+        accept_health_request,
+        accept_readiness_request,
+        LiveReadyRequestSnd,
+    },
+    log_info,
+};
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -131,7 +138,14 @@ pub async fn accept_admin_request(
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     cache: Arc<Db>,
     config: Arc<RwLock<Settings>>,
+    liveness_request_tx: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    if tx.uri().path() == "/ready" {
+        return accept_readiness_request(liveness_request_tx).await;
+    } else if tx.uri().path() == "/health" {
+        return accept_health_request(liveness_request_tx).await;
+    }
+
     let mut tx = incoming_to_value(tx).await.unwrap();
 
     // If we have JWT enabled check that tx is valid

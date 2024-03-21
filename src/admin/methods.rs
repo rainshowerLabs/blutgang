@@ -1,3 +1,14 @@
+#[cfg(feature = "prometheusd")]
+use crate::config::system::{
+    MetricChannelCommand,
+    MetricReceiver,
+    MetricSender,
+    MetricsCommand,
+    MetricsError,
+    RegistryChannel,
+    RpcMetrics,
+    RpcMetricsSender,
+};
 use crate::{
     admin::error::AdminError,
     Rpc,
@@ -128,8 +139,19 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
         "jsonrpc": "2.0",
         "result": format!("Cache flushed in {:?}", time),
     });
-
     Ok(rx)
+}
+
+#[cfg(feature = "prometheusd")]
+async fn admin_flush_metrics(
+    channel: &RegistryChannel,
+    tx: RpcMetricsSender,
+) -> Result<(), MetricsError> {
+    let dt = Instant::now();
+
+    let command = MetricsCommand::Flush(channel);
+    channel.on_flush(tx);
+    Ok(())
 }
 
 // Respond with the config we started blutgang with

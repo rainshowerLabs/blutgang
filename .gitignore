@@ -7,3 +7,5 @@
 /config.toml
 /.env
 /default.sled
+.local-history
+src/config/test_metrics.json

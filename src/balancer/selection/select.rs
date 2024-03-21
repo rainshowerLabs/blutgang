@@ -2,7 +2,7 @@ use crate::Rpc;
 use std::time::SystemTime;
 
 // Generic entry point fn to select the next rpc and return its position
-pub fn pick(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+pub fn pick(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // If len is 1, return the only element
     if list.len() == 1 {
         return (list[0].clone(), Some(0));
@@ -35,7 +35,7 @@ pub fn argsort(data: &[Rpc]) -> Vec<usize> {
     not(feature = "selection-random"),
     not(feature = "old-weighted-round-robin"),
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // Sort by latency
     let indices = argsort(list);
 
@@ -84,7 +84,7 @@ fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     feature = "selection-weighed-round-robin",
     feature = "old-weighted-round-robin",
 ))]
-fn algo(list: &mut Vec<Rpc>) -> (Rpc, Option<usize>) {
+fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     // Sort by latency
     let indices = argsort(list);
 

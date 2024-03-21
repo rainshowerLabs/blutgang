@@ -14,8 +14,9 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
-      cargoMeta = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-      in {
+        cargoMeta = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+      in
+      {
         packages.default = pkgs.rustPlatform.buildRustPackage {
           pname = cargoMeta.package.name;
           version = cargoMeta.package.version;
@@ -33,7 +34,6 @@
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
           ];
-
           cargoBuildFlags = [ "--profile maxperf" ];
         };
 
@@ -43,8 +43,10 @@
             pkg-config
             openssl
             systemd
-            (rust-bin.stable.latest.default.override { 
-              extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer"];
+            clang
+            gdb
+            (rust-bin.stable.latest.default.override {
+              extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
           ];
 
@@ -53,9 +55,13 @@
             export RUSTC_WRAPPER=$(which sccache)
             export OLD_PS1="$PS1" # Preserve the original PS1
             export PS1="nix-shell:blutgang $PS1" # Customize this line as needed
+
+            # Set NIX_LD and NIX_LD_LIBRARY_PATH for rust-analyzer
+            export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.glibc pkgs.gcc-unwrapped.lib ]}"
+            export NIX_LD="${pkgs.stdenv.cc}/nix-support/dynamic-linker"
           '';
 
-          # reser PS1
+          # reset ps1
           shellExitHook = ''
             export PS1="$OLD_PS1"
           '';

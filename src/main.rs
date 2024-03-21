@@ -6,7 +6,14 @@ mod rpc;
 mod websocket;
 
 use crate::{
-    admin::listener::listen_for_admin_requests,
+    admin::{
+        listener::listen_for_admin_requests,
+        liveready::{
+            liveness_update_sink,
+            LiveReadyUpdate,
+            ReadinessState,
+        },
+    },
     balancer::{
         accept_http::{
             accept_request,
@@ -18,6 +25,12 @@ use crate::{
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
+        system::{
+            metrics_channel,
+            metrics_monitor,
+            RpcMetrics,
+            metrics_update_sink,
+        },
         types::Settings,
     },
     health::{
@@ -123,8 +136,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (finalized_tx, finalized_rx) = watch::channel(0);
 
     let finalized_rx_arc = Arc::new(finalized_rx.clone());
-    let rpc_poverty_list = Arc::new(RwLock::new(Vec::<Rpc>::new()));
+    let rpc_poverty_list = Arc::new(RwLock::new(config.read().unwrap().poverty_list.clone()));
 
+    // We need liveness status channels even if admin is unused
+    let (liveness_tx, liveness_rx) = mpsc::channel(16);
+
+    // TODO: using this for testing because of ownership eval of rx under feature flag 
+    let prometheus_enabled :bool = true;
+    let (metrics_tx, metrics_rx) = metrics_channel().await;
+    
+    #[cfg(feature = "prometheusd")]
+    {
+        if prometheus_enabled {
+        let metrics_rx_ws = Arc::new(&metrics_rx);
+        let metrics_rx_http = Arc::new(&metrics_rx);
+        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+        let registry = RpcMetrics::init(&storage_registry);
+        let registry_arc = Arc::new(RwLock::new(registry));
+        tokio::task::spawn(metrics_monitor(metrics_rx, storage_registry));
+        } else {
+            tokio::task::spawn(metrics_update_sink(metrics_rx));
+        }
+            
+    }
+
+
+        
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
@@ -138,9 +175,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 poverty_list_admin,
                 cache_admin,
                 config_admin,
+                liveness_rx,
             )
             .await;
         });
+    } else {
+        // dont want to deal with potentially dropped channels if admin is disabled?
+        // create a sink to immediately drop all messages you receive!
+        tokio::task::spawn(liveness_update_sink(liveness_rx));
     }
 
     // Spawn a thread for the head cache
@@ -168,12 +210,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let rpc_list_health = Arc::clone(&rpc_list_rwlock);
         let named_blocknumbers_health = Arc::clone(&named_blocknumbers);
+        let liveness_tx_health = liveness_tx.clone();
 
         tokio::task::spawn(async move {
             let _ = health_check(
                 rpc_list_health,
                 poverty_list_health,
                 finalized_tx,
+                liveness_tx_health,
                 &named_blocknumbers_health,
                 &config_health,
             )
@@ -258,6 +302,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
         }
     }
+
+    // Send an update to change the state to ready
+    let _ = liveness_tx
+        .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+        .await;
 
     // We start a loop to continuously accept incoming connections
     loop {
