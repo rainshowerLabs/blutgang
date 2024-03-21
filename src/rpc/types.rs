@@ -160,7 +160,7 @@ impl Rpc {
         });
 
         let number: Value =
-            unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?).unwrap() };
+            unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?)? };
         let number = &number["result"]["number"];
 
         let number = match number.as_str() {
