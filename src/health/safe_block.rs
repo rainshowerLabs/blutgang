@@ -95,9 +95,11 @@ pub async fn get_safe_block(
             let a = rpc_clone.get_finalized_block();
             let result = timeout(Duration::from_millis(ttl), a).await;
 
+            // Handle timeout as 0
             let reported_finalized = match result {
-                Ok(response) => response.unwrap(), // Handle timeout as 0
-                Err(_) => 0,                       // Handle timeout as 0
+                Ok(Ok(response)) => response,
+                Err(_) => 0,
+                Ok(Err(_)) => 0,
             };
 
             // Send the result to the main thread through the channel
