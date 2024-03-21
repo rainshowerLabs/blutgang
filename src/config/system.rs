@@ -117,7 +117,7 @@ impl std::fmt::Debug for RpcMetricsSender {
 // #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
 pub enum MetricsCommand<'a> {
-    Flush(&'a RegistryChannel),
+    Flush(),
     Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
     PushLatency(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, f64),
     PushRequest(
@@ -194,7 +194,7 @@ async fn metrics_processor(
 // async fn metrics_encoder(mut metrics_rx: RpcMetricsReciever) -> String {
 //     let encoder = prometheus::TextEncoder::new();
 //     let mut buffer = vec![];
-//     encoder.encode().unwrap();
+//     encoder.
 // }
 
 pub async fn metrics_monitor(metrics_rx: RpcMetricsReciever, storage_registry: StorageRegistry) {
