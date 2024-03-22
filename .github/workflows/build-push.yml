@@ -2,8 +2,10 @@ name: Build docker image
 
 on:
   push:
+    branches:
+      - master
     tags:
-      - '*'
+      - '**'
 
 jobs:
 
@@ -34,7 +36,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: rainshowerlabs/blutgang
+        images: makemake1337/blutgang
         tags: |
           type=semver,pattern={{version}}
 
