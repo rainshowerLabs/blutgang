@@ -183,7 +183,9 @@ async fn metrics_processor(
     status: &u16,
     duration: Duration,
 ) {
+    let mut interval = tokio::time::interval(Duration::from_millis(10));
     loop {
+        interval.tick().await;
         while let Some(incoming) = metrics_rx.inner.recv().await {
             let _current_metrics = metrics_status.read().unwrap();
             incoming.requests_complete(path, method, status, duration);

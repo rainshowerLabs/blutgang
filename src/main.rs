@@ -28,8 +28,8 @@ use crate::{
         system::{
             metrics_channel,
             metrics_monitor,
-            RpcMetrics,
             metrics_update_sink,
+            RpcMetrics,
         },
         types::Settings,
     },
@@ -141,27 +141,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
-    // TODO: using this for testing because of ownership eval of rx under feature flag 
-    let prometheus_enabled :bool = true;
+    // TODO: using this for testing because of ownership eval of rx under feature flag
+    let prometheus_enabled: bool = true;
     let (metrics_tx, metrics_rx) = metrics_channel().await;
-    
+
     #[cfg(feature = "prometheusd")]
     {
         if prometheus_enabled {
-        let metrics_rx_ws = Arc::new(&metrics_rx);
-        let metrics_rx_http = Arc::new(&metrics_rx);
-        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
-        let registry = RpcMetrics::init(&storage_registry);
-        let registry_arc = Arc::new(RwLock::new(registry));
-        tokio::task::spawn(metrics_monitor(metrics_rx, storage_registry));
+            let metrics_rx_ws = Arc::new(&metrics_rx);
+            let metrics_rx_http = Arc::new(&metrics_rx);
+            let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+            let registry = RpcMetrics::init(&storage_registry);
+            let registry_arc = Arc::new(RwLock::new(registry));
+            tokio::task::spawn(async move {
+                let _ = metrics_monitor(metrics_rx, storage_registry).await;
+            });
         } else {
             tokio::task::spawn(metrics_update_sink(metrics_rx));
         }
-            
     }
 
-
-        
     // Spawn a thread for the admin namespace if enabled
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);

@@ -1,10 +1,3 @@
-use crate::config::system::{
-    MetricReceiver,
-    MetricSender,
-    RegistryChannel,
-    RpcMetrics,
-};
-use crate::log_info;
 use crate::rpc::error::RpcError;
 use reqwest::Client;
 use serde_json::{
