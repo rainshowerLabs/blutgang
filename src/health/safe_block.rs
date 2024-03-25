@@ -234,11 +234,11 @@ pub async fn subscribe_to_new_heads(
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
                     nn_rwlock.latest = 0;
                     match incoming_tx.send(WsconnMessage::Reconnect()) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(_) => {
                             log_err!("WS incoming channel closed.");
                             panic!("FATAL: WS module failed trying to reinitialize! Please restart Blutgang!");
-                        },
+                        }
                     }
                 }
                 log_wrn!("Timeout in newHeads subscription, possible connection failiure or missed block.");

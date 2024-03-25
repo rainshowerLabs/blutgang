@@ -25,10 +25,9 @@ async fn set_starting_latency(
         match rpc.syncing().await {
             Ok(false) => {}
             Ok(true) => {
-                tx.send(StartingLatencyResp::Error(rpc, ConfigError::Syncing())).await?;
-                return Err(ConfigError::RpcError(
-                    "Node syncing to head".to_string(),
-                ));
+                tx.send(StartingLatencyResp::Error(rpc, ConfigError::Syncing()))
+                    .await?;
+                return Err(ConfigError::RpcError("Node syncing to head".to_string()));
             }
             Err(e) => {
                 tx.send(StartingLatencyResp::Error(rpc, e.into())).await?;

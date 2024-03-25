@@ -38,6 +38,7 @@ use tokio::{
     sync::{
         broadcast,
         mpsc,
+        oneshot,
     },
     time::{
         sleep,
@@ -48,6 +49,12 @@ use tokio::{
 #[derive(Debug, Default)]
 struct HeadResult {
     rpc_list_index: usize,
+    is_syncing: bool,
+    reported_head: u64,
+}
+
+#[derive(Debug)]
+struct InnerResult {
     is_syncing: bool,
     reported_head: u64,
 }
@@ -150,28 +157,39 @@ async fn head_check(
 
         // Spawn a future for each RPC
         let rpc_future = async move {
+            let (send_tx, send_rx) = oneshot::channel();
+
             // Check the current block number
-            let a = rpc_clone.block_number();
-            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
+            let a = async move {
+                let block_number = rpc_clone.block_number().await.unwrap_or(0);
+                let syncing = rpc_clone.syncing().await.unwrap_or(true);
 
-            let head = match result {
-                Ok(response) => response.unwrap_or(0), // Handle timeout as 0
-                Err(_) => 0,                           // Handle timeout as 0
+                let rax = InnerResult {
+                    is_syncing: syncing,
+                    reported_head: block_number,
+                };
+
+                let _ = send_tx.send(rax);
             };
+            tokio::spawn(a);
 
-            // Checks if the node is syncing
-            let a = rpc_clone.syncing();
-            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
+            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), send_rx).await;
 
-            let sync = match result {
-                Ok(response) => response.unwrap_or(true), // Handle timeout as true
-                Err(_) => true,                           // Handle timeout as true
+            let result = match result {
+                Ok(Ok(response)) => response,
+                // Handle timeout as failiure
+                Err(_) | Ok(Err(_)) => {
+                    InnerResult {
+                        is_syncing: true,
+                        reported_head: 0,
+                    }
+                }
             };
 
             let head_result = HeadResult {
                 rpc_list_index: i,
-                is_syncing: sync,
-                reported_head: head,
+                is_syncing: result.is_syncing,
+                reported_head: result.reported_head,
             };
 
             // Send the result to the main thread through the channel
@@ -489,5 +507,4 @@ mod tests {
         // The poverty list should have 1 RPC
         assert_eq!(poverty_list_guard.len(), 1);
     }
-
 }

@@ -219,11 +219,15 @@ fn extract_sync(rx: &str) -> Result<bool, RpcError> {
     let result = &json["result"];
 
     if result.is_boolean() {
-        result.as_bool().ok_or_else(|| RpcError::InvalidResponse("Boolean expected".to_string()))
+        result
+            .as_bool()
+            .ok_or_else(|| RpcError::InvalidResponse("Boolean expected".to_string()))
     } else if result.is_object() {
         Ok(true) // Syncing information present, thus syncing is in progress
     } else {
-        Err(RpcError::InvalidResponse("Unexpected result format".to_string()))
+        Err(RpcError::InvalidResponse(
+            "Unexpected result format".to_string(),
+        ))
     }
 }
 
