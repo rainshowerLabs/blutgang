@@ -40,7 +40,6 @@ use tokio::sync::{
     Notify,
 };
 
-//Canidate for metrics storage
 //#[cfg(feature = "prometheusd")]
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 //#[cfg(feature = "prometheusd")]
@@ -72,7 +71,7 @@ impl From<MetricsError> for String {
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
     requests: prometheus::IntCounterVec,
-    #[metric(labels("path", "method"), help = "latency of rpc calls")]
+    #[metric(labels("path", "method"), help = "latency of request")]
     duration: prometheus::HistogramVec,
 }
 //#[cfg(feature = "prometheusd")]
@@ -80,15 +79,11 @@ impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
     }
-    pub fn requests_complete(&self, path: &str, method: &str, status: &u16, duration: Duration) {
-        let dt = duration.as_millis() as f64;
+    pub fn requests_complete(&self, path: &str, method: &str, status: &u16, dt: Duration) {
         self.requests
             .with_label_values(&[path, method, &status.to_string()])
             .inc();
-        self.duration.with_label_values(&[path, method]).observe(dt)
-    }
-    pub fn push_latency(&self, path: &str, method: &str, dt: f64) {
-        self.duration.with_label_values(&[path, method]).observe(dt)
+        self.duration.with_label_values(&[path, method]).observe(dt.as_millis() as f64)
     }
 }
 
@@ -99,32 +94,10 @@ pub fn log_journald(level: u32, message: &str) {
 }
 
 // #[cfg(feature = "prometheusd")]
-pub struct RpcMetricsReciever {
-    inner: MetricReceiver,
-    metrics: Option<RpcMetrics>,
-}
-// #[cfg(feature = "prometheusd")]
-impl std::fmt::Debug for RpcMetricsReciever {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("RpcMetricsReciever").finish()
-    }
-}
-// #[cfg(feature = "prometheusd")]
-pub struct RpcMetricsSender {
-    inner: MetricSender,
-    metrics: Option<RpcMetrics>,
-}
-// #[cfg(feature = "prometheusd")]
-impl std::fmt::Debug for RpcMetricsSender {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("RpcMetricsSender").finish()
-    }
-}
-// #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
 pub enum MetricsCommand<'a> {
     Flush(),
-    Channel(&'a RpcMetricsSender, &'a RpcMetricsReciever),
+    Channel(&'a MetricSender, &'a MetricReceiver),
     PushLatency(&'a RpcMetrics, &'a RegistryChannel, &'a str, &'a str, f64),
     PushRequest(
         &'a RpcMetrics,
@@ -154,24 +127,24 @@ pub enum MetricChannelCommand {
 }
 
 //#[cfg(feature = "prometheusd")]
-pub async fn metrics_update_sink(mut metrics_rx: RpcMetricsReciever) {
+pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
     loop {
-        while metrics_rx.inner.recv().await.is_some() {
+        while metrics_rx.recv().await.is_some() {
             continue;
         }
     }
 }
 //#[cfg(feature = "prometheusd")]
-pub async fn listen_for_metrics(_metric: RpcMetrics, _metrics_tx: RpcMetricsSender) {
+pub async fn listen_for_metrics(_metric: RpcMetrics, _metrics_tx: MetricSender) {
     unimplemented!()
     // let mut tx.inner.
 }
 
 pub async fn metrics_listener(
-    mut metrics_rx: RpcMetricsReciever,
+    mut metrics_rx: MetricReceiver,
     metrics_status: Arc<RwLock<RpcMetrics>>,
 ) {
-    while let Some(update) = metrics_rx.inner.recv().await {
+    while let Some(update) = metrics_rx.recv().await {
         //TODO: match for metrics type, latency, errors, requests
         //match metric {
         //MetricsType::Latency => {
@@ -182,7 +155,7 @@ pub async fn metrics_listener(
 }
 
 async fn metrics_processor(
-    mut metrics_rx: RpcMetricsReciever,
+    mut metrics_rx: MetricReceiver,
     metrics_status: Arc<RwLock<RpcMetrics>>,
     path: &str,
     method: &str,
@@ -192,7 +165,7 @@ async fn metrics_processor(
     let mut interval = tokio::time::interval(Duration::from_millis(10));
     loop {
         interval.tick().await;
-        while let Some(incoming) = metrics_rx.inner.recv().await {
+        while let Some(incoming) = metrics_rx.recv().await {
             let _current_metrics = metrics_status.read().unwrap();
             incoming.requests_complete(path, method, status, duration);
         }
@@ -200,17 +173,24 @@ async fn metrics_processor(
 }
 /// Accepts metrics request, encodes and prints
 //#[cfg(feature = "prometheusd")]
-async fn accept_metrics_request(tx: Request<hyper::body::Incoming>, metrics_rx_ws : Arc<RpcMetricsReciever>, metrics_rx_http: Arc<RpcMetricsReciever>, registry_state: Arc<RwLock<StorageRegistry>> ) -> Result<String, Infallible> 
+async fn accept_metrics_request(tx: Request<hyper::body::Incoming>, metrics_tx : Arc<MetricSender>, registry_state: Arc<RwLock<StorageRegistry>> ) -> Result<String, Infallible> 
 {
-    unimplemented!()
-    // if tx.uri().path() == "/ws_metrics"  {
-    //     todo!()
-    // } else if tx.uri().path() == "/http_metrics" {
-    //     todo!()
-    // }
-    // let mut tx
+    if tx.uri().path() == "/ws_metrics"  {
+        return accept_ws_request(metrics_tx).await;            
+    } else if tx.uri().path() == "/http_metrics" {
+        return accept_http_request(metrics_tx).await;
+    }
+    let mut metrics = metrics_encoder(registry_state).await;
+    Ok(metrics)
     
 
+}
+
+async fn accept_ws_request(metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+    unimplemented!()
+}
+async fn accept_http_request(metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+    unimplemented!()
 }
 
 async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> String {
@@ -222,7 +202,7 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     String::from_utf8(buffer).unwrap()
 }
 
-pub async fn metrics_monitor(metrics_rx: RpcMetricsReciever, storage_registry: StorageRegistry) {
+pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: StorageRegistry) {
     //TODO: figure ownership mess here
     let metrics_status = Arc::new(RwLock::new(
         RpcMetrics::instance(&storage_registry).unwrap().to_owned(),
@@ -232,16 +212,8 @@ pub async fn metrics_monitor(metrics_rx: RpcMetricsReciever, storage_registry: S
     //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;
 }
 
-pub async fn metrics_channel() -> (RpcMetricsSender, RpcMetricsReciever) {
+pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
-    let tx = RpcMetricsSender {
-        inner: tx,
-        metrics: None,
-    };
-    let rx = RpcMetricsReciever {
-        inner: rx,
-        metrics: None,
-    };
     (tx, rx)
 }
 
