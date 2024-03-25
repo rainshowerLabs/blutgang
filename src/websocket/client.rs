@@ -135,7 +135,14 @@ pub async fn create_ws_vec(
     broadcast_tx: &broadcast::Sender<IncomingResponse>,
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
-    let rpc_list_clone = rpc_list.read().unwrap().clone();
+    let rpc_list_clone = rpc_list
+        .read()
+        .unwrap_or_else(|e| {
+            // Handle the case where the rpc_list RwLock is poisoned
+            log_err!("{}", e);
+            e.into_inner()
+        })
+        .clone();
     let mut ws_handles = Vec::new();
 
     for (index, rpc) in rpc_list_clone.iter().enumerate() {
