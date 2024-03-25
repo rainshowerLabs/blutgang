@@ -6,6 +6,7 @@ use std::error::Error;
 #[allow(dead_code)]
 pub enum ConfigError {
     RpcError(String),
+    Syncing(),
     BadConfig,
 }
 
@@ -13,6 +14,7 @@ impl std::fmt::Display for ConfigError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             ConfigError::RpcError(e) => write!(f, "Error while calling RPC: {}", e),
+            ConfigError::Syncing() => write!(f, "Node is syncing!"),
             ConfigError::BadConfig => write!(f, "Invalid Config File!"),
         }
     }

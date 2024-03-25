@@ -22,12 +22,18 @@ async fn set_starting_latency(
 
     for _ in 0..ma_length as u32 {
         let start = Instant::now();
-        match rpc.block_number().await {
-            Ok(_) => {}
+        match rpc.syncing().await {
+            Ok(false) => {}
+            Ok(true) => {
+                tx.send(StartingLatencyResp::Error(rpc, ConfigError::Syncing())).await?;
+                return Err(ConfigError::RpcError(
+                    "Node syncing to head".to_string(),
+                ));
+            }
             Err(e) => {
                 tx.send(StartingLatencyResp::Error(rpc, e.into())).await?;
                 return Err(ConfigError::RpcError(
-                    "Error awaiting block_number!".to_string(),
+                    "Error awaiting sync status!".to_string(),
                 ));
             }
         };
