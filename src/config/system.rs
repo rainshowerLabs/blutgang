@@ -15,8 +15,14 @@ use prometheus_metric_storage::{
     StorageRegistry,
 };
 use thiserror::Error;
-
+use http_body_util::Full;
+use hyper::{
+    body::Bytes,
+    Request,
+};
+use zerocopy::AsBytes;
 use std::{
+    convert::Infallible,
     collections::hash_map::HashMap,
     sync::{
         Arc,
@@ -192,12 +198,29 @@ async fn metrics_processor(
         }
     }
 }
+/// Accepts metrics request, encodes and prints
+//#[cfg(feature = "prometheusd")]
+async fn accept_metrics_request(tx: Request<hyper::body::Incoming>, metrics_rx_ws : Arc<RpcMetricsReciever>, metrics_rx_http: Arc<RpcMetricsReciever>, registry_state: Arc<RwLock<StorageRegistry>> ) -> Result<String, Infallible> 
+{
+    unimplemented!()
+    // if tx.uri().path() == "/ws_metrics"  {
+    //     todo!()
+    // } else if tx.uri().path() == "/http_metrics" {
+    //     todo!()
+    // }
+    // let mut tx
+    
 
-// async fn metrics_encoder(mut metrics_rx: RpcMetricsReciever) -> String {
-//     let encoder = prometheus::TextEncoder::new();
-//     let mut buffer = vec![];
-//     encoder.
-// }
+}
+
+async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> String {
+    use prometheus::Encoder;
+    let encoder = prometheus::TextEncoder::new();
+    let mut buffer = vec![];
+    let registry = storage_registry.read().unwrap().gather();
+    encoder.encode(&registry, &mut buffer).unwrap();
+    String::from_utf8(buffer).unwrap()
+}
 
 pub async fn metrics_monitor(metrics_rx: RpcMetricsReciever, storage_registry: StorageRegistry) {
     //TODO: figure ownership mess here

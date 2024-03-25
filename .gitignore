@@ -9,3 +9,4 @@
 /default.sled
 .local-history
 src/config/test_metrics.json
+Cargo.lock
