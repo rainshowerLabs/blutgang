@@ -216,16 +216,15 @@ fn extract_sync(rx: &str) -> Result<bool, RpcError> {
 
     let json: Value = unsafe { simd_json::serde::from_str(&mut rx)? };
 
-    let status = match json["result"].as_bool() {
-        Some(status) => status,
-        None => {
-            return Err(RpcError::InvalidResponse(
-                "error: Extracting response from request failed!".to_string(),
-            ))
-        }
-    };
+    let result = &json["result"];
 
-    Ok(status)
+    if result.is_boolean() {
+        result.as_bool().ok_or_else(|| RpcError::InvalidResponse("Boolean expected".to_string()))
+    } else if result.is_object() {
+        Ok(true) // Syncing information present, thus syncing is in progress
+    } else {
+        Err(RpcError::InvalidResponse("Unexpected result format".to_string()))
+    }
 }
 
 // Take in the result of `eth_getBlockByNumber`, and extract the block number
@@ -265,9 +264,15 @@ mod tests {
     use simd_json::serde::to_string;
 
     #[test]
-    fn test_extract_sync_success() {
+    fn test_extract_sync_syncing() {
         let input = json!({
-            "result": true
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "startingBlock": "0x384",
+                "currentBlock": "0x386",
+                "highestBlock": "0x454"
+            }
         });
         let input_str = to_string(&input).unwrap();
         let result = extract_sync(&input_str);
@@ -275,9 +280,27 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_sync_failure() {
+    fn test_extract_sync_not_syncing() {
         let input = json!({
-            "wrong_field": false
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": false
+        });
+        let input_str = to_string(&input).unwrap();
+        let result = extract_sync(&input_str);
+        assert_eq!(result.unwrap(), false);
+    }
+
+    #[test]
+    fn test_extract_sync_invalid() {
+        let input = json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "wrong_key": {
+                "startingBlock": "0x384",
+                "currentBlock": "0x386",
+                "highestBlock": "0x454"
+            }
         });
         let input_str = to_string(&input).unwrap();
         let result = extract_sync(&input_str);
