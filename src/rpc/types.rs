@@ -150,6 +150,21 @@ impl Rpc {
         Ok(return_number)
     }
 
+    // Returns the sync status. False if we're synced and following the head.
+    pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
+        let request = json!({
+            "method": "eth_syncing".to_string(),
+            "params": serde_json::Value::Null,
+            "id": 1,
+            "jsonrpc": "2.0".to_string(),
+        });
+
+        let sync = self.send_request(request).await?;
+        let status = extract_sync(&sync)?;
+
+        Ok(status)
+    }
+
     // Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
@@ -195,7 +210,25 @@ impl Rpc {
     }
 }
 
-// Take in the result of eth_getBlockByNumber, and extract the block number
+// Parses the result of `eth_syncing` and returns the status as a bool.
+fn extract_sync(rx: &str) -> Result<bool, RpcError> {
+    let mut rx = rx.to_string();
+
+    let json: Value = unsafe { simd_json::serde::from_str(&mut rx)? };
+
+    let status = match json["result"].as_bool() {
+        Some(status) => status,
+        None => {
+            return Err(RpcError::InvalidResponse(
+                "error: Extracting response from request failed!".to_string(),
+            ))
+        }
+    };
+
+    Ok(status)
+}
+
+// Take in the result of `eth_getBlockByNumber`, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
     let mut rx = rx.to_string();
 
@@ -223,4 +256,51 @@ pub fn hex_to_decimal(hex_string: &str) -> Result<u64, std::num::ParseIntError> 
     let hex_string = hex_string.trim_start_matches("0x");
 
     u64::from_str_radix(hex_string, 16)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use simd_json::serde::to_string;
+
+    #[test]
+    fn test_extract_sync_success() {
+        let input = json!({
+            "result": true
+        });
+        let input_str = to_string(&input).unwrap();
+        let result = extract_sync(&input_str);
+        assert_eq!(result.unwrap(), true);
+    }
+
+    #[test]
+    fn test_extract_sync_failure() {
+        let input = json!({
+            "wrong_field": false
+        });
+        let input_str = to_string(&input).unwrap();
+        let result = extract_sync(&input_str);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_extract_number_success() {
+        let input = json!({
+            "result": "0x1b4"
+        });
+        let input_str = to_string(&input).unwrap();
+        let result = extract_number(&input_str);
+        assert_eq!(result.unwrap(), 436); // 0x1b4 in decimal
+    }
+
+    #[test]
+    fn test_extract_number_failure() {
+        let input = json!({
+            "wrong_field": "0x1b4"
+        });
+        let input_str = to_string(&input).unwrap();
+        let result = extract_number(&input_str);
+        assert!(result.is_err());
+    }
 }

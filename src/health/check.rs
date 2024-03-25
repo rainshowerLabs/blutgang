@@ -48,6 +48,7 @@ use tokio::{
 #[derive(Debug, Default)]
 struct HeadResult {
     rpc_list_index: usize,
+    is_syncing: bool,
     reported_head: u64,
 }
 
@@ -149,6 +150,7 @@ async fn head_check(
 
         // Spawn a future for each RPC
         let rpc_future = async move {
+            // Check the current block number
             let a = rpc_clone.block_number();
             let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
 
@@ -157,8 +159,18 @@ async fn head_check(
                 Err(_) => 0,                           // Handle timeout as 0
             };
 
+            // Checks if the node is syncing
+            let a = rpc_clone.syncing();
+            let result = timeout(Duration::from_millis(ttl.try_into().unwrap()), a).await;
+
+            let sync = match result {
+                Ok(response) => response.unwrap_or(true), // Handle timeout as true
+                Err(_) => true,                           // Handle timeout as true
+            };
+
             let head_result = HeadResult {
                 rpc_list_index: i,
+                is_syncing: sync,
                 reported_head: head,
             };
 
@@ -205,7 +217,7 @@ fn make_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
     for head in heads {
-        if head.reported_head < highest_head {
+        if head.reported_head < highest_head || head.is_syncing == true {
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
             log_wrn!(
@@ -238,7 +250,7 @@ fn escape_poverty(
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
     for head_result in poverty_heads {
-        if head_result.reported_head >= agreed_head {
+        if head_result.reported_head >= agreed_head && head_result.is_syncing == false {
             let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
             rpc.status.is_erroring = false;
             log_info!(
@@ -352,14 +364,17 @@ mod tests {
         vec![
             HeadResult {
                 rpc_list_index: 0,
+                is_syncing: false,
                 reported_head: 18177557,
             },
             HeadResult {
                 rpc_list_index: 1,
+                is_syncing: false,
                 reported_head: 18193012,
             },
             HeadResult {
                 rpc_list_index: 2,
+                is_syncing: false,
                 reported_head: 0,
             },
         ]
@@ -410,10 +425,12 @@ mod tests {
         let heads = vec![
             HeadResult {
                 rpc_list_index: 0,
+                is_syncing: false,
                 reported_head: 18177557,
             },
             HeadResult {
                 rpc_list_index: 1,
+                is_syncing: false,
                 reported_head: 18193012,
             },
         ];
@@ -431,4 +448,46 @@ mod tests {
         // The poverty list should have 1 RPC
         assert_eq!(poverty_list_guard.len(), 1);
     }
+
+    #[test]
+    fn test_escape_sync() {
+        // Create a mock RPC list and poverty list
+        let mut rpc1 = Rpc::default();
+        rpc1.status.is_erroring = true;
+
+        let rpc2 = Rpc::default();
+        let mut rpc3 = Rpc::default();
+        rpc3.status.is_erroring = true;
+
+        let rpc_list = Arc::new(RwLock::new(vec![rpc2.clone()]));
+        let poverty_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc3.clone()]));
+
+        // Test with dummy head results
+        let heads = vec![
+            HeadResult {
+                rpc_list_index: 0,
+                is_syncing: false,
+                reported_head: 18193012,
+            },
+            HeadResult {
+                rpc_list_index: 1,
+                is_syncing: true,
+                reported_head: 18193012,
+            },
+        ];
+
+        // Call the escape_poverty function
+        let result = escape_poverty(&rpc_list, &poverty_list, heads, 18193012);
+        assert!(result.is_ok());
+
+        // Check the state of RPCs after the test
+        let rpc_list_guard = rpc_list.read().unwrap();
+        let poverty_list_guard = poverty_list.read().unwrap();
+        // RPC3 should have escaped poverty
+        assert_eq!(rpc_list_guard.len(), 2);
+
+        // The poverty list should have 1 RPC
+        assert_eq!(poverty_list_guard.len(), 1);
+    }
+
 }
