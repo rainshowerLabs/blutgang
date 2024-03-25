@@ -84,7 +84,11 @@ async fn update_ws_connections(
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) {
     let ws_vec = create_ws_vec(rpc_list, broadcast_tx, ws_error_tx).await;
-    let mut ws_handle_guard = ws_handles.write().unwrap();
+    let mut ws_handle_guard = ws_handles.write().unwrap_or_else(|e| {
+        // Handle the case where the ws_handles RwLock is poisoned
+        log_err!("{}", e);
+        e.into_inner()
+    });
     *ws_handle_guard = ws_vec;
 }
 
@@ -97,7 +101,13 @@ async fn handle_incoming_message(
     let rpc_position = if let Some(index) = specified_index {
         index
     } else {
-        match pick(&mut rpc_list.write().unwrap()).1 {
+        let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
+            // Handle the case where the rpc_list RwLock is poisoned
+            log_err!("{}", e);
+            e.into_inner()
+        });
+
+        match pick(&mut rpc_list_guard).1 {
             Some(position) => position,
             None => {
                 log_err!("No RPC position available");
