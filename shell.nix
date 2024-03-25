@@ -15,6 +15,10 @@ pkgs.mkShell {
     pkgs.pkg-config
     pkgs.openssl
     pkgs.systemdLibs
+    pkgs.clang
+    pkgs.gdb
+    pkgs.python311Packages.requests
+    pkgs.python311Packages.websocket-client
   ];
 
   shellHook = ''

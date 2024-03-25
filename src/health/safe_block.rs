@@ -231,7 +231,11 @@ pub async fn subscribe_to_new_heads(
             Err(_) => {
                 // Handle the timeout case
                 {
-                    let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
+                    let mut nn_rwlock = cache_args.named_numbers.write().unwrap_or_else(|e| {
+                        // Handle the case where the named_numbers RwLock is poisoned
+                        log_err!("{}", e);
+                        e.into_inner()
+                    });
                     nn_rwlock.latest = 0;
                     match incoming_tx.send(WsconnMessage::Reconnect()) {
                         Ok(_) => {}
@@ -240,6 +244,7 @@ pub async fn subscribe_to_new_heads(
                             panic!("FATAL: WS module failed trying to reinitialize! Please restart Blutgang!");
                         }
                     }
+                    drop(nn_rwlock);
                 }
                 log_wrn!("Timeout in newHeads subscription, possible connection failiure or missed block.");
                 let node_id = match sub_data.get_node_from_id(&subscription_id) {

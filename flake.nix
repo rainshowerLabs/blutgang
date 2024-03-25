@@ -46,6 +46,7 @@
             clang
             gdb
             python311Packages.requests
+            python311Packages.websocket-client
             (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
@@ -58,8 +59,8 @@
             export PS1="nix-shell:blutgang $PS1" # Customize this line as needed
 
             # Set NIX_LD and NIX_LD_LIBRARY_PATH for rust-analyzer
-            export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.glibc pkgs.gcc-unwrapped.lib ]}"
-            export NIX_LD="${pkgs.stdenv.cc}/nix-support/dynamic-linker"
+            # export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.glibc pkgs.gcc-unwrapped.lib ]}"
+            # export NIX_LD="${pkgs.stdenv.cc}/nix-support/dynamic-linker"
           '';
 
           # reset ps1

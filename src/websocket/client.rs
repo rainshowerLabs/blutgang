@@ -84,7 +84,11 @@ async fn update_ws_connections(
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) {
     let ws_vec = create_ws_vec(rpc_list, broadcast_tx, ws_error_tx).await;
-    let mut ws_handle_guard = ws_handles.write().unwrap();
+    let mut ws_handle_guard = ws_handles.write().unwrap_or_else(|e| {
+        // Handle the case where the ws_handles RwLock is poisoned
+        log_err!("{}", e);
+        e.into_inner()
+    });
     *ws_handle_guard = ws_vec;
 }
 
@@ -97,7 +101,13 @@ async fn handle_incoming_message(
     let rpc_position = if let Some(index) = specified_index {
         index
     } else {
-        match pick(&mut rpc_list.write().unwrap()).1 {
+        let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
+            // Handle the case where the rpc_list RwLock is poisoned
+            log_err!("{}", e);
+            e.into_inner()
+        });
+
+        match pick(&mut rpc_list_guard).1 {
             Some(position) => position,
             None => {
                 log_err!("No RPC position available");
@@ -125,7 +135,14 @@ pub async fn create_ws_vec(
     broadcast_tx: &broadcast::Sender<IncomingResponse>,
     ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
 ) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
-    let rpc_list_clone = rpc_list.read().unwrap().clone();
+    let rpc_list_clone = rpc_list
+        .read()
+        .unwrap_or_else(|e| {
+            // Handle the case where the rpc_list RwLock is poisoned
+            log_err!("{}", e);
+            e.into_inner()
+        })
+        .clone();
     let mut ws_handles = Vec::new();
 
     for (index, rpc) in rpc_list_clone.iter().enumerate() {
