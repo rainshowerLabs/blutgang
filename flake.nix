@@ -45,6 +45,7 @@
             systemd
             clang
             gdb
+            valgrind
             python311Packages.requests
             python311Packages.websocket-client
             (rust-bin.stable.latest.default.override {
