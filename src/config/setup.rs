@@ -81,8 +81,9 @@ pub async fn sort_by_latency(
     while let Some(rpc) = rx.recv().await {
         let rpc = match rpc {
             StartingLatencyResp::Ok(rax) => rax,
-            StartingLatencyResp::Error(rax, e) => {
+            StartingLatencyResp::Error(mut rax, e) => {
                 log_err!("Adding to poverty list: {}", e);
+                rax.status.is_erroring = true;
                 poverty_list.push(rax);
                 continue;
             }
