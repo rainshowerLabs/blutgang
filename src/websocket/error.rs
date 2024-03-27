@@ -13,6 +13,7 @@ pub enum WsError {
     ReceiverLagged(),
     ChannelClosed(),
     InvalidData(String),
+    NoIdInResponse(String),
     FailedParsing(),
     MissingSubscription(),
     EmptyList(String),
@@ -35,6 +36,7 @@ impl fmt::Display for WsError {
             WsError::ReceiverLagged() => write!(f, "Receiver Lagged!"),
             WsError::ChannelClosed() => write!(f, "Channel Closed!"),
             WsError::InvalidData(msg) => write!(f, "Invalid Data: {}", msg),
+            WsError::NoIdInResponse(msg) => write!(f, "No ID in response: {}", msg),
             WsError::FailedParsing() => write!(f, "Failed to Parse Input Data!"),
             WsError::MissingSubscription() => {
                 write!(f, "Tried to Perform Action On Non-Existing Subscription!")

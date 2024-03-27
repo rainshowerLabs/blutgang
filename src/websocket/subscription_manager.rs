@@ -129,7 +129,7 @@ pub async fn move_subscriptions(
         // Discard any response that does not have a proper ID
         let pair_id = match response.content["id"].as_u64() {
             Some(rax) => rax as u32,
-            None => return Err(WsError::InvalidData(format!("No ID in response: {}", response.content))),
+            None => return Err(WsError::NoIdInResponse(response.content.to_string())),
         };
 
         let params = match pairs.get(&pair_id) {
