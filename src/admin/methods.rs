@@ -7,7 +7,6 @@ use crate::config::system::{
     MetricsError,
     RegistryChannel,
     RpcMetrics,
-    RpcMetricsSender,
 };
 use crate::{
     admin::error::AdminError,
@@ -145,12 +144,10 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 #[cfg(feature = "prometheusd")]
 async fn admin_flush_metrics(
     channel: &RegistryChannel,
-    tx: RpcMetricsSender,
+    tx: MetricSender,
 ) -> Result<(), MetricsError> {
     let dt = Instant::now();
 
-    let command = MetricsCommand::Flush(channel);
-    channel.on_flush(tx);
     Ok(())
 }
 

@@ -156,18 +156,23 @@ pub async fn metrics_listener(
 
 async fn metrics_processor(
     mut metrics_rx: MetricReceiver,
-    metrics_status: Arc<RwLock<RpcMetrics>>,
-    path: &str,
-    method: &str,
-    status: &u16,
-    duration: Duration,
+    registry_state: Arc<RwLock<StorageRegistry>>,
+    // path: &str,
+    // method: &str,
+    // status: &u16,
+    // duration: Duration,
 ) {
+    use crate::log_info;
+    let metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(10));
     loop {
         interval.tick().await;
         while let Some(incoming) = metrics_rx.recv().await {
-            let _current_metrics = metrics_status.read().unwrap();
-            incoming.requests_complete(path, method, status, duration);
+            let current_metrics = incoming.requests_complete("test", "test", &200, Duration::from_millis(100));
+            let test_report = metrics_encoder(registry_state.clone()).await;
+            log_info!("prometheus metrics: {:?}", test_report);
+            let registry = registry_state.read().unwrap();
+            // incoming.requests_complete(path, method, status, duration);
         }
     }
 }
@@ -181,9 +186,7 @@ async fn accept_metrics_request(tx: Request<hyper::body::Incoming>, metrics_tx :
         return accept_http_request(metrics_tx).await;
     }
     let mut metrics = metrics_encoder(registry_state).await;
-    Ok(metrics)
-    
-
+    Ok(metrics)   
 }
 
 async fn accept_ws_request(metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
