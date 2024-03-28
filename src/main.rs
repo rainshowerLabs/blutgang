@@ -26,10 +26,8 @@ use crate::{
         cache_setup::setup_data,
         cli_args::create_match,
         system::{
-            metrics_channel,
-            metrics_monitor,
-            metrics_update_sink,
-            RpcMetrics,
+            metrics_channel, RpcMetrics, metrics_monitor, metrics_update_sink,
+                    
         },
         types::Settings,
     },

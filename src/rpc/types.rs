@@ -181,8 +181,6 @@ impl Rpc {
     // We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
         // #[cfg(feature = "prometheusd")]
-        // let metric_channel = RegistryChannel::new();
-        // #[cfg(feature = "prometheusd")]
         // let metric =
         //     RpcMetrics::init(RegistryChannel::get_storage_registry(&metric_channel)).unwrap();
         // #[cfg(feature = "prometheusd")]

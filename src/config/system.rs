@@ -10,26 +10,24 @@ use crate::Rpc;
 
 use once_cell::sync::Lazy;
 
+
+use hyper::{
+    Request,
+};
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
-use thiserror::Error;
-use http_body_util::Full;
-use hyper::{
-    body::Bytes,
-    Request,
-};
-use zerocopy::AsBytes;
 use std::{
-    convert::Infallible,
     collections::hash_map::HashMap,
+    convert::Infallible,
     sync::{
         Arc,
         RwLock,
     },
     time::Duration,
 };
+use thiserror::Error;
 use tokio::sync::{
     mpsc::{
         unbounded_channel,
@@ -39,6 +37,7 @@ use tokio::sync::{
     oneshot,
     Notify,
 };
+
 
 //#[cfg(feature = "prometheusd")]
 pub type MetricSender = UnboundedSender<RpcMetrics>;
@@ -83,7 +82,9 @@ impl RpcMetrics {
         self.requests
             .with_label_values(&[path, method, &status.to_string()])
             .inc();
-        self.duration.with_label_values(&[path, method]).observe(dt.as_millis() as f64)
+        self.duration
+            .with_label_values(&[path, method])
+            .observe(dt.as_millis() as f64)
     }
 }
 
@@ -163,36 +164,39 @@ async fn metrics_processor(
     // duration: Duration,
 ) {
     use crate::log_info;
-    let metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
+    let _metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(10));
     loop {
         interval.tick().await;
         while let Some(incoming) = metrics_rx.recv().await {
-            let current_metrics = incoming.requests_complete("test", "test", &200, Duration::from_millis(100));
+            incoming.requests_complete("test", "test", &200, Duration::from_millis(100));
             let test_report = metrics_encoder(registry_state.clone()).await;
             log_info!("prometheus metrics: {:?}", test_report);
-            let registry = registry_state.read().unwrap();
+            let _registry = registry_state.read().unwrap();
             // incoming.requests_complete(path, method, status, duration);
         }
     }
 }
 /// Accepts metrics request, encodes and prints
 //#[cfg(feature = "prometheusd")]
-async fn accept_metrics_request(tx: Request<hyper::body::Incoming>, metrics_tx : Arc<MetricSender>, registry_state: Arc<RwLock<StorageRegistry>> ) -> Result<String, Infallible> 
-{
-    if tx.uri().path() == "/ws_metrics"  {
-        return accept_ws_request(metrics_tx).await;            
+async fn accept_metrics_request(
+    tx: Request<hyper::body::Incoming>,
+    metrics_tx: Arc<MetricSender>,
+    registry_state: Arc<RwLock<StorageRegistry>>,
+) -> Result<String, Infallible> {
+    if tx.uri().path() == "/ws_metrics" {
+        return accept_ws_metrics(metrics_tx).await;
     } else if tx.uri().path() == "/http_metrics" {
-        return accept_http_request(metrics_tx).await;
+        return accept_http_metrics(metrics_tx).await;
     }
-    let mut metrics = metrics_encoder(registry_state).await;
-    Ok(metrics)   
+    let metrics = metrics_encoder(registry_state).await;
+    Ok(metrics)
 }
 
-async fn accept_ws_request(metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+async fn accept_ws_metrics(_metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
     unimplemented!()
 }
-async fn accept_http_request(metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+async fn accept_http_metrics(_metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
     unimplemented!()
 }
 
@@ -219,26 +223,6 @@ pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
     (tx, rx)
 }
-
-//#[cfg(feature = "prometheusd")]
-// pub async fn spawn_metrics_channel(metrics_status: Arc<RwLock<Vec<Rpc>>>, mut rx: MetricReceiver) {
-//     use crate::log_info;
-//     let (tx, rx) = unbounded_channel();
-//     let tx = RpcMetricsSender {
-//         inner: tx,
-//         metrics: None,
-//     };
-//     let rx = RpcMetricsReciever {
-//         inner: rx,
-//         metrics: None,
-//     };
-//     tokio::spawn();
-//     }
-
-// struct MetricsChannel {
-//     metrics: RpcMetrics,
-//     rx: RpcMetricsReciever,
-// }
 
 #[macro_export]
 macro_rules! log_info {
@@ -304,25 +288,35 @@ macro_rules! log_err {
 }
 
 //WIP: macros
-// #[macro_export]
-// macro_rules! prometheusd_latency {
-//         ($fmt:expr, $($arg:tt)*) => {
-//         let rpc_path = format!($fmt, $($arg)*);
-//         // #[cfg(feature = "prometheusd")]
-//         {
-//             use $crate::config::system::RpcMetrics;
-//             use $crate::config::system::get_storage_registry;
-//             let registry = get_storage_registry();
-//             let metric = RpcMetrics::inst(registry).unwrap();
-//             let start = std::time::Instant::now();
-//             move |status: u16| {
-//                 let duration = start.elapsed();
-//                 metric.requests_complete(duration);
-//             }
-//         }
-//         };
-// }
-//
+macro_rules! accept_prometheusd {
+    (
+     $io:expr,
+     $http_tx:expr,
+     $ws_tx:expr,
+     $registry_state:expr,
+     $metrics_request_tx:expr,
+    ) => {
+        if let Err(err) = http1::Builder::new()
+            .serve_connection(
+                $io,
+                service_fn(|req| {
+                    let response = accept_metrics_request(
+                        req,
+                        $http_tx,
+                        $ws_tx,
+                        $registry_state,
+                        $metrics_request_tx.clone(),
+                    );
+                    response
+                }),
+            )
+            .await
+        {
+            println!("Error serving prometheus metrics: {:?}", err);
+        }
+    };
+}
+
 pub mod test_mocks {
     use super::*;
     //borrowed from admin
