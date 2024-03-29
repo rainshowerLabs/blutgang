@@ -51,7 +51,7 @@ macro_rules! accept_admin {
                         req,
                         Arc::clone($rpc_list_rwlock),
                         Arc::clone($poverty_list_rwlock),
-                        Arc::clone($cache),
+                        $cache.clone(),
                         Arc::clone($config),
                         $liveness_request_tx.clone(),
                     );
@@ -68,7 +68,7 @@ macro_rules! accept_admin {
 async fn admin_api_server(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Arc<Db>,
+    cache: Db,
     config: Arc<RwLock<Settings>>,
     address: SocketAddr,
     liveness_request_tx: LiveReadyRequestSnd,
@@ -87,7 +87,7 @@ async fn admin_api_server(
 
         let rpc_list_rwlock_clone = Arc::clone(&rpc_list_rwlock);
         let poverty_list_rwlock_clone = Arc::clone(&poverty_list_rwlock);
-        let cache_clone = Arc::clone(&cache);
+        let cache_clone = cache.clone();
         let config_clone = Arc::clone(&config);
         let liveness_request_tx_clone = liveness_request_tx.clone();
 
@@ -112,7 +112,7 @@ async fn admin_api_server(
 pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Arc<Db>,
+    cache: Db,
     config: Arc<RwLock<Settings>>,
     liveness_receiver: LiveReadyUpdateRecv,
 ) -> Result<(), Box<dyn std::error::Error>> {

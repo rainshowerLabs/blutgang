@@ -100,14 +100,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
 
     // Create/Open sled DB
-    let cache = Arc::new(
+    let cache = 
         config
             .read()
             .unwrap()
             .sled_config
             .open()
-            .expect("Can't open/create database!"),
-    );
+            .expect("Can't open/create database!");
 
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
@@ -120,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert data about blutgang and our settings into the DB
     //
     // Print any relevant warnings about a misconfigured DB. Check docs for more
-    setup_data(Arc::clone(&cache));
+    setup_data(cache.clone());
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
@@ -139,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
         let poverty_list_admin = Arc::clone(&rpc_poverty_list);
-        let cache_admin = Arc::clone(&cache);
+        let cache_admin = cache.clone();
         let config_admin = Arc::clone(&config);
         tokio::task::spawn(async move {
             log_info!("Admin namespace enabled, accepting admin methods at admin port");
@@ -160,14 +159,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
-    let cache_clone = Arc::clone(&cache);
+    let cache_clone = cache.clone();
     let finalized_rxclone = Arc::clone(&finalized_rx_arc);
     tokio::task::spawn(async move {
         let _ = manage_cache(
             &head_cache_clone,
             blocknum_rx,
             finalized_rxclone,
-            &cache_clone,
+            cache_clone,
         )
         .await;
     });
@@ -302,7 +301,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &named_blocknumbers,
             &head_cache,
             &sub_data,
-            &cache,
+            cache.clone(),
             &config,
         );
 

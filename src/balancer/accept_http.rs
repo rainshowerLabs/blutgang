@@ -85,7 +85,7 @@ pub struct ConnectionParams {
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     pub sub_data: Arc<SubscriptionData>,
-    pub cache: Arc<Db>,
+    pub cache: Db,
     pub config: Arc<RwLock<Settings>>,
 }
 
@@ -96,7 +96,7 @@ impl ConnectionParams {
         named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
         head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: &Arc<Db>,
+        cache: Db,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
@@ -308,7 +308,7 @@ async fn forward_body(
     finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    cache: Arc<Db>,
+    cache: Db,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,

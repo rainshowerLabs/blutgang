@@ -7,9 +7,8 @@ use crate::{
     log_info,
 };
 use sled::Db;
-use std::sync::Arc;
 
-pub fn setup_data(cache: Arc<Db>) {
+pub fn setup_data(cache: Db) {
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
         VERSION_STR, TAGLINE
@@ -56,3 +55,4 @@ pub fn setup_data(cache: Arc<Db>) {
         }
     }
 }
+
