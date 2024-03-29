@@ -100,13 +100,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
 
     // Create/Open sled DB
-    let cache = 
-        config
-            .read()
-            .unwrap()
-            .sled_config
-            .open()
-            .expect("Can't open/create database!");
+    let cache = config
+        .read()
+        .unwrap()
+        .sled_config
+        .open()
+        .expect("Can't open/create database!");
 
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));

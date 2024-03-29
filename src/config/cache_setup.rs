@@ -55,4 +55,3 @@ pub fn setup_data(cache: Db) {
         }
     }
 }
-

@@ -157,7 +157,7 @@ mod tests {
         }
 
         // Call handle_reorg
-        let result = handle_reorg(&head_cache, 2, 3, cache);
+        let result = handle_reorg(&head_cache, 2, 3, cache.clone());
 
         // Verify the result and check if the data is removed from the cache
         assert!(result.is_ok());

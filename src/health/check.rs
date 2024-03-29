@@ -235,7 +235,7 @@ fn make_poverty(
     let mut poverty_list_guard = poverty_list.write().unwrap();
 
     for head in heads {
-        if head.reported_head < highest_head || head.is_syncing == true {
+        if head.reported_head < highest_head || head.is_syncing {
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
             log_wrn!(
@@ -268,7 +268,7 @@ fn escape_poverty(
     let mut rpc_list_guard = rpc_list.write().unwrap();
 
     for head_result in poverty_heads {
-        if head_result.reported_head >= agreed_head && head_result.is_syncing == false {
+        if head_result.reported_head >= agreed_head && !head_result.is_syncing {
             let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
             rpc.status.is_erroring = false;
             log_info!(

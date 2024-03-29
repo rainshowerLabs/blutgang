@@ -429,9 +429,9 @@ mod tests {
     // Helper function to create a test cache
     fn create_test_cache() -> Db {
         let db = sled::Config::new().temporary(true);
-        let db = db.open().unwrap();
+        
 
-        db
+        db.open().unwrap()
     }
 
     #[tokio::test]
