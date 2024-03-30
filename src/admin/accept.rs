@@ -82,7 +82,7 @@ macro_rules! get_response {
             $rpc_list_rwlock,
             $poverty_list_rwlock,
             Arc::clone(&$config),
-            Arc::clone(&$cache),
+            $cache.clone(),
         ).await {
             Ok(rx) => rx,
             Err(err) => json!({
@@ -106,7 +106,7 @@ async fn forward_body(
     mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    cache: Arc<Db>,
+    cache: Db,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Get the id of the request and set it to 0 for caching
@@ -136,7 +136,7 @@ pub async fn accept_admin_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Arc<Db>,
+    cache: Db,
     config: Arc<RwLock<Settings>>,
     liveness_request_tx: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -202,11 +202,11 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> Arc<Db> {
+    fn create_test_cache() -> Db {
         let db = sled::Config::new().temporary(true);
-        let db = db.open().unwrap();
+        
 
-        Arc::new(db)
+        db.open().unwrap()
     }
 
     #[tokio::test]

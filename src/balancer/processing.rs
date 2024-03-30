@@ -31,7 +31,7 @@ use sled::Db;
 pub struct CacheArgs {
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-    pub cache: Arc<Db>,
+    pub cache: Db,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
 }
 
@@ -41,7 +41,7 @@ impl CacheArgs {
         CacheArgs {
             finalized_rx: watch::channel(0).1,
             named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
-            cache: Arc::new(sled::Config::default().open().unwrap()),
+            cache: (sled::Config::default().open().unwrap()),
             head_cache: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }

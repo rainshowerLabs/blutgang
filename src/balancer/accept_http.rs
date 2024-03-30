@@ -85,7 +85,7 @@ pub struct ConnectionParams {
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     pub sub_data: Arc<SubscriptionData>,
-    pub cache: Arc<Db>,
+    pub cache: Db,
     pub config: Arc<RwLock<Settings>>,
 }
 
@@ -96,7 +96,7 @@ impl ConnectionParams {
         named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
         head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: &Arc<Db>,
+        cache: Db,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
@@ -308,7 +308,7 @@ async fn forward_body(
     finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    cache: Arc<Db>,
+    cache: Db,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
@@ -317,16 +317,14 @@ async fn forward_body(
     // Check if body has application/json
     //
     // Can be toggled via the config. Should be on if we want blutgang to be JSON-RPC compliant.
-    if params.header_check {
-        if tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
-            return (
-                Ok(hyper::Response::builder()
-                    .status(400)
-                    .body(Full::new(Bytes::from("Improper content-type header")))
-                    .unwrap()),
-                None,
-            );
-        }
+    if params.header_check && tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
+        return (
+            Ok(hyper::Response::builder()
+                .status(400)
+                .body(Full::new(Bytes::from("Improper content-type header")))
+                .unwrap()),
+            None,
+        );
     }
 
     // Convert incoming body to serde value

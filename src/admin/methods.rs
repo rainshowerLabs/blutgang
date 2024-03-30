@@ -26,7 +26,7 @@ pub async fn execute_method(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     config: Arc<RwLock<Settings>>,
-    cache: Arc<Db>,
+    cache: Db,
 ) -> Result<Value, AdminError> {
     let method = tx["method"].as_str();
     println!("Method: {:?}", method.unwrap_or("None"));
@@ -104,7 +104,7 @@ pub async fn execute_method(
 // Quit Blutgang upon receiving this method
 // We're returning a Null and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
-async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
+async fn admin_blutgang_quit(cache: Db) -> Result<Value, AdminError> {
     // We're doing something not-good so flush everything to disk
     let _ = cache.flush_async().await;
     // Drop cache so we get the print profile on drop thing before we quit
@@ -118,7 +118,7 @@ async fn admin_blutgang_quit(cache: Arc<Db>) -> Result<Value, AdminError> {
 }
 
 // Flushes sled cache to disk
-async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
+async fn admin_flush_cache(cache: Db) -> Result<Value, AdminError> {
     let time = Instant::now();
     let _ = cache.flush_async().await;
     let time = time.elapsed();
@@ -427,11 +427,11 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> Arc<Db> {
+    fn create_test_cache() -> Db {
         let db = sled::Config::new().temporary(true);
-        let db = db.open().unwrap();
+        
 
-        Arc::new(db)
+        db.open().unwrap()
     }
 
     #[tokio::test]

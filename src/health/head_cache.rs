@@ -22,7 +22,7 @@ pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
-    cache: &Arc<sled::Db>,
+    cache: sled::Db,
 ) -> Result<(), sled::Error> {
     let mut block_number = 0;
     let mut last_finalized = 0;
@@ -38,7 +38,7 @@ pub async fn manage_cache(
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
             log_wrn!("Reorg detected!\nRemoving stale entries from the cache.");
-            handle_reorg(head_cache, block_number, new_block, cache)?;
+            handle_reorg(head_cache, block_number, new_block, cache.clone())?;
         }
 
         // Check if finalized_stream has changed
@@ -61,7 +61,7 @@ fn handle_reorg(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
     new_block: u64,
-    cache: &Arc<sled::Db>,
+    cache: sled::Db,
 ) -> Result<(), sled::Error> {
     // sled batch
     let mut batch = Batch::default();
@@ -142,7 +142,7 @@ mod tests {
     fn test_handle_reorg() {
         // Create test data and resources
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
-        let cache = Arc::new(Config::new().temporary(true).open().unwrap());
+        let cache = Config::new().temporary(true).open().unwrap();
 
         let _ = cache.insert("key1", "value1");
         let _ = cache.insert("key2", "value2");
@@ -157,7 +157,7 @@ mod tests {
         }
 
         // Call handle_reorg
-        let result = handle_reorg(&head_cache, 2, 3, &cache);
+        let result = handle_reorg(&head_cache, 2, 3, cache.clone());
 
         // Verify the result and check if the data is removed from the cache
         assert!(result.is_ok());
