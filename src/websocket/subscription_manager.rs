@@ -30,7 +30,7 @@ use tokio::sync::{
 
 use serde_json::json;
 
-// Sends all subscriptions to their relevant nodes
+/// Sends all subscriptions to their relevant nodes
 pub async fn subscription_dispatcher(
     mut rx: broadcast::Receiver<IncomingResponse>,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
@@ -88,8 +88,8 @@ pub async fn subscription_dispatcher(
     }
 }
 
-// Moves all subscriptions from one node to another one.
-// Used during node failiure. Do not use this liberally as it is very heavy.
+/// Moves all subscriptions from one node to another one.
+/// Used during node failiure. *Do not* use this liberally as it is very heavy.
 pub async fn move_subscriptions(
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     mut rx: broadcast::Receiver<IncomingResponse>,

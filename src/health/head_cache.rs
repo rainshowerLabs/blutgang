@@ -17,7 +17,7 @@ use tokio_stream::{
     StreamExt,
 };
 
-// Check if we need to do a reorg or if a new block has finalized.
+/// Check if we need to do a reorg or if a new block has finalized.
 pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
@@ -54,9 +54,9 @@ pub async fn manage_cache(
     Ok(())
 }
 
-// We use the head_cache to store keys of querries we made near the tip
-// If a reorg happens, we need to remove all querries in the reorg range
-// from the sled database.
+/// We use the head_cache to store keys of querries we made near the tip
+/// If a reorg happens, we need to remove all querries in the reorg range
+/// from the sled database.
 fn handle_reorg(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
@@ -84,10 +84,10 @@ fn handle_reorg(
     Ok(())
 }
 
-// Removes stale entries from `head_cache`
-//
-// Once a new block finalizes, we can be sure that certain TXs wont
-// reorg, so theyre safe to be permanantly in the cache.
+/// Removes stale entries from `head_cache`
+///
+/// Once a new block finalizes, we can be sure that certain TXs wont
+/// reorg, so theyre safe to be permanantly in the cache.
 fn remove_stale(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,

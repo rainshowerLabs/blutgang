@@ -59,7 +59,7 @@ struct InnerResult {
     reported_head: u64,
 }
 
-// Call check and safe_block in a loop
+/// Call check and safe_block in a loop
 pub async fn health_check(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,
@@ -94,7 +94,7 @@ pub async fn health_check(
     }
 }
 
-// Track the head of each RPC and process them accordingly
+/// Track the head of each RPC and process them accordingly
 async fn check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -131,7 +131,7 @@ async fn check(
     Ok(())
 }
 
-// Check what heads are reported by each RPC
+/// Check what heads are reported by each RPC
 async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
@@ -216,7 +216,7 @@ async fn head_check(
     Ok(heads)
 }
 
-// Add unresponsive/erroring RPCs to the poverty list
+/// Add unresponsive/erroring RPCs to the poverty list
 fn make_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -254,9 +254,9 @@ fn make_poverty(
     Ok(highest_head)
 }
 
-// Go over the `poverty_list` to see if any nodes are back to normal
-//
-// Update liveness statuses when done
+/// Go over the `poverty_list` to see if any nodes are back to normal.
+///
+/// Update liveness statuses when done.
 fn escape_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -306,7 +306,7 @@ fn escape_poverty(
     Ok(to_send)
 }
 
-// Remove the RPC that dropped out ws_conn and add it to the poverty list
+/// Remove the RPC that dropped out ws_conn and add it to the poverty list.
 pub async fn send_dropped_to_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -335,7 +335,7 @@ pub async fn send_dropped_to_poverty(
     Ok(())
 }
 
-// Listen for dropped ws connections and handle them
+/// Listen for dropped ws connections and handle them.
 pub async fn dropped_listener(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     poverty_list: Arc<RwLock<Vec<Rpc>>>,

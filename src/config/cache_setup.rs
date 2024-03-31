@@ -8,6 +8,7 @@ use crate::{
 };
 use sled::Db;
 
+/// Sets up the cache with various basic data about our current blutgang instance.
 pub fn setup_data(cache: Db) {
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",

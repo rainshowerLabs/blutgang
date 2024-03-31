@@ -1,4 +1,5 @@
-// Errors
+//! Health errors
+
 use crate::rpc::error::RpcError;
 use crate::websocket::error::WsError;
 use std::error::Error;

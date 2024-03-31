@@ -12,7 +12,7 @@ enum StartingLatencyResp {
     Error(Rpc, ConfigError),
 }
 
-// Get the average latency for a RPC
+/// Get the average latency for a RPC
 async fn set_starting_latency(
     mut rpc: Rpc,
     ma_length: f64,
@@ -51,7 +51,7 @@ async fn set_starting_latency(
     Ok(())
 }
 
-// Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
+/// Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
 pub async fn sort_by_latency(
     mut rpc_list: Vec<Rpc>,
     mut poverty_list: Vec<Rpc>,
