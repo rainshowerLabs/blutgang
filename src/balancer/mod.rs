@@ -7,7 +7,6 @@
 //! In addition to this, it includes various helper fn's for formatting
 //! and processing incoming data.
 
-mod pipeline;
 pub mod accept_http;
 pub mod format;
 pub mod processing;

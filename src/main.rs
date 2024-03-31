@@ -4,6 +4,7 @@ mod config;
 mod health;
 mod rpc;
 mod websocket;
+mod database;
 
 use crate::{
     admin::{
