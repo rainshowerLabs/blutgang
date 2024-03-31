@@ -34,7 +34,22 @@
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
           ];
-          cargoBuildFlags = [ "--profile maxperf" ];
+          # This is the only way im aware of to have
+          # different build profiles with `buildRustPackage` (:
+          preBuild = ''
+            # Backup the original Cargo.toml
+            cp Cargo.toml Cargo.toml.backup
+            # Add the desired profile settings to Cargo.toml
+            echo '[profile.release]' >> Cargo.toml
+            echo 'lto = "fat"' >> Cargo.toml
+            echo 'codegen-units = 1' >> Cargo.toml
+            echo 'incremental = false' >> Cargo.toml
+          '';
+          postBuild = ''
+            # Restore the original Cargo.toml
+            mv Cargo.toml.backup Cargo.toml
+          '';
+          cargoBuildFlags = [ "" ];
         };
 
         devShells.default = pkgs.mkShell {
