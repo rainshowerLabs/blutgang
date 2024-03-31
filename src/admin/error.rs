@@ -1,4 +1,5 @@
-// Errors
+//! Admin specific errors
+
 use std::error::Error;
 
 #[derive(Debug)]

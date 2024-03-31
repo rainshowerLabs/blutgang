@@ -64,7 +64,7 @@ impl NamedBlocknumbers {
     }
 }
 
-// Get the latest finalized block
+/// Get the latest finalized block
 pub async fn get_safe_block(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     finalized_tx: &tokio::sync::watch::Sender<u64>,
@@ -145,7 +145,7 @@ pub async fn get_safe_block(
     Ok(safe)
 }
 
-// Send a message subscribing to newHeads
+/// Send a message subscribing to newHeads
 async fn send_newheads_sub_message(
     user_id: u32,
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
@@ -181,7 +181,7 @@ async fn send_newheads_sub_message(
     };
 }
 
-// Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
+/// Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
 pub async fn subscribe_to_new_heads(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<IncomingResponse>,

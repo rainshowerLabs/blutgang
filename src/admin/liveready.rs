@@ -22,10 +22,14 @@ pub enum ReadinessState {
     Setup,
 }
 
+/// `HealthState` represents what state blutgang is in:
+/// - Healthy, Everything nominal
+/// - MissingRpcs, Some RPCs are not following the head but otherwise ok
+/// - Unhealthy, Nothing works
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum HealthState {
     #[default]
-    Healthy, // Everything nominal
+    Healthy,     // Everything nominal
     MissingRpcs, // Some RPCs are not following the head but otherwise ok
     Unhealthy,   // Nothing works
 }
@@ -42,19 +46,19 @@ pub enum LiveReadyUpdate {
     Health(HealthState),
 }
 
-// These 2 are used to send and receive updates related to the current
-// health of blutgang.
+/// These 2 are used to send and receive updates related to the current
+/// health of blutgang.
 pub type LiveReadyUpdateRecv = mpsc::Receiver<LiveReadyUpdate>;
 pub type LiveReadyUpdateSnd = mpsc::Sender<LiveReadyUpdate>;
 
-// These are used to request/return updates about health
-// pub type LiveReadyRecv = oneshot::Receiver<LiveReady>;
+/// These are used to request/return updates about health
 pub type LiveReadySnd = oneshot::Sender<LiveReady>;
+// pub type LiveReadyRecv = oneshot::Receiver<LiveReady>;
 
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
-// Macros to make returning statuses less ugly in code
+/// Macros to make returning statuses less ugly in code
 macro_rules! ok {
     () => {
         Ok(hyper::Response::builder()
@@ -82,7 +86,7 @@ macro_rules! nok {
     };
 }
 
-// Listen for liveness update messages and update the current status accordingly
+/// Listen for liveness update messages and update the current status accordingly
 async fn liveness_listener(
     mut liveness_receiver: LiveReadyUpdateRecv,
     liveness_status: Arc<RwLock<LiveReady>>,
@@ -101,7 +105,7 @@ async fn liveness_listener(
     }
 }
 
-// Receives requests about current status updates and returns the current liveness
+/// Receives requests about current status updates and returns the current liveness
 async fn liveness_request_processor(
     mut liveness_request_receiver: LiveReadyRequestRecv,
     liveness_status: Arc<RwLock<LiveReady>>,
@@ -114,9 +118,9 @@ async fn liveness_request_processor(
     }
 }
 
-// Monitor for new liveness updates and update the statuses accordingly.
-//
-// Also handles incoming requests about the current status.
+/// Monitor for new liveness updates and update the statuses accordingly.
+///
+/// Also handles incoming requests about the current status.
 pub(in crate::r#admin) async fn liveness_monitor(
     liveness_receiver: LiveReadyUpdateRecv,
     liveness_request_receiver: LiveReadyRequestRecv,
@@ -176,7 +180,7 @@ pub async fn accept_health_request(
     }
 }
 
-// Just a sink used to immediately discard request in cases where admin is disabled
+/// Sink used to immediately discard request in cases where admin is disabled
 pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
     loop {
         while (liveness_rx.recv().await).is_some() {

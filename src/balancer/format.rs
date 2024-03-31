@@ -29,8 +29,8 @@ enum NamedNumber {
     Null,
 }
 
-// Returns the corresponding NamedNumber enum value for the named number
-// Null if n/a
+/// Returns the corresponding NamedNumber enum value for the named number
+/// Null if n/a.
 fn has_named_number(param: &str) -> NamedNumber {
     let named_list = ["latest", "earliest", "safe", "finalized", "pending"];
 
@@ -50,7 +50,8 @@ fn has_named_number(param: &str) -> NamedNumber {
     NamedNumber::Null
 }
 
-// Return the blocknumber from a json-rpc request as a Option<String>, returning None if it cant find anything
+/// Return the blocknumber from a json-rpc request as a Option<String>,
+/// returning None if it cant find anything.
 pub fn get_block_number_from_request(
     tx: Value,
     named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
@@ -108,7 +109,7 @@ pub fn get_block_number_from_request(
     Some(block_number)
 }
 
-// Replaces block tags with a hex number and return the request
+/// Replaces block tags with a hex number and return the request
 pub fn replace_block_tags(
     tx: &mut Value,
     named_blocknumbers: &Arc<RwLock<NamedBlocknumbers>>,
@@ -161,6 +162,7 @@ pub fn replace_block_tags(
     tx.to_owned()
 }
 
+/// *Converts* a hyper `Incoming` request to a `serde_json::Value`.
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
     #[cfg(feature = "debug-verbose")]
     println!("Incoming request: {:?}", tx);

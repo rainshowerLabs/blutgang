@@ -32,7 +32,10 @@ use futures::{
 use hyper_tungstenite::HyperWebsocket;
 use tungstenite::Message;
 
-/// Handle a websocket connection.
+/// Handle a WebSocket connection request.
+///
+/// Opens a WebSocket connection between Blutgang and a client,
+/// sending their requests to be processed.
 pub async fn serve_websocket(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,

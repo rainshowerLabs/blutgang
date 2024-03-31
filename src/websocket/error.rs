@@ -1,3 +1,5 @@
+//! WebSocket module errors.
+
 use std::fmt;
 use tokio::sync::{
     broadcast,

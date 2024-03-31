@@ -20,7 +20,7 @@ use serde_json::{
 
 use sled::Db;
 
-// Extract the method, call the appropriate function and return the response
+/// Extract the method, call the appropriate function and return the response
 pub async fn execute_method(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -101,8 +101,8 @@ pub async fn execute_method(
     }
 }
 
-// Quit Blutgang upon receiving this method
-// We're returning a Null and allowing unreachable code so rustc doesnt cry
+/// Quit Blutgang upon receiving this method
+/// We're returning a Null and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
 async fn admin_blutgang_quit(cache: Db) -> Result<Value, AdminError> {
     // We're doing something not-good so flush everything to disk
@@ -117,7 +117,7 @@ async fn admin_blutgang_quit(cache: Db) -> Result<Value, AdminError> {
     Ok(Value::Null)
 }
 
-// Flushes sled cache to disk
+/// Flushes sled cache to disk
 async fn admin_flush_cache(cache: Db) -> Result<Value, AdminError> {
     let time = Instant::now();
     let _ = cache.flush_async().await;
@@ -132,7 +132,7 @@ async fn admin_flush_cache(cache: Db) -> Result<Value, AdminError> {
     Ok(rx)
 }
 
-// Respond with the config we started blutgang with
+/// Respond with the config we started blutgang with
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let rx = json!({
@@ -154,8 +154,8 @@ fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     Ok(rx)
 }
 
-// List generic Fn to retrieve RPCs from an Arc<RwLock<Vec<Rpc>>>
-// Used for `blutgang_rpc_list` and `blutgang_poverty_list`
+/// List generic Fn to retrieve RPCs from an Arc<RwLock<Vec<Rpc>>>
+/// Used for `blutgang_rpc_list` and `blutgang_poverty_list`
 fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError> {
     // Read the RPC list, handling errors
     let rpc_list = rpc_list.read().map_err(|_| AdminError::Inaccessible)?;
@@ -185,12 +185,11 @@ fn admin_list_rpc(rpc_list: &Arc<RwLock<Vec<Rpc>>>) -> Result<Value, AdminError>
     Ok(rx)
 }
 
-// Pushes an RPC to the end of the list
-//
-// param[0] - RPC url
-// param[1] - max_consecutive
-// param[2] - ma_len
-// param[3] - ma_len
+/// Pushes an RPC to the end of the list:
+/// - param[0] - RPC url
+/// - param[1] - max_consecutive
+/// - param[2] - ma_len
+/// - param[3] - ma_len
 fn admin_add_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
@@ -259,9 +258,8 @@ fn admin_add_rpc(
     Ok(rx)
 }
 
-// Remove RPC at a specified index, return the url of the removed RPC
-//
-// param[0] - RPC index
+/// Remove RPC at a specified index, return the url of the removed RPC:
+/// - param[0] - RPC index
 fn admin_remove_rpc(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     params: Option<&Vec<Value>>,
@@ -301,7 +299,7 @@ fn admin_remove_rpc(
 
 // TODO: change the following 4 fn so theyre generic
 
-// Responds with health_check_ttl
+/// Responds with health_check_ttl
 fn admin_blutgang_health_check_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let rx = json!({
@@ -313,7 +311,7 @@ fn admin_blutgang_health_check_ttl(config: Arc<RwLock<Settings>>) -> Result<Valu
     Ok(rx)
 }
 
-// Responds with ttl
+/// Responds with ttl
 fn admin_blutgang_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
     let rx = json!({
@@ -325,9 +323,8 @@ fn admin_blutgang_ttl(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError
     Ok(rx)
 }
 
-// Sets health_check_ttl
-//
-// param[0] - health_check_ttl
+/// Sets health_check_ttl:
+/// - param[0] - health_check_ttl
 fn admin_blutgang_set_health_check_ttl(
     config: Arc<RwLock<Settings>>,
     params: Option<&Vec<Value>>,
@@ -358,9 +355,8 @@ fn admin_blutgang_set_health_check_ttl(
     Ok(rx)
 }
 
-// Sets ttl
-//
-// param[0] - ttl
+/// Sets ttl:
+/// param[0] - ttl
 fn admin_blutgang_set_ttl(
     config: Arc<RwLock<Settings>>,
     params: Option<&Vec<Value>>,

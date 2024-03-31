@@ -1,4 +1,4 @@
-// Errors
+//! RPC type errors
 use std::error::Error;
 
 #[derive(Debug)]
