@@ -78,14 +78,11 @@ use std::{
     },
 };
 
+/// `ConnectionParams` contains the necessary data needed for blutgang
+/// to fulfil an incoming request.
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     pub channels: RequestChannels,
-    pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    pub sub_data: Arc<SubscriptionData>,
-    pub cache: Db,
     pub config: Arc<RwLock<Settings>>,
 }
 
