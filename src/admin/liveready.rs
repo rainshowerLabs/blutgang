@@ -29,7 +29,7 @@ pub enum ReadinessState {
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum HealthState {
     #[default]
-    Healthy,     // Everything nominal
+    Healthy, // Everything nominal
     MissingRpcs, // Some RPCs are not following the head but otherwise ok
     Unhealthy,   // Nothing works
 }

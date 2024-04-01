@@ -1,5 +1,5 @@
 //! # `balancer` module
-//! 
+//!
 //! The `balancer` module is the core and center of Blutgang.
 //! It includes logic for handling and processing incoming JSON-RPC requests,
 //! caching, and returning answers.
