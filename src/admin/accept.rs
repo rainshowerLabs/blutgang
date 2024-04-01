@@ -46,14 +46,7 @@ use crate::{
     Settings,
 };
 
-// use tokio::net::TcpListener;
-// use hyper::{
-//     server::conn::http1,
-//     service::service_fn,
-// };
-// use hyper_util_blutgang::rt::TokioIo;
-
-// For decoding JWT
+/// For decoding JWT
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
     id: Value,
@@ -63,10 +56,10 @@ struct Claims {
     exp: usize,
 }
 
-// Macro for getting responses from either the cache or RPC nodes.
-//
-// Since we don't cache the admin request responses, this functions
-// quite differently from the one you'll find in `blutgang/balancer/accept_http.rs`
+/// Macro for getting responses from either the cache or RPC nodes.
+///
+/// Since we don't cache the admin request responses, this functions
+/// quite differently from the one you'll find in `blutgang/balancer/accept_http.rs`
 macro_rules! get_response {
     (
         $tx:expr,
@@ -101,7 +94,7 @@ macro_rules! get_response {
     }};
 }
 
-// Execute request and construct a HTTP response
+/// Execute request and construct a HTTP response
 async fn forward_body(
     mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
@@ -131,7 +124,7 @@ async fn forward_body(
     Ok(res)
 }
 
-// Accept admin request, self explanatory
+/// Accept admin request, self explanatory
 pub async fn accept_admin_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
@@ -204,7 +197,6 @@ mod tests {
     // Helper function to create a test cache
     fn create_test_cache() -> Db {
         let db = sled::Config::new().temporary(true);
-        
 
         db.open().unwrap()
     }

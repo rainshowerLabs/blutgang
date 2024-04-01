@@ -148,7 +148,7 @@ impl Clone for RequestChannels {
     }
 }
 
-// Macros for accepting requests
+/// Macros for accepting requests
 #[macro_export]
 macro_rules! accept {
     (
@@ -173,7 +173,7 @@ macro_rules! accept {
     };
 }
 
-// Macro for getting responses from either the cache or RPC nodes
+/// Macro for getting responses from either the cache or RPC nodes
 macro_rules! get_response {
     (
         $tx:expr,
@@ -300,8 +300,8 @@ macro_rules! fetch_from_rpc {
     }};
 }
 
-// Pick RPC and send request to it. In case the result is cached,
-// read and return from the cache.
+/// Pick RPC and send request to it. In case the result is cached,
+/// read and return from the cache.
 async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
@@ -317,7 +317,9 @@ async fn forward_body(
     // Check if body has application/json
     //
     // Can be toggled via the config. Should be on if we want blutgang to be JSON-RPC compliant.
-    if params.header_check && tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json")) {
+    if params.header_check
+        && tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json"))
+    {
         return (
             Ok(hyper::Response::builder()
                 .status(400)
@@ -386,10 +388,10 @@ async fn forward_body(
     (Ok(res), rpc_position)
 }
 
-// Forward the request to *a* RPC picked by the algo set by the user.
-// Measures the time needed for a request, and updates the respective
-// RPC lself.
-// In case of a timeout, returns an error.
+/// Forward the request to *a* RPC picked by the algo set by the user.
+/// Measures the time needed for a request, and updates the respective
+/// RPC lself.
+/// In case of a timeout, returns an error.
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     connection_params: ConnectionParams,

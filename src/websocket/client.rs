@@ -55,6 +55,10 @@ use blake3::hash;
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
 
+/// Accepts incoming internal WS messages.
+///
+/// Upon receiving a `WsconnMessage::Reconnect()` it will drop all current WS
+/// connections and initiate new ones from the `rpc_list`.
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     ws_handles: Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
@@ -77,6 +81,7 @@ pub async fn ws_conn_manager(
     }
 }
 
+/// Updates the active WS handles to match the active connections.
 async fn update_ws_connections(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
@@ -92,6 +97,9 @@ async fn update_ws_connections(
     *ws_handle_guard = ws_vec;
 }
 
+/// Sends an incoming request to a WS connection.
+///
+/// Indexes can be specified via the `specified_index` param.
 async fn handle_incoming_message(
     ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
@@ -130,6 +138,10 @@ async fn handle_incoming_message(
     }
 }
 
+/// Creates new WS connections off of RPCs in `rpc_list`.
+///
+/// Returns a Vec of channels that can be used to send values
+/// to different individual WS connections.
 pub async fn create_ws_vec(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     broadcast_tx: &broadcast::Sender<IncomingResponse>,
@@ -162,6 +174,15 @@ pub async fn create_ws_vec(
     ws_handles
 }
 
+/// Represents a single WS connection to an RPC.
+///
+/// Accepts incoming requests via `incoming_rx` and send responses
+/// via `broadcast_tx`. Messages are *discovered* by their respective
+/// senders via the `"id"` field.
+///
+/// In case of an error where the connection is forced to close,
+/// a message will be sent via the `ws_error_tx` channel alerting
+/// the health check module.
 pub async fn ws_conn(
     rpc: Rpc,
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
@@ -243,6 +264,10 @@ pub async fn ws_conn(
     });
 }
 
+/// Processes an individual RPC request received via WebSockets.
+///
+/// Contains logic for retreiving from cache, sending to the internal
+/// WS pipeline, retreiving and returning received responses.
 pub async fn execute_ws_call(
     mut call: Value,
     user_id: u32,
@@ -355,6 +380,7 @@ pub async fn execute_ws_call(
     Ok(response.content.to_string())
 }
 
+/// Listens for a respond corresponding to our internal `user_id`.
 async fn listen_for_response(
     user_id: u32,
     mut broadcast_rx: broadcast::Receiver<IncomingResponse>,

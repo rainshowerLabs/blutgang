@@ -55,7 +55,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
     false
 }
 
-// Check if we should cache the querry, and if so cache it in the DB
+/// Check if we should cache the querry, and if so cache it in the DB
 pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
     let tx_string = method.to_string();
 
@@ -84,6 +84,8 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
     }
 }
 
+/// Updates the latency of an RPC node given an rpc list, its position, and the time it took for
+/// a request to complete.
 pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize, time: Duration) {
     let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
         // Handle the case where the RwLock is poisoned

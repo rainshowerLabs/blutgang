@@ -17,7 +17,7 @@ use crate::{
 use serde_json::Value;
 use tokio::sync::mpsc;
 
-// RequestResult enum
+/// RequestResult enum
 #[derive(Debug, Clone)]
 pub enum RequestResult {
     Call(Value),
@@ -33,7 +33,7 @@ impl From<RequestResult> for Value {
     }
 }
 
-// WsconnMessage enum
+/// WsconnMessage enum
 #[derive(Debug)]
 pub enum WsconnMessage {
     // call received from user and optional node index
@@ -50,7 +50,7 @@ impl From<WsconnMessage> for Value {
     }
 }
 
-// WsChannelErr enum
+/// WsChannelErr enum
 #[derive(Debug, Clone)]
 pub enum WsChannelErr {
     Closed(usize),
@@ -70,8 +70,8 @@ pub struct IncomingResponse {
     pub node_id: usize,
 }
 
-// Main struct for storing data related to subscriptions and the associated users
-// TODO: we should probably store more data for the sake of compute performance
+/// Main struct for storing data related to subscriptions and the associated users
+/// TODO: we should probably store more data for the sake of compute performance
 #[derive(Debug, Clone)]
 pub struct SubscriptionData {
     users: Arc<RwLock<HashMap<u32, UserData>>>,

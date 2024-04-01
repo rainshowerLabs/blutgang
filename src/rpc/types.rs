@@ -40,9 +40,9 @@ pub struct Rpc {
     pub min_time_delta: u128, // microseconds
 }
 
-// Sanitizes URLs so secrets don't get outputed.
-//
-// For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
+/// Sanitizes URLs so secrets don't get outputed.
+///
+/// For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
 // as input, we output: https://eth-mainnet.g.alchemy.com/
 fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
     let parsed_url = Url::parse(url)?;
@@ -104,13 +104,13 @@ impl Rpc {
         }
     }
 
-    // Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth
+    /// Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth
     #[cfg(test)]
     pub fn get_url(&self) -> String {
         self.url.clone()
     }
 
-    // Generic fn to send rpc
+    /// Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
         #[cfg(feature = "debug-verbose")]
         println!("Sending request: {}", tx.clone());
@@ -135,7 +135,7 @@ impl Rpc {
         Ok(response.text().await.unwrap())
     }
 
-    // Request blocknumber and return its value
+    /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_blockNumber".to_string(),
@@ -150,7 +150,7 @@ impl Rpc {
         Ok(return_number)
     }
 
-    // Returns the sync status. False if we're synced and following the head.
+    /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_syncing".to_string(),
@@ -165,7 +165,7 @@ impl Rpc {
         Ok(status)
     }
 
-    // Get the latest finalized block
+    /// Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
         let request = json!({
             "method": "eth_getBlockByNumber".to_string(),
@@ -195,8 +195,8 @@ impl Rpc {
         Ok(return_number)
     }
 
-    // Update the latency of the last n calls.
-    // We don't do it within send_request because we might kill it if it times out.
+    /// Update the latency of the last n calls.
+    /// We don't do it within send_request because we might kill it if it times out.
     pub fn update_latency(&mut self, latest: f64) {
         // If we have data >= to ma_length, remove the first one in line
         if self.status.latency_data.len() >= self.status.ma_length as usize {
@@ -210,7 +210,7 @@ impl Rpc {
     }
 }
 
-// Parses the result of `eth_syncing` and returns the status as a bool.
+/// Parses the result of `eth_syncing` and returns the status as a bool.
 fn extract_sync(rx: &str) -> Result<bool, RpcError> {
     let mut rx = rx.to_string();
 
@@ -231,7 +231,7 @@ fn extract_sync(rx: &str) -> Result<bool, RpcError> {
     }
 }
 
-// Take in the result of `eth_getBlockByNumber`, and extract the block number
+/// Take in the result of `eth_getBlockByNumber`, and extract the block number
 fn extract_number(rx: &str) -> Result<u64, RpcError> {
     let mut rx = rx.to_string();
 
