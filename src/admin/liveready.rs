@@ -1,4 +1,5 @@
 use crate::{
+    admin::metrics::MetricSender,
     metrics_channel,
     metrics_monitor,
     RpcMetrics,
@@ -162,15 +163,21 @@ async fn liveness_request_processor(
     }
 }
 
-#[cfg(feature = "prometheusd")]
 async fn liveness_request_processor_metrics(
     mut liveness_request_receiver: LiveReadyRequestRecv,
+    mut metrics_receiver: MetricReceiver,
     liveness_status: Arc<RwLock<LiveReadyMetrics>>,
 ) {
     loop {
         while let Some(incoming) = liveness_request_receiver.recv().await {
-            let current_status = *liveness_status.read().unwrap();
-            let _ = incoming.send(current_status);
+            let current_status_health = liveness_status.read().unwrap().health;
+            let current_status_readiness = liveness_status.read().unwrap().readiness;
+            let current_liveready = LiveReady {
+                health: current_status_health,
+                readiness: current_status_readiness,
+            };
+            // let current_status = *liveness_status.read().unwrap();
+            let _ = incoming.send(current_liveready);
         }
     }
 }
@@ -216,7 +223,6 @@ pub async fn accept_readiness_request(
     nok!()
 }
 
-#[cfg(feature = "prometheusd")]
 pub async fn accept_readiness_request_metrics(
     liveness_request_sender: LiveReadyRequestSnd,
     metrics_sender: MetricSender,
@@ -224,7 +230,7 @@ pub async fn accept_readiness_request_metrics(
     let (tx, rx) = oneshot::channel();
 
     let _ = liveness_request_sender.send(tx).await;
-    let _ = metrics_sender.send(tx).await;
+    // let _ = metrics_sender.send(tx);
 
     let rax = match rx.await {
         Ok(v) => v,
@@ -261,7 +267,6 @@ pub async fn accept_health_request(
     }
 }
 
-#[cfg(feature = "prometheusd")]
 pub async fn accept_health_request_metrics(
     liveness_request_sender: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -304,21 +309,23 @@ mod tests {
     };
     use tokio::time::sleep;
     use tokio::time::Duration;
+    // RUST_LOG=info cargo test -- test_liveness_listener_with_metrics --nocapture
     #[tokio::test]
     async fn test_liveness_listener_with_metrics() {
         let (metrics_tx, metrics_recv) = metrics_channel().await;
         let (update_snd, update_recv) = mpsc::channel(10);
         let storage = StorageRegistry::default();
-        let metrics = RpcMetrics::init(&storage).unwrap();
+        let _metrics = RpcMetrics::init(&storage).unwrap();
         let liveness_metrics_state = Arc::new(RwLock::new(LiveReadyMetrics {
             readiness: ReadinessState::Ready,
             health: HealthState::Healthy,
-            metrics: metrics.clone(),
+            metrics: _metrics.clone(),
         }));
         let liveness_metrics_clone = liveness_metrics_state.clone();
         tokio::spawn(async move {
             liveness_listener_metrics(update_recv, metrics_recv, liveness_metrics_clone).await;
         });
+        metrics_tx.send(_metrics.clone()).unwrap();
         update_snd
             .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
             .await
@@ -331,6 +338,35 @@ mod tests {
         log_info!(
             "metrics: {:?}",
             liveness_metrics_state.read().unwrap().metrics
+        );
+        log_info!("metrics_tx: {:?}", metrics_tx);
+    }
+
+    #[tokio::test]
+    // RUST_LOG=info cargo test -- test_accept_readiness_metrics_request_correct_response --nocapture
+
+    async fn test_accept_readiness_metrics_request_correct_response() {
+        let (metrics_tx, metrics_recv) = metrics_channel().await;
+        let (request_snd, request_recv) = mpsc::channel(1);
+        let storage = StorageRegistry::default();
+        let _metrics = RpcMetrics::init(&storage).unwrap();
+
+        let liveness_status = Arc::new(RwLock::new(LiveReadyMetrics {
+            readiness: ReadinessState::Ready,
+            health: HealthState::Healthy,
+            metrics: _metrics.clone(),
+        }));
+        tokio::spawn(liveness_request_processor_metrics(
+            request_recv,
+            metrics_recv,
+            liveness_status.clone(),
+        ));
+        let response = accept_readiness_request_metrics(request_snd.clone(), metrics_tx.clone())
+            .await
+            .unwrap();
+        log_info!(
+            "readiness + metrics response status: {:?}",
+            response.status()
         );
     }
 
