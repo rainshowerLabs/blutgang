@@ -2,10 +2,6 @@ use std::sync::Arc;
 
 use crate::{
     balancer::processing::CacheArgs,
-    config::system::{
-        RegistryChannel,
-        RpcMetrics,
-    },
     log_info,
     websocket::{
         client::execute_ws_call,

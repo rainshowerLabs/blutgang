@@ -13,6 +13,12 @@ use crate::{
             LiveReadyUpdate,
             ReadinessState,
         },
+        metrics::{
+            metrics_channel,
+            metrics_monitor,
+            metrics_update_sink,
+            RpcMetrics,
+        },
     },
     balancer::{
         accept_http::{
@@ -25,10 +31,6 @@ use crate::{
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
-        system::{
-            metrics_channel, RpcMetrics, metrics_monitor, metrics_update_sink,
-                    
-        },
         types::Settings,
     },
     health::{

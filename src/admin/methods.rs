@@ -1,15 +1,10 @@
-#[cfg(feature = "prometheusd")]
-use crate::config::system::{
-    MetricChannelCommand,
-    MetricReceiver,
-    MetricSender,
-    MetricsCommand,
-    MetricsError,
-    RegistryChannel,
-    RpcMetrics,
-};
 use crate::{
     admin::error::AdminError,
+    admin::metrics::{
+        MetricSender,
+        MetricsError,
+        RegistryChannel,
+    },
     Rpc,
     Settings,
 };

@@ -398,12 +398,13 @@ impl Settings {
         let mut poverty_list = Vec::new();
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
-            (rpc_list, poverty_list) = match sort_by_latency(rpc_list, poverty_list, ma_length).await {
-                Ok(rax) => rax,
-                Err(e) => {
-                    panic!("{:?}", e);
-                }
-            };
+            (rpc_list, poverty_list) =
+                match sort_by_latency(rpc_list, poverty_list, ma_length).await {
+                    Ok(rax) => rax,
+                    Err(e) => {
+                        panic!("{:?}", e);
+                    }
+                };
         }
 
         Settings {
