@@ -16,7 +16,6 @@ use crate::{
         metrics::{
             metrics_channel,
             metrics_monitor,
-            metrics_update_sink,
             RpcMetrics,
         },
     },
@@ -157,7 +156,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let _ = metrics_monitor(metrics_rx, storage_registry).await;
             });
         } else {
-            tokio::task::spawn(metrics_update_sink(metrics_rx));
+            #[cfg(not(feature = "prometheusd"))]
+            {
+                tokio::task::spawn(metrics_update_sink(metrics_rx));
+            }
         }
     }
 

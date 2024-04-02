@@ -105,7 +105,7 @@ pub enum MetricChannelCommand {
     StatsMsg(oneshot::Sender<RpcMetrics>),
 }
 
-//#[cfg(feature = "prometheusd")]
+#[cfg(not(feature = "prometheusd"))]
 pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
     loop {
         while metrics_rx.recv().await.is_some() {

@@ -1,3 +1,8 @@
+use crate::{
+    metrics_channel,
+    metrics_monitor,
+    RpcMetrics,
+};
 use std::{
     convert::Infallible,
     sync::{
@@ -14,6 +19,8 @@ use tokio::sync::{
 };
 
 use hyper::body::Bytes;
+
+use super::metrics::MetricReceiver;
 
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
@@ -34,6 +41,13 @@ pub enum HealthState {
 pub struct LiveReady {
     readiness: ReadinessState,
     health: HealthState,
+}
+
+#[derive(Debug, Clone)]
+pub struct LiveReadyMetrics {
+    readiness: ReadinessState,
+    health: HealthState,
+    metrics: RpcMetrics,
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -101,10 +115,57 @@ async fn liveness_listener(
     }
 }
 
+async fn liveness_listener_metrics(
+    mut liveness_receiver: LiveReadyUpdateRecv,
+    mut metrics_receiver: MetricReceiver,
+    liveness_status: Arc<RwLock<LiveReadyMetrics>>,
+) {
+    while let Some(update) = liveness_receiver.recv().await {
+        match update {
+            LiveReadyUpdate::Readiness(state) => {
+                let dt = std::time::Instant::now();
+                let mut liveness = liveness_status.write().unwrap();
+                liveness.readiness = state;
+                liveness.metrics.requests_complete(
+                    "/liveready_readiness",
+                    "LiveReadyUpdate::Readiness",
+                    //should I try using ok! macro here?
+                    &200,
+                    dt.elapsed(),
+                );
+            }
+            LiveReadyUpdate::Health(state) => {
+                let dt = std::time::Instant::now();
+                let mut liveness = liveness_status.write().unwrap();
+                liveness.health = state;
+                liveness.metrics.requests_complete(
+                    "/liveready_health",
+                    "LiveReadyUpdate::Health",
+                    &200,
+                    dt.elapsed(),
+                );
+            }
+        }
+    }
+}
+
 // Receives requests about current status updates and returns the current liveness
 async fn liveness_request_processor(
     mut liveness_request_receiver: LiveReadyRequestRecv,
     liveness_status: Arc<RwLock<LiveReady>>,
+) {
+    loop {
+        while let Some(incoming) = liveness_request_receiver.recv().await {
+            let current_status = *liveness_status.read().unwrap();
+            let _ = incoming.send(current_status);
+        }
+    }
+}
+
+#[cfg(feature = "prometheusd")]
+async fn liveness_request_processor_metrics(
+    mut liveness_request_receiver: LiveReadyRequestRecv,
+    liveness_status: Arc<RwLock<LiveReadyMetrics>>,
 ) {
     loop {
         while let Some(incoming) = liveness_request_receiver.recv().await {
@@ -155,7 +216,53 @@ pub async fn accept_readiness_request(
     nok!()
 }
 
+#[cfg(feature = "prometheusd")]
+pub async fn accept_readiness_request_metrics(
+    liveness_request_sender: LiveReadyRequestSnd,
+    metrics_sender: MetricSender,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    let (tx, rx) = oneshot::channel();
+
+    let _ = liveness_request_sender.send(tx).await;
+    let _ = metrics_sender.send(tx).await;
+
+    let rax = match rx.await {
+        Ok(v) => v,
+        Err(_) => {
+            return nok!();
+        }
+    };
+
+    if rax.readiness == ReadinessState::Ready {
+        return ok!();
+    }
+
+    nok!()
+}
+
 pub async fn accept_health_request(
+    liveness_request_sender: LiveReadyRequestSnd,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    let (tx, rx) = oneshot::channel();
+
+    let _ = liveness_request_sender.send(tx).await;
+
+    let rax = match rx.await {
+        Ok(v) => v,
+        Err(_) => {
+            return nok!();
+        }
+    };
+
+    match rax.health {
+        HealthState::Healthy => ok!(),
+        HealthState::MissingRpcs => partial_ok!(),
+        HealthState::Unhealthy => nok!(),
+    }
+}
+
+#[cfg(feature = "prometheusd")]
+pub async fn accept_health_request_metrics(
     liveness_request_sender: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let (tx, rx) = oneshot::channel();
@@ -188,13 +295,44 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::log_info;
     use crate::Rpc;
+    use prometheus_metric_storage::StorageRegistry;
     use tokio::sync::{
         mpsc,
         oneshot,
     };
     use tokio::time::sleep;
     use tokio::time::Duration;
+    #[tokio::test]
+    async fn test_liveness_listener_with_metrics() {
+        let (metrics_tx, metrics_recv) = metrics_channel().await;
+        let (update_snd, update_recv) = mpsc::channel(10);
+        let storage = StorageRegistry::default();
+        let metrics = RpcMetrics::init(&storage).unwrap();
+        let liveness_metrics_state = Arc::new(RwLock::new(LiveReadyMetrics {
+            readiness: ReadinessState::Ready,
+            health: HealthState::Healthy,
+            metrics: metrics.clone(),
+        }));
+        let liveness_metrics_clone = liveness_metrics_state.clone();
+        tokio::spawn(async move {
+            liveness_listener_metrics(update_recv, metrics_recv, liveness_metrics_clone).await;
+        });
+        update_snd
+            .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+            .await
+            .unwrap();
+        update_snd
+            .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
+            .await
+            .unwrap();
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await; // Give time for async updates
+        log_info!(
+            "metrics: {:?}",
+            liveness_metrics_state.read().unwrap().metrics
+        );
+    }
 
     #[tokio::test]
     async fn test_liveness_listener_updates_status() {
