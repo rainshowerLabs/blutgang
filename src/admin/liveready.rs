@@ -302,6 +302,7 @@ mod tests {
     use super::*;
     use crate::log_info;
     use crate::Rpc;
+    use prometheus::core::Collector;
     use prometheus_metric_storage::StorageRegistry;
     use tokio::sync::{
         mpsc,
@@ -367,6 +368,18 @@ mod tests {
         log_info!(
             "readiness + metrics response status: {:?}",
             response.status()
+        );
+        let dt = std::time::Instant::now();
+        //TODO: Not sure if this is good 
+        let (tx, _rx) = oneshot::channel::<LiveReadyMetrics>();
+        metrics_tx.send(liveness_status.read().unwrap().metrics.clone()).unwrap();
+        liveness_status.write().unwrap().metrics.requests_complete("/liveready_health","LiveReadyUpdate::Health::Setup", &503, dt.elapsed());
+        let response = accept_readiness_request_metrics(request_snd, metrics_tx).await.unwrap();
+        //TODO: Not sure if raw dogging metrics request field is good idea here 
+        log_info!(
+            "readiness + metrics response status: {:?}, metrics: {:?}",
+            response.status(),
+            liveness_status.read().unwrap().metrics.requests.collect()
         );
     }
 

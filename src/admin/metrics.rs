@@ -55,9 +55,9 @@ impl From<MetricsError> for String {
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
-    requests: prometheus::IntCounterVec,
+    pub requests: prometheus::IntCounterVec,
     #[metric(labels("path", "method"), help = "latency of request")]
-    duration: prometheus::HistogramVec,
+    pub duration: prometheus::HistogramVec,
 }
 //#[cfg(feature = "prometheusd")]
 impl RpcMetrics {
