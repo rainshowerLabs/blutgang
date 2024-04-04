@@ -69,6 +69,11 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
+
+pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
+pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
+pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
+
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
     () => {
@@ -164,7 +169,7 @@ async fn liveness_request_processor(
 }
 
 async fn liveness_request_processor_metrics(
-    mut liveness_request_receiver: LiveReadyRequestRecv,
+    mut liveness_request_receiver: LRMetricsRequestRx,
     mut metrics_receiver: MetricReceiver,
     liveness_status: Arc<RwLock<LiveReadyMetrics>>,
 ) {
@@ -172,9 +177,12 @@ async fn liveness_request_processor_metrics(
         while let Some(incoming) = liveness_request_receiver.recv().await {
             let current_status_health = liveness_status.read().unwrap().health;
             let current_status_readiness = liveness_status.read().unwrap().readiness;
-            let current_liveready = LiveReady {
+            let current_status_metrics = liveness_status.read().unwrap().metrics.clone();
+            let current_liveready = LiveReadyMetrics {
                 health: current_status_health,
                 readiness: current_status_readiness,
+                metrics: current_status_metrics,
+                            
             };
             // let current_status = *liveness_status.read().unwrap();
             let _ = incoming.send(current_liveready);
@@ -224,7 +232,7 @@ pub async fn accept_readiness_request(
 }
 
 pub async fn accept_readiness_request_metrics(
-    liveness_request_sender: LiveReadyRequestSnd,
+    liveness_request_sender: LRMetricsRequestTx,
     metrics_sender: MetricSender,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let (tx, rx) = oneshot::channel();
@@ -347,10 +355,11 @@ mod tests {
     // RUST_LOG=info cargo test -- test_accept_readiness_metrics_request_correct_response --nocapture
 
     async fn test_accept_readiness_metrics_request_correct_response() {
-        let (metrics_tx, metrics_recv) = metrics_channel().await;
         let (request_snd, request_recv) = mpsc::channel(1);
         let storage = StorageRegistry::default();
         let _metrics = RpcMetrics::init(&storage).unwrap();
+        let dt = std::time::Instant::now();
+        let (metrics_tx, metrics_recv) = metrics_channel().await;
 
         let liveness_status = Arc::new(RwLock::new(LiveReadyMetrics {
             readiness: ReadinessState::Ready,
@@ -365,19 +374,38 @@ mod tests {
         let response = accept_readiness_request_metrics(request_snd.clone(), metrics_tx.clone())
             .await
             .unwrap();
+        liveness_status.write().unwrap().metrics.requests_complete(
+            "/liveready_health",
+            "LiveReadyUpdate::Health::Healthy",
+            &200,
+            dt.elapsed(),
+        );
+
         log_info!(
-            "readiness + metrics response status: {:?}",
-            response.status()
+            "readiness response status for healthy rpc: {:?}, metrics: {:?}",
+            response.status(),
+            liveness_status.read().unwrap().metrics.requests.collect()
+
         );
         let dt = std::time::Instant::now();
-        //TODO: Not sure if this is good 
+        //TODO: Not sure if this is good
         let (tx, _rx) = oneshot::channel::<LiveReadyMetrics>();
-        metrics_tx.send(liveness_status.read().unwrap().metrics.clone()).unwrap();
-        liveness_status.write().unwrap().metrics.requests_complete("/liveready_health","LiveReadyUpdate::Health::Setup", &503, dt.elapsed());
-        let response = accept_readiness_request_metrics(request_snd, metrics_tx).await.unwrap();
-        //TODO: Not sure if raw dogging metrics request field is good idea here 
+        metrics_tx
+            .send(liveness_status.read().unwrap().metrics.clone())
+            .unwrap();
+        liveness_status.write().unwrap().readiness = ReadinessState::Setup;
+        liveness_status.write().unwrap().metrics.requests_complete(
+            "/liveready_health",
+            "LiveReadyUpdate::Health::Setup",
+            &503,
+            dt.elapsed(),
+        );
+        let response = accept_readiness_request_metrics(request_snd, metrics_tx)
+            .await
+            .unwrap();
+        //TODO: Not sure if raw dogging metrics request field is good idea here
         log_info!(
-            "readiness + metrics response status: {:?}, metrics: {:?}",
+            "readiness response status for setup: {:?}, metrics: {:?}",
             response.status(),
             liveness_status.read().unwrap().metrics.requests.collect()
         );
