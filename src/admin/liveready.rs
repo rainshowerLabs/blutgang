@@ -1,6 +1,8 @@
 use crate::{
     RpcMetrics,
 };
+use crate::admin::metrics::{MetricReceiver, MetricSender, };
+use prometheus_metric_storage::StorageRegistry;
 use std::{
     convert::Infallible,
     sync::{
@@ -308,7 +310,6 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
     use crate::Rpc;
     use prometheus::core::Collector;
     
@@ -322,7 +323,8 @@ mod tests {
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
     async fn test_liveness_listener_with_metrics() {
-        use crate::metrics_channel;
+        use crate::admin::metrics::metrics_channel;
+        use crate::log_info;
         let (metrics_tx, metrics_recv) = metrics_channel().await;
         let (update_snd, update_recv) = mpsc::channel(10);
         let storage = StorageRegistry::default();
@@ -357,6 +359,8 @@ mod tests {
     #[tokio::test]
     // RUST_LOG=info cargo test --features prometheusd -- test_accept_readiness_metrics_request_correct_response --nocapture
     async fn test_accept_readiness_metrics_request_correct_response() {
+        use crate::admin::metrics::metrics_channel;
+        use crate::log_info;
         let (request_snd, request_recv) = mpsc::channel(1);
         let storage = StorageRegistry::default();
         let _metrics = RpcMetrics::init(&storage).unwrap();
