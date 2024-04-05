@@ -68,20 +68,17 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
-<<<<<<< HEAD
 #[cfg(feature = "prometheusd")]
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
 #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
 #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
-=======
 
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
 
->>>>>>> e2fb78b9664929f5aa4727963db10a967d7cf1b0
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
     () => {
@@ -190,10 +187,6 @@ async fn liveness_request_processor_metrics(
                 health: current_status_health,
                 readiness: current_status_readiness,
                 metrics: current_status_metrics,
-<<<<<<< HEAD
-=======
-                            
->>>>>>> e2fb78b9664929f5aa4727963db10a967d7cf1b0
             };
             let _ = incoming.send(current_liveready);
         }
@@ -402,10 +395,6 @@ mod tests {
             "readiness response status for healthy rpc: {:?}, metrics: {:?}",
             response.status(),
             liveness_status.read().unwrap().metrics.requests.collect()
-<<<<<<< HEAD
-=======
-
->>>>>>> e2fb78b9664929f5aa4727963db10a967d7cf1b0
         );
         let dt = std::time::Instant::now();
         //TODO: Not sure if this is good
