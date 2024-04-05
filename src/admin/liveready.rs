@@ -183,7 +183,6 @@ async fn liveness_request_processor_metrics(
                 readiness: current_status_readiness,
                 metrics: current_status_metrics,
             };
-            // let current_status = *liveness_status.read().unwrap();
             let _ = incoming.send(current_liveready);
         }
     }
