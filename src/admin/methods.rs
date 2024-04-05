@@ -1,10 +1,5 @@
 use crate::{
     admin::error::AdminError,
-    admin::metrics::{
-        MetricSender,
-        MetricsError,
-        RegistryChannel,
-    },
     Rpc,
     Settings,
 };
@@ -137,14 +132,15 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
 }
 
 #[cfg(feature = "prometheusd")]
-async fn admin_flush_metrics(
-    channel: &RegistryChannel,
-    tx: MetricSender,
-) -> Result<(), MetricsError> {
-    let dt = Instant::now();
+use crate::admin::metrics::MetricsError;
+// async fn admin_flush_metrics(
+//     channel: &RegistryChannel,
+//     tx: MetricSender,
+// ) -> Result<(), MetricsError> {
+//     let dt = Instant::now();
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 // Respond with the config we started blutgang with
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {

@@ -13,11 +13,7 @@ use crate::{
             LiveReadyUpdate,
             ReadinessState,
         },
-        metrics::{
-            metrics_channel,
-            metrics_monitor,
-            RpcMetrics,
-        },
+        metrics::RpcMetrics,
     },
     balancer::{
         accept_http::{
@@ -141,11 +137,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
     // TODO: using this for testing because of ownership eval of rx under feature flag
-    let prometheus_enabled: bool = true;
-    let (metrics_tx, metrics_rx) = metrics_channel().await;
-
     #[cfg(feature = "prometheusd")]
     {
+        use crate::admin::metrics::metrics_channel;
+        use crate::admin::metrics::metrics_monitor;
+        let prometheus_enabled: bool = true;
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+
         if prometheus_enabled {
             let metrics_rx_ws = Arc::new(&metrics_rx);
             let metrics_rx_http = Arc::new(&metrics_rx);

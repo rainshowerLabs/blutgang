@@ -1,7 +1,4 @@
 use crate::{
-    admin::metrics::MetricSender,
-    metrics_channel,
-    metrics_monitor,
     RpcMetrics,
 };
 use std::{
@@ -21,7 +18,7 @@ use tokio::sync::{
 
 use hyper::body::Bytes;
 
-use super::metrics::MetricReceiver;
+
 
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
@@ -69,11 +66,12 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
-
+#[cfg(feature = "prometheusd")]
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
+#[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
+#[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
-
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
     () => {
@@ -120,7 +118,7 @@ async fn liveness_listener(
         }
     }
 }
-
+#[cfg(feature = "prometheusd")]
 async fn liveness_listener_metrics(
     mut liveness_receiver: LiveReadyUpdateRecv,
     mut metrics_receiver: MetricReceiver,
@@ -167,7 +165,7 @@ async fn liveness_request_processor(
         }
     }
 }
-
+#[cfg(feature = "prometheusd")]
 async fn liveness_request_processor_metrics(
     mut liveness_request_receiver: LRMetricsRequestRx,
     mut metrics_receiver: MetricReceiver,
@@ -182,7 +180,6 @@ async fn liveness_request_processor_metrics(
                 health: current_status_health,
                 readiness: current_status_readiness,
                 metrics: current_status_metrics,
-                            
             };
             // let current_status = *liveness_status.read().unwrap();
             let _ = incoming.send(current_liveready);
@@ -230,11 +227,13 @@ pub async fn accept_readiness_request(
 
     nok!()
 }
-
+#[cfg(feature = "prometheusd")]
 pub async fn accept_readiness_request_metrics(
     liveness_request_sender: LRMetricsRequestTx,
     metrics_sender: MetricSender,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    use crate::admin::metrics::metrics_channel;
+    //unbounded with metrics_channel or oneshot channel here?
     let (tx, rx) = oneshot::channel();
 
     let _ = liveness_request_sender.send(tx).await;
@@ -274,10 +273,11 @@ pub async fn accept_health_request(
         HealthState::Unhealthy => nok!(),
     }
 }
-
+#[cfg(feature = "prometheusd")]
 pub async fn accept_health_request_metrics(
     liveness_request_sender: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    use crate::admin::metrics::metrics_channel;
     let (tx, rx) = oneshot::channel();
 
     let _ = liveness_request_sender.send(tx).await;
@@ -308,19 +308,21 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::log_info;
+    
     use crate::Rpc;
     use prometheus::core::Collector;
-    use prometheus_metric_storage::StorageRegistry;
+    
     use tokio::sync::{
         mpsc,
         oneshot,
     };
     use tokio::time::sleep;
     use tokio::time::Duration;
-    // RUST_LOG=info cargo test -- test_liveness_listener_with_metrics --nocapture
+    // RUST_LOG=info cargo test --features prometheusd -- test_liveness_listener_with_metrics --nocapture
+    #[cfg(feature = "prometheusd")]
     #[tokio::test]
     async fn test_liveness_listener_with_metrics() {
+        use crate::metrics_channel;
         let (metrics_tx, metrics_recv) = metrics_channel().await;
         let (update_snd, update_recv) = mpsc::channel(10);
         let storage = StorageRegistry::default();
@@ -351,9 +353,9 @@ mod tests {
         log_info!("metrics_tx: {:?}", metrics_tx);
     }
 
+    #[cfg(feature = "prometheusd")]
     #[tokio::test]
-    // RUST_LOG=info cargo test -- test_accept_readiness_metrics_request_correct_response --nocapture
-
+    // RUST_LOG=info cargo test --features prometheusd -- test_accept_readiness_metrics_request_correct_response --nocapture
     async fn test_accept_readiness_metrics_request_correct_response() {
         let (request_snd, request_recv) = mpsc::channel(1);
         let storage = StorageRegistry::default();
@@ -385,7 +387,6 @@ mod tests {
             "readiness response status for healthy rpc: {:?}, metrics: {:?}",
             response.status(),
             liveness_status.read().unwrap().metrics.requests.collect()
-
         );
         let dt = std::time::Instant::now();
         //TODO: Not sure if this is good
