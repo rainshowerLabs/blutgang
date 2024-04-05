@@ -1,23 +1,127 @@
 use crate::{
     balancer::{
-        format::get_block_number_from_request,
+        format::{
+            get_block_number_from_request,
+            incoming_to_value,
+            replace_block_tags,
+        },
         processing::can_cache,
     },
     database::accept::RequestSender,
     CacheArgs,
+    NamedBlocknumbers,
+    Rpc,
 };
-use std::convert::Infallible;
 
-use blake3::Hash;
+use std::{
+    collections::BTreeMap,
+    convert::Infallible,
+    sync::{
+        Arc,
+        RwLock,
+    },
+};
+
+use blake3::{
+    hash,
+    Hash,
+};
 use serde_json::Value;
 use simd_json::to_vec;
-use std::sync::Arc;
+
+use sled::Db;
+use tokio::sync::watch;
 
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
     Request,
 };
+
+/// Pick RPC and send request to it. In case the result is cached,
+/// read and return from the cache.
+async fn forward_body(
+    tx: Request<hyper::body::Incoming>,
+    rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
+    finalized_rx: &watch::Receiver<u64>,
+    named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    cache: Db,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // TODO: do  content type validation more upstream
+    // Check if body has application/json
+    //
+    // Can be toggled via the config. Should be on if we want blutgang to be JSON-RPC compliant.
+    // if params.header_check
+    //     && tx.headers().get("content-type") != Some(&HeaderValue::from_static("application/json"))
+    // {
+    //     return (
+    //         Ok(hyper::Response::builder()
+    //             .status(400)
+    //             .body(Full::new(Bytes::from("Improper content-type header")))
+    //             .unwrap()),
+    //         None,
+    //     );
+    // }
+
+    // Convert incoming body to serde value
+    let mut tx = incoming_to_value(tx).await.unwrap();
+
+    // Get the id of the request and set it to 0 for caching
+    //
+    // We're doing this ID gymnastics because we're hashing the
+    // whole request and we don't want the ID as it's arbitrary
+    // and does not impact the request result.
+    let id = tx["id"].take().as_u64().unwrap_or(0);
+
+    // Hash the request with either blake3 or xxhash depending on the enabled feature
+    let tx_hash;
+    #[cfg(not(feature = "xxhash"))]
+    {
+        tx_hash = hash(tx.to_string().as_bytes());
+    }
+    #[cfg(feature = "xxhash")]
+    {
+        tx_hash = xxh3_64(tx.to_string().as_bytes());
+    }
+
+    // RPC used to get the response, we use it to update the latency for it later.
+    let mut rpc_position;
+
+    // Rewrite named block parameters if possible
+    let mut tx = replace_block_tags(&mut tx, named_numbers);
+
+    // Get the response from either the DB or from a RPC. If it timeouts, retry.
+    let rax = get_response!(
+        tx,
+        cache,
+        tx_hash,
+        rpc_position,
+        id,
+        rpc_list_rwlock,
+        finalized_rx.clone(),
+        named_numbers.clone(),
+        head_cache.clone(),
+        params.ttl,
+        params.max_retries
+    );
+
+    // Convert rx to bytes and but it in a Buf
+    let body = hyper::body::Bytes::from(rax);
+
+    // Put it in a http_body_util::Full
+    let body = Full::new(body);
+
+    // Build the response
+    let res = hyper::Response::builder()
+        .status(200)
+        .header("Content-Type", "application/json")
+        .header("Access-Control-Allow-Origin", "*")
+        .body(body)
+        .unwrap();
+
+    Ok(res)
+}
 
 /// Forward the request to *a* RPC picked by the algo set by the user.
 /// Measures the time needed for a request, and updates the respective
@@ -30,7 +134,6 @@ pub async fn accept_request(
 ) {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
-    let rpc_position: Option<usize>;
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
