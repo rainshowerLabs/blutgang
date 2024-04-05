@@ -1,8 +1,10 @@
 use crate::{
-	CacheArgs,
-	database::processing::cache_querry,
+    database::processing::{
+        accept_request,
+        cache_querry,
+    },
+    CacheArgs,
 };
-
 
 use std::sync::Arc;
 
@@ -11,17 +13,15 @@ use hyper::{
     Request,
 };
 
-use tokio::{
-	sync::{
-		oneshot,
-		mpsc,
-	},
+use tokio::sync::{
+    mpsc,
+    oneshot,
 };
 
 use serde_json::Value;
 
 // Select either blake3 or xxhash based on the features
-use blake3::{Hash};
+use blake3::Hash;
 
 #[cfg(feature = "xxhash")]
 use xxhash_rust::xxh3::xxh3_64;
@@ -41,42 +41,36 @@ pub type Error = Box<dyn std::error::Error>;
 /// of if we're sending a new request to the DB.
 #[derive(Debug)]
 enum RequestKind {
-	UserRequest(Request<Incoming>),
-	// TODO: dont be a string plz
-	Cache(Hash, Value, String),
+    UserRequest(Request<Incoming>),
+    // TODO: dont be a string plz
+    Cache(Hash, Value, String),
 }
 
 /// Contains data to be sent to the DB thread for processing.
 #[derive(Debug)]
 pub struct DbRequest {
-	request: RequestKind,
-	sender: RequestSender,
+    request: RequestKind,
+    sender: RequestSender,
 }
 
-async fn process_incoming(
-	incoming: DbRequest,
-	cache_args: Arc<CacheArgs>,
-) {
-	match incoming.request {
-	    RequestKind::UserRequest(incoming) => todo!(),
-	    RequestKind::Cache(key, value, mut rx) => {
-			cache_querry(value, &mut rx, &key, cache_args)
-	    },
-	};
+async fn process_incoming(incoming: DbRequest, cache_args: Arc<CacheArgs>) {
+    match incoming.request {
+        RequestKind::UserRequest(req) => accept_request(req, incoming.sender, cache_args).await,
+        RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args),
+    };
 }
 
 /// Processes incoming requests from clients and return responses
 pub async fn database_processing(
-	cache_args: Arc<CacheArgs>,
-	mut rax: mpsc::UnboundedReceiver<DbRequest>,
+    cache_args: Arc<CacheArgs>,
+    mut rax: mpsc::UnboundedReceiver<DbRequest>,
 ) {
     loop {
         while let Some(incoming) = rax.recv().await {
-        	let cache_args_clone = cache_args.clone();
-        	tokio::spawn(async move {
-	            process_incoming(incoming, cache_args_clone).await;
-	        }
-        );
+            let cache_args_clone = cache_args.clone();
+            tokio::spawn(async move {
+                process_incoming(incoming, cache_args_clone).await;
+            });
         }
     }
 }

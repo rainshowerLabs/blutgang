@@ -443,46 +443,8 @@ pub async fn accept_request(
         return Ok(response);
     }
 
-    // Send request and measure time
+    // Send request
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
-    let rpc_position: Option<usize>;
-
-    // RequestParams from config
-    let params = {
-        let config_guard = connection_params.config.read().unwrap();
-        RequestParams {
-            ttl: config_guard.ttl,
-            max_retries: config_guard.max_retries,
-            header_check: config_guard.header_check,
-        }
-    };
-
-    // Check if we have the response hashed, and if not forward it
-    // to the best available RPC.
-    //
-    // Also handle cache insertions.
-    let time = Instant::now();
-    (response, rpc_position) = forward_body(
-        tx,
-        &connection_params.rpc_list_rwlock,
-        &connection_params.channels.finalized_rx,
-        &connection_params.named_numbers,
-        &connection_params.head_cache,
-        connection_params.cache,
-        params,
-    )
-    .await;
-    let time = time.elapsed();
-    log_info!("Request time: {:?}", time);
-
-    // `rpc_position` is an Option<> that either contains the index of the RPC
-    // we forwarded our request to, or is None if the result was cached.
-    //
-    // Here, we update the latency of the RPC that was used to process the request
-    // if `rpc_position` is Some.
-    if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&connection_params.rpc_list_rwlock, rpc_position, time);
-    }
 
     response
 }

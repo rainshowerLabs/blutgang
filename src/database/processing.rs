@@ -1,15 +1,23 @@
 use crate::{
-    CacheArgs,
     balancer::{
         format::get_block_number_from_request,
         processing::can_cache,
     },
+    database::accept::RequestSender,
+    CacheArgs,
 };
+use std::convert::Infallible;
 
+use blake3::Hash;
+use serde_json::Value;
 use simd_json::to_vec;
 use std::sync::Arc;
-use serde_json::Value;
-use blake3::Hash;
+
+use http_body_util::Full;
+use hyper::{
+    body::Bytes,
+    Request,
+};
 
 /// Forward the request to *a* RPC picked by the algo set by the user.
 /// Measures the time needed for a request, and updates the respective
@@ -17,100 +25,12 @@ use blake3::Hash;
 /// In case of a timeout, returns an error.
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
-    connection_params: ConnectionParams,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // Check if the request is a websocket upgrade request.
-    if is_upgrade_request(&tx) {
-        log_info!("Received WS upgrade request");
-
-        if !connection_params.config.read().unwrap().is_ws {
-            return rpc_response!(
-                500,
-                Full::new(Bytes::from(
-                    "{code:-32005, message:\"error: WebSockets are disabled!\"}".to_string(),
-                ))
-            );
-        }
-
-        let (response, websocket) = match upgrade(&mut tx, None) {
-            Ok((response, websocket)) => (response, websocket),
-            Err(e) => {
-                log_err!("Websocket upgrade error: {}", e);
-                return rpc_response!(500, Full::new(Bytes::from(
-                    "{code:-32004, message:\"error: Websocket upgrade error! Try again later...\"}"
-                        .to_string(),
-                )));
-            }
-        };
-
-        let cache_args = CacheArgs {
-            finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
-            named_numbers: connection_params.named_numbers.clone(),
-            cache: connection_params.cache,
-            head_cache: connection_params.head_cache.clone(),
-        };
-
-        // Spawn a task to handle the websocket connection.
-        tokio::task::spawn(async move {
-            if let Err(e) = serve_websocket(
-                websocket,
-                connection_params.channels.incoming_tx,
-                connection_params.channels.outgoing_rx,
-                connection_params.sub_data.clone(),
-                cache_args,
-            )
-            .await
-            {
-                log_err!("Websocket connection error: {}", e);
-            }
-        });
-
-        // Return the response so the spawned future can continue.
-        return Ok(response);
-    }
-
+    sender: RequestSender,
+    cache_args: Arc<CacheArgs>,
+) {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
     let rpc_position: Option<usize>;
-
-    // RequestParams from config
-    let params = {
-        let config_guard = connection_params.config.read().unwrap();
-        RequestParams {
-            ttl: config_guard.ttl,
-            max_retries: config_guard.max_retries,
-            header_check: config_guard.header_check,
-        }
-    };
-
-    // Check if we have the response hashed, and if not forward it
-    // to the best available RPC.
-    //
-    // Also handle cache insertions.
-    let time = Instant::now();
-    (response, rpc_position) = forward_body(
-        tx,
-        &connection_params.rpc_list_rwlock,
-        &connection_params.channels.finalized_rx,
-        &connection_params.named_numbers,
-        &connection_params.head_cache,
-        connection_params.cache,
-        params,
-    )
-    .await;
-    let time = time.elapsed();
-    log_info!("Request time: {:?}", time);
-
-    // `rpc_position` is an Option<> that either contains the index of the RPC
-    // we forwarded our request to, or is None if the result was cached.
-    //
-    // Here, we update the latency of the RPC that was used to process the request
-    // if `rpc_position` is Some.
-    if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&connection_params.rpc_list_rwlock, rpc_position, time);
-    }
-
-    response
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
