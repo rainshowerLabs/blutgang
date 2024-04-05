@@ -4,6 +4,7 @@ use crate::{
         cache_querry,
     },
     CacheArgs,
+    ConnectionParams,
 };
 
 use std::sync::Arc;
@@ -41,7 +42,7 @@ pub type Error = Box<dyn std::error::Error>;
 /// of if we're sending a new request to the DB.
 #[derive(Debug)]
 enum RequestKind {
-    UserRequest(Request<Incoming>),
+    UserRequest(Request<Incoming>, ConnectionParams),
     // TODO: dont be a string plz
     Cache(Hash, Value, String),
 }
@@ -53,9 +54,12 @@ pub struct DbRequest {
     sender: RequestSender,
 }
 
-async fn process_incoming(incoming: DbRequest, cache_args: Arc<CacheArgs>) {
+async fn process_incoming(
+	incoming: DbRequest,
+	cache_args: Arc<CacheArgs>,
+) {
     match incoming.request {
-        RequestKind::UserRequest(req) => accept_request(req, incoming.sender, cache_args).await,
+        RequestKind::UserRequest(req, params) => accept_request(req, incoming.sender, cache_args, params).await,
         RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args),
     };
 }

@@ -5,17 +5,26 @@ use crate::{
             incoming_to_value,
             replace_block_tags,
         },
-        processing::can_cache,
+        processing::{
+            can_cache,
+            update_rpc_latency,
+        },
+        accept_http::{
+            ConnectionParams,
+            RequestParams,
+        },
     },
     database::accept::RequestSender,
     CacheArgs,
     NamedBlocknumbers,
     Rpc,
+    log_info,
 };
 
 use std::{
     collections::BTreeMap,
     convert::Infallible,
+    time::Instant,
     sync::{
         Arc,
         RwLock,
@@ -29,7 +38,6 @@ use blake3::{
 use serde_json::Value;
 use simd_json::to_vec;
 
-use sled::Db;
 use tokio::sync::watch;
 
 use http_body_util::Full;
@@ -46,7 +54,6 @@ async fn forward_body(
     finalized_rx: &watch::Receiver<u64>,
     named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    cache: Db,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // TODO: do  content type validation more upstream
     // Check if body has application/json
@@ -131,9 +138,47 @@ pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     sender: RequestSender,
     cache_args: Arc<CacheArgs>,
+    connection_params: ConnectionParams
 ) {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
+    let rpc_position: Option<usize>;
+
+    // RequestParams from config
+    let params = {
+        let config_guard = connection_params.config.read().unwrap();
+        RequestParams {
+            ttl: config_guard.ttl,
+            max_retries: config_guard.max_retries,
+            header_check: config_guard.header_check,
+        }
+    };
+
+    // Check if we have the response hashed, and if not forward it
+    // to the best available RPC.
+    //
+    // Also handle cache insertions.
+    let time = Instant::now();
+    (response, rpc_position) = forward_body(
+        tx,
+        &connection_params.rpc_list_rwlock,
+        &connection_params.channels.finalized_rx,
+        &connection_params.named_numbers,
+        &connection_params.head_cache,
+    )
+    .await;
+    let time = time.elapsed();
+    log_info!("Request time: {:?}", time);
+
+    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // we forwarded our request to, or is None if the result was cached.
+    //
+    // Here, we update the latency of the RPC that was used to process the request
+    // if `rpc_position` is Some.
+    if let Some(rpc_position) = rpc_position {
+        update_rpc_latency(&connection_params.rpc_list_rwlock, rpc_position, time);
+    }
+
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
