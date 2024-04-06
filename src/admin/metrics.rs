@@ -28,7 +28,7 @@ use thiserror::Error;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 #[derive(Debug, Error)]
 pub enum MetricsError {
     #[error(transparent)]
@@ -37,7 +37,7 @@ pub enum MetricsError {
     RPCError(#[from] crate::rpc::error::RpcError),
 }
 
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 impl From<MetricsError> for String {
     fn from(error: MetricsError) -> Self {
         error.to_string()
@@ -90,11 +90,6 @@ pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
             continue;
         }
     }
-}
-#[cfg(feature = "prometheusd")]
-pub async fn listen_for_metrics(_metric: RpcMetrics, _metrics_tx: MetricSender) {
-    unimplemented!()
-    // let mut tx.inner.
 }
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_listener(
@@ -175,10 +170,15 @@ pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: Stora
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
     //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
     (tx, rx)
+}
+
+#[cfg(feature = "prometheusd")]
+pub async fn close(rx: &mut MetricReceiver) {
+rx.close();
 }
 #[cfg(feature = "prometheusd")]
 macro_rules! accept_prometheusd {

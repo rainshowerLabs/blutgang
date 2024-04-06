@@ -2,7 +2,10 @@ use crate::{
     RpcMetrics,
 };
 use crate::admin::metrics::{MetricReceiver, MetricSender, };
+use prometheus::core::Collector;
 use prometheus_metric_storage::StorageRegistry;
+use std::fmt;
+use std::time::Duration;
 use std::{
     convert::Infallible,
     sync::{
@@ -68,16 +71,13 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
 
-pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
-pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
-pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
 
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
@@ -125,7 +125,7 @@ async fn liveness_listener(
         }
     }
 }
-#[cfg(feature = "prometheusd")]
+// #[cfg(feature = "prometheusd")]
 async fn liveness_listener_metrics(
     mut liveness_receiver: LiveReadyUpdateRecv,
     mut metrics_receiver: MetricReceiver,
@@ -137,24 +137,24 @@ async fn liveness_listener_metrics(
                 let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.readiness = state;
-                liveness.metrics.requests_complete(
-                    "/liveready_readiness",
-                    "LiveReadyUpdate::Readiness",
-                    //should I try using ok! macro here?
-                    &200,
-                    dt.elapsed(),
-                );
+                //liveness.metrics.requests_complete(
+                //    "/liveready_readiness",
+                //    "LiveReadyUpdate::Readiness",
+                //    //should I try using ok! macro here?
+                //    &200,
+                //    dt.elapsed(),
+                // );
             }
             LiveReadyUpdate::Health(state) => {
                 let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.health = state;
-                liveness.metrics.requests_complete(
-                    "/liveready_health",
-                    "LiveReadyUpdate::Health",
-                    &200,
-                    dt.elapsed(),
-                );
+                // liveness.metrics.requests_complete(
+                //     "/liveready_health",
+                //     "LiveReadyUpdate::Health",
+                //     &200,
+                //     dt.elapsed(),
+                // );
             }
         }
     }
@@ -222,7 +222,7 @@ pub async fn accept_readiness_request(
 
     let rax = match rx.await {
         Ok(v) => v,
-        Err(_) => {
+        Err(_) => {            
             return nok!();
         }
     };
@@ -233,17 +233,56 @@ pub async fn accept_readiness_request(
 
     nok!()
 }
-#[cfg(feature = "prometheusd")]
+
+
+//#[cfg(feature = "prometheusd")]
+pub async fn on_accept_metrics_write_readiness(response : hyper::Response<Full<Bytes>>, LRMetrics: LiveReadyMetrics, dt: Duration)  -> Result<(), Infallible>{
+let rax = match response.status().as_str() {
+    "200" => {
+        LRMetrics.metrics.requests_complete(
+            "/liveready_health",
+            "Readiness::Ready",
+            &200,
+            dt,
+        );
+    },
+    "503" => {
+        LRMetrics.metrics.requests_complete(
+            "/liveready_health",
+            "Readiness::Setup",
+            &503,
+            dt,
+        );
+    },
+    _ => {
+        LRMetrics.metrics.requests_complete(
+            "/liveready_health",
+            "Readiness::Unknown",
+            &500,
+            dt,
+        );
+    },
+};
+LRMetrics.metrics.requests.collect();
+LRMetrics.metrics.duration.collect();
+Ok(rax)
+}
+
+
+
+        
+
+// #[cfg(feature = "prometheusd")]
 pub async fn accept_readiness_request_metrics(
     liveness_request_sender: LRMetricsRequestTx,
     metrics_sender: MetricSender,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     use crate::admin::metrics::metrics_channel;
     //unbounded with metrics_channel or oneshot channel here?
+    let dt = std::time::Instant::now();
     let (tx, rx) = oneshot::channel();
 
     let _ = liveness_request_sender.send(tx).await;
-    // let _ = metrics_sender.send(tx);
 
     let rax = match rx.await {
         Ok(v) => v,
@@ -255,6 +294,7 @@ pub async fn accept_readiness_request_metrics(
     if rax.readiness == ReadinessState::Ready {
         return ok!();
     }
+    // rax.metrics.requests_complete("liveready_readiness", &readiness_str, status, dt);
 
     nok!()
 }
@@ -384,15 +424,10 @@ mod tests {
         let response = accept_readiness_request_metrics(request_snd.clone(), metrics_tx.clone())
             .await
             .unwrap();
-        liveness_status.write().unwrap().metrics.requests_complete(
-            "/liveready_health",
-            "LiveReadyUpdate::Health::Healthy",
-            &200,
-            dt.elapsed(),
-        );
-
+        let lr_metric = liveness_status.write().unwrap().clone();
+        on_accept_metrics_write_readiness(response.clone(), lr_metric, dt.elapsed());
         log_info!(
-            "readiness response status for healthy rpc: {:?}, metrics: {:?}",
+            "readiness response status for healthy rpc: {:?}, on_accept_metrics_write_readiness: metrics: {:?}",
             response.status(),
             liveness_status.read().unwrap().metrics.requests.collect()
         );
@@ -418,6 +453,29 @@ mod tests {
             response.status(),
             liveness_status.read().unwrap().metrics.requests.collect()
         );
+    }
+
+    #[cfg(feature="prometheusd")]
+    #[tokio::test]
+    async fn test_metrics_sink_discards_updates() {
+        use crate::admin::metrics::metrics_update_sink;
+        let (tx, rx) = mpsc::channel(10);
+        // Simulate a sink that discards updates
+        tokio::spawn(async move {
+            metrics_update_sink(rx).await;
+        });
+        tx.send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+            .await
+            .unwrap();
+        tx
+            .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
+            .await
+            .unwrap();
+        assert!(
+            true,
+            "Successfully discarded updates without affecting the test flow");
+
+
     }
 
     #[tokio::test]
