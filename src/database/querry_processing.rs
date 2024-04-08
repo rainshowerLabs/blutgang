@@ -1,6 +1,7 @@
 use tokio::time::timeout;
 use tokio::time::Duration;
 use serde_json::Value;
+use crate::balancer::accept_http::RequestParams;
 use crate::{
     log_wrn,
     no_rpc_available,
@@ -40,7 +41,8 @@ pub async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     con_params: &ConnectionParams,
     cache_args: &CacheArgs,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    params: RequestParams
+) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, Option<usize>) {
     // TODO: do content type validation more upstream
     // Check if body has application/json
     //
@@ -65,6 +67,7 @@ pub async fn forward_body(
         tx,
         con_params,
         cache_args,
+        params,
     ).await.unwrap();
 
     // Convert rx to bytes and but it in a Buf
@@ -81,13 +84,14 @@ pub async fn forward_body(
         .body(body)
         .unwrap();
 
-    Ok(res)
+    (Ok(res), position)
 }
 
 async fn get_response(
     tx: Value,
     con_params: &ConnectionParams,
     cache_args: &CacheArgs,
+    params: RequestParams,
 ) -> Result<(String, Option<usize>), DbError> {
 
     // Get the id of the request and set it to 0 for caching
@@ -124,7 +128,7 @@ async fn get_response(
             cached["id"] = id;
             return Ok((cached.to_string(), rpc_position));
         },
-        Ok(None) => todo!(),
+        Ok(None) => fetch_from_rpc(tx, id, con_params, cache_args, params).await,
         Err(_) => {
             // If anything errors send an rpc request and see if it works, if not then gg
             print_cache_error!();
@@ -140,11 +144,12 @@ async fn fetch_from_rpc(
     id: Value,
     con_params: &ConnectionParams,
     cache_args: &CacheArgs,
+    params: RequestParams,
 ) -> Result<(String, Option<usize>), DbError> {
     // Kinda jank but set the id back to what it was before
     tx["id"] = id;
-    let ttl = con_params.config.read().unwrap().ttl;
-    let max_retries = con_params.config.read().unwrap().max_retries;
+    let ttl = params.ttl;
+    let max_retries = params.max_retries;
 
     // Loop until we get a response
     let mut rx;

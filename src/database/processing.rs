@@ -45,10 +45,10 @@ use hyper::{
 /// RPC lself.
 /// In case of a timeout, returns an error.
 pub async fn accept_request(
-    mut tx: Request<hyper::body::Incoming>,
+    tx: Request<hyper::body::Incoming>,
     sender: RequestSender,
+    connection_params: Arc<ConnectionParams>,
     cache_args: Arc<CacheArgs>,
-    connection_params: ConnectionParams
 ) {
     // Send request and measure time
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
@@ -71,10 +71,9 @@ pub async fn accept_request(
     let time = Instant::now();
     (response, rpc_position) = forward_body(
         tx,
-        &connection_params.rpc_list_rwlock,
-        &connection_params.channels.finalized_rx,
-        &connection_params.named_numbers,
-        &connection_params.head_cache,
+        &connection_params,
+        &cache_args,
+        params,
     )
     .await;
     let time = time.elapsed();
@@ -90,7 +89,7 @@ pub async fn accept_request(
     // Here, we update the latency of the RPC that was used to process the request
     // if `rpc_position` is Some.
     if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&connection_params.rpc_list_rwlock, rpc_position, time);
+        update_rpc_latency(&connection_params.rpc_list, rpc_position, time);
     }
 }
 

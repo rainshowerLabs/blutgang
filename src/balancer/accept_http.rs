@@ -110,9 +110,9 @@ impl ConnectionParams {
 }
 
 pub struct RequestParams {
-    ttl: u128,
-    max_retries: u32,
-    header_check: bool,
+    pub ttl: u128,
+    pub max_retries: u32,
+    pub header_check: bool,
 }
 
 #[derive(Debug)]

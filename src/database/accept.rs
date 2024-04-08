@@ -47,7 +47,7 @@ pub type RequestSender = oneshot::Sender<Result<hyper::Response<Full<Bytes>>, In
 /// of if we're sending a new request to the DB.
 #[derive(Debug)]
 enum RequestKind {
-    UserRequest(Request<Incoming>, ConnectionParams),
+    UserRequest(Request<Incoming>, Arc<ConnectionParams>),
     // TODO: dont be a string plz
     Cache(Hash, Value, String),
 }
@@ -64,7 +64,7 @@ async fn process_incoming(
 	cache_args: Arc<CacheArgs>,
 ) {
     match incoming.request {
-        RequestKind::UserRequest(req, params) => accept_request(req, incoming.sender, cache_args, params).await,
+        RequestKind::UserRequest(req, params) => accept_request(req, incoming.sender, params, cache_args).await,
         RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args),
     };
 }
