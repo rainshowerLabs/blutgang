@@ -1,36 +1,30 @@
 use crate::{
     balancer::{
-        format::{
-            get_block_number_from_request,
-        },
-        processing::{
-            can_cache,
-            update_rpc_latency,
-        },
         accept_http::{
             ConnectionParams,
             RequestParams,
+        },
+        format::get_block_number_from_request,
+        processing::{
+            can_cache,
+            update_rpc_latency,
         },
     },
     database::{
         accept::RequestSender,
         querry_processing::forward_body,
     },
-    CacheArgs,
     log_info,
+    CacheArgs,
 };
 
 use std::{
     convert::Infallible,
+    sync::Arc,
     time::Instant,
-    sync::{
-        Arc,
-    },
 };
 
-use blake3::{
-    Hash,
-};
+use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
 
@@ -69,13 +63,7 @@ pub async fn accept_request(
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(
-        tx,
-        &connection_params,
-        &cache_args,
-        params,
-    )
-    .await;
+    (response, rpc_position) = forward_body(tx, &connection_params, &cache_args, params).await;
     let time = time.elapsed();
 
     // Send the resul

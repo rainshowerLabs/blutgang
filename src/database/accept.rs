@@ -8,18 +8,18 @@ use crate::{
 };
 
 use std::{
-    sync::Arc,
     convert::Infallible,
+    sync::Arc,
 };
 
+use http_body_util::Full;
 use hyper::{
     body::{
-        Incoming,
         Bytes,
+        Incoming,
     },
     Request,
 };
-use http_body_util::Full;
 
 use tokio::sync::{
     mpsc,
@@ -59,12 +59,11 @@ pub struct DbRequest {
     sender: RequestSender,
 }
 
-async fn process_incoming(
-	incoming: DbRequest,
-	cache_args: Arc<CacheArgs>,
-) {
+async fn process_incoming(incoming: DbRequest, cache_args: Arc<CacheArgs>) {
     match incoming.request {
-        RequestKind::UserRequest(req, params) => accept_request(req, incoming.sender, params, cache_args).await,
+        RequestKind::UserRequest(req, params) => {
+            accept_request(req, incoming.sender, params, cache_args).await
+        }
         RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args),
     };
 }

@@ -1,33 +1,34 @@
-use tokio::time::timeout;
-use tokio::time::Duration;
-use serde_json::Value;
-use crate::balancer::accept_http::RequestParams;
+use std::convert::Infallible;
+
 use crate::{
-    log_wrn,
-    no_rpc_available,
-    cache_error,
-    print_cache_error,
-    log_info,
     balancer::{
-        selection::select::pick,
+        accept_http::{
+            ConnectionParams,
+            RequestParams,
+        },
         format::{
             incoming_to_value,
             replace_block_tags,
         },
-        accept_http::ConnectionParams, processing::CacheArgs,
+        processing::CacheArgs,
+        selection::select::pick,
     },
-    database::{
-        error::DbError,
-    },
+    cache_error,
+    database::error::DbError,
+    log_info,
+    log_wrn,
+    no_rpc_available,
+    print_cache_error,
 };
 
-use std::{
-    convert::Infallible,
+use serde_json::Value;
+
+use tokio::time::{
+    timeout,
+    Duration,
 };
 
-use blake3::{
-    hash,
-};
+use blake3::hash;
 
 use http_body_util::Full;
 use hyper::{
@@ -41,8 +42,11 @@ pub async fn forward_body(
     tx: Request<hyper::body::Incoming>,
     con_params: &ConnectionParams,
     cache_args: &CacheArgs,
-    params: RequestParams
-) -> (Result<hyper::Response<Full<Bytes>>, Infallible>, Option<usize>) {
+    params: RequestParams,
+) -> (
+    Result<hyper::Response<Full<Bytes>>, Infallible>,
+    Option<usize>,
+) {
     // TODO: do content type validation more upstream
     // Check if body has application/json
     //
@@ -63,12 +67,9 @@ pub async fn forward_body(
     let tx = incoming_to_value(tx).await.unwrap();
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
-    let (rax, position) = get_response(
-        tx,
-        con_params,
-        cache_args,
-        params,
-    ).await.unwrap();
+    let (rax, position) = get_response(tx, con_params, cache_args, params)
+        .await
+        .unwrap();
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
@@ -93,7 +94,6 @@ async fn get_response(
     cache_args: &CacheArgs,
     params: RequestParams,
 ) -> Result<(String, Option<usize>), DbError> {
-
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -127,7 +127,7 @@ async fn get_response(
 
             cached["id"] = id;
             return Ok((cached.to_string(), rpc_position));
-        },
+        }
         Ok(None) => fetch_from_rpc(tx, id, con_params, cache_args, params).await,
         Err(_) => {
             // If anything errors send an rpc request and see if it works, if not then gg
@@ -136,7 +136,6 @@ async fn get_response(
             return Ok((cache_error!(), rpc_position));
         }
     }
-
 }
 
 async fn fetch_from_rpc(
@@ -182,16 +181,16 @@ async fn fetch_from_rpc(
             Ok(rxa) => {
                 rx = rxa.unwrap();
                 break;
-            },
+            }
             Err(_) => {
                 log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
                 rpc.update_latency(ttl as f64);
                 retries += 1;
-            },
+            }
         };
 
         if retries == max_retries {
-            return (timed_out!(), rpc_position,);
+            return (timed_out!(), rpc_position);
         }
     }
 }
