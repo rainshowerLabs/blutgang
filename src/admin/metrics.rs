@@ -1,26 +1,25 @@
+use hyper::Request;
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
-use hyper::Request;
 use std::convert::Infallible;
 use std::{
     collections::hash_map::HashMap,
     sync::{
         Arc,
         RwLock,
-        
     },
     time::Duration,
 };
 
 use tokio::sync::{
-    oneshot,
     mpsc::{
+        unbounded_channel,
         UnboundedReceiver,
         UnboundedSender,
-        unbounded_channel,
     },
+    oneshot,
 };
 
 use thiserror::Error;
@@ -178,7 +177,7 @@ pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
 
 #[cfg(feature = "prometheusd")]
 pub async fn close(rx: &mut MetricReceiver) {
-rx.close();
+    rx.close();
 }
 #[cfg(feature = "prometheusd")]
 macro_rules! accept_prometheusd {

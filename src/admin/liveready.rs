@@ -1,7 +1,8 @@
-use crate::{
-    RpcMetrics,
+use crate::admin::metrics::{
+    MetricReceiver,
+    MetricSender,
 };
-use crate::admin::metrics::{MetricReceiver, MetricSender, };
+use crate::RpcMetrics;
 use prometheus::core::Collector;
 use prometheus_metric_storage::StorageRegistry;
 use std::fmt;
@@ -22,8 +23,6 @@ use tokio::sync::{
 };
 
 use hyper::body::Bytes;
-
-
 
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum ReadinessState {
@@ -77,7 +76,6 @@ pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
 // #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
-
 
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
@@ -222,7 +220,7 @@ pub async fn accept_readiness_request(
 
     let rax = match rx.await {
         Ok(v) => v,
-        Err(_) => {            
+        Err(_) => {
             return nok!();
         }
     };
@@ -234,43 +232,36 @@ pub async fn accept_readiness_request(
     nok!()
 }
 
-
 //#[cfg(feature = "prometheusd")]
-pub async fn on_accept_metrics_write_readiness(response : hyper::Response<Full<Bytes>>, LRMetrics: LiveReadyMetrics, dt: Duration)  -> Result<(), Infallible>{
-let rax = match response.status().as_str() {
-    "200" => {
-        LRMetrics.metrics.requests_complete(
-            "/liveready_health",
-            "Readiness::Ready",
-            &200,
-            dt,
-        );
-    },
-    "503" => {
-        LRMetrics.metrics.requests_complete(
-            "/liveready_health",
-            "Readiness::Setup",
-            &503,
-            dt,
-        );
-    },
-    _ => {
-        LRMetrics.metrics.requests_complete(
-            "/liveready_health",
-            "Readiness::Unknown",
-            &500,
-            dt,
-        );
-    },
-};
-LRMetrics.metrics.requests.collect();
-LRMetrics.metrics.duration.collect();
-Ok(rax)
+pub async fn on_accept_metrics_write_readiness(
+    response: hyper::Response<Full<Bytes>>,
+    LRMetrics: LiveReadyMetrics,
+    dt: Duration,
+) -> Result<(), Infallible> {
+    let rax = match response.status().as_str() {
+        "200" => {
+            LRMetrics
+                .metrics
+                .requests_complete("/liveready_health", "Readiness::Ready", &200, dt);
+        }
+        "503" => {
+            LRMetrics
+                .metrics
+                .requests_complete("/liveready_health", "Readiness::Setup", &503, dt);
+        }
+        _ => {
+            LRMetrics.metrics.requests_complete(
+                "/liveready_health",
+                "Readiness::Unknown",
+                &500,
+                dt,
+            );
+        }
+    };
+    LRMetrics.metrics.requests.collect();
+    LRMetrics.metrics.duration.collect();
+    Ok(rax)
 }
-
-
-
-        
 
 // #[cfg(feature = "prometheusd")]
 pub async fn accept_readiness_request_metrics(
@@ -356,7 +347,7 @@ mod tests {
     use super::*;
     use crate::Rpc;
     use prometheus::core::Collector;
-    
+
     use tokio::sync::{
         mpsc,
         oneshot,
@@ -454,30 +445,30 @@ mod tests {
             liveness_status.read().unwrap().metrics.requests.collect()
         );
     }
-
-    #[cfg(feature="prometheusd")]
+    #[cfg(not(feature = "prometheusd"))]
     #[tokio::test]
     async fn test_metrics_sink_discards_updates() {
-        use crate::admin::metrics::metrics_update_sink;
         let (tx, rx) = mpsc::channel(10);
+        let storage = StorageRegistry::default();
+        let _metrics = RpcMetrics::init(&storage).unwrap();
+        let dt = std::time::Instant::now();
+        let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
+
         // Simulate a sink that discards updates
         tokio::spawn(async move {
-            metrics_update_sink(rx).await;
+            crate::admin::metrics::metrics_update_sink(metrics_rx).await;
         });
         tx.send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
             .await
             .unwrap();
-        tx
-            .send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
+        tx.send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
             .await
             .unwrap();
         assert!(
             true,
-            "Successfully discarded updates without affecting the test flow");
-
-
+            "Successfully discarded updates without affecting the test flow"
+        );
     }
-
     #[tokio::test]
     async fn test_liveness_listener_updates_status() {
         let (update_snd, update_recv) = mpsc::channel(10);
