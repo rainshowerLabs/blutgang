@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    command: --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - '3000:3000'
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
