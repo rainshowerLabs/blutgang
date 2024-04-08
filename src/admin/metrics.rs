@@ -1,4 +1,10 @@
-use hyper::Request;
+use http_body_util::Full;
+use hyper::{
+    body::Bytes,
+    server::conn::http1,
+    service::service_fn,
+    Request,
+};
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
@@ -105,7 +111,7 @@ pub async fn metrics_listener(
     }
 }
 #[cfg(feature = "prometheusd")]
-async fn metrics_processor(
+pub async fn metrics_processor(
     mut metrics_rx: MetricReceiver,
     registry_state: Arc<RwLock<StorageRegistry>>,
     // path: &str,
@@ -129,25 +135,47 @@ async fn metrics_processor(
 }
 /// Accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
-async fn accept_metrics_request(
+pub async fn accept_metrics_request(
     tx: Request<hyper::body::Incoming>,
-    metrics_tx: Arc<MetricSender>,
+    metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
-) -> Result<String, Infallible> {
-    if tx.uri().path() == "/ws_metrics" {
-        return accept_ws_metrics(metrics_tx).await;
-    } else if tx.uri().path() == "/http_metrics" {
-        return accept_http_metrics(metrics_tx).await;
-    }
-    let metrics = metrics_encoder(registry_state).await;
-    Ok(metrics)
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    // if tx.uri().path() == "/ws_metrics" {
+    //     return accept_ws_metrics(metrics_tx).await;
+    // } else if tx.uri().path() == "/http_metrics" {
+    //     return accept_http_metrics(metrics_tx).await;
+    // }
+    use crate::balancer::format::incoming_to_value;
+    use serde_json::{
+        json,
+        Value,
+        Value::Null,
+    };
+    // let mut tx = incoming_to_value(tx).await;
+    //     tx = json!({
+    //         "path": tx["path"],
+    //         "method": tx["method"],
+    //         "status": tx["status"],
+    //         "duration": tx["duration"],
+    //     });
+
+    let metrics_report = metrics_encoder(registry_state).await;
+    let response = Ok(hyper::Response::builder()
+        .status(200)
+        .body(Full::from(Bytes::from(metrics_report)))
+        .unwrap());
+    (response)
 }
 #[cfg(feature = "prometheusd")]
-async fn accept_ws_metrics(_metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+async fn accept_ws_metrics(
+    _metrics_tx: Arc<MetricSender>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     unimplemented!()
 }
 #[cfg(feature = "prometheusd")]
-async fn accept_http_metrics(_metrics_tx: Arc<MetricSender>) -> Result<String, Infallible> {
+async fn accept_http_metrics(
+    _metrics_tx: Arc<MetricSender>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     unimplemented!()
 }
 #[cfg(feature = "prometheusd")]
@@ -160,10 +188,10 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     String::from_utf8(buffer).unwrap()
 }
 #[cfg(feature = "prometheusd")]
-pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: StorageRegistry) {
+pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: &StorageRegistry) {
     //TODO: figure ownership mess here
     let metrics_status = Arc::new(RwLock::new(
-        RpcMetrics::instance(&storage_registry).unwrap().to_owned(),
+        RpcMetrics::instance(storage_registry).unwrap().to_owned(),
     ));
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
@@ -180,24 +208,53 @@ pub async fn close(rx: &mut MetricReceiver) {
     rx.close();
 }
 #[cfg(feature = "prometheusd")]
+pub async fn metrics_server(
+    io: tokio::net::TcpListener,
+    http_tx: Arc<RwLock<MetricSender>>,
+    ws_tx: Arc<RwLock<MetricSender>>,
+    registry_state: Arc<RwLock<StorageRegistry>>,
+    metrics_request_tx: MetricSender,
+    address: std::net::SocketAddr,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::accept_prometheusd;
+    use crate::log_info;
+    use hyper_util_blutgang::rt::TokioIo;
+    use tokio::{
+        net::TcpListener,
+        sync::mpsc,
+    };
+
+    let listener = TcpListener::bind(address).await?;
+    log_info!("Bound prometheus metrics to : {}", address);
+    loop {
+        let (stream, socket_addr) = listener.accept().await?;
+        log_info!("Admin::metrics connection from: {}", socket_addr);
+        let io = TokioIo::new(stream);
+        let http_clone = Arc::clone(&http_tx);
+        let registry_clone = Arc::clone(&registry_state);
+        tokio::task::spawn(async move {
+            accept_prometheusd!(io, &http_clone, &registry_clone, metrics_request_tx,);
+        });
+    }
+}
+#[cfg(feature = "prometheusd")]
+#[macro_export]
 macro_rules! accept_prometheusd {
     (
      $io:expr,
      $http_tx:expr,
-     $ws_tx:expr,
      $registry_state:expr,
      $metrics_request_tx:expr,
     ) => {
+        use crate::admin::metrics::accept_metrics_request;
         if let Err(err) = http1::Builder::new()
             .serve_connection(
                 $io,
                 service_fn(|req| {
                     let response = accept_metrics_request(
                         req,
-                        $http_tx,
-                        $ws_tx,
-                        $registry_state,
-                        $metrics_request_tx.clone(),
+                        Arc::clone($http_tx),
+                        Arc::clone($registry_state),
                     );
                     response
                 }),

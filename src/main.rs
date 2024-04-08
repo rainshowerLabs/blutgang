@@ -141,18 +141,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         use crate::admin::metrics::metrics_channel;
         use crate::admin::metrics::metrics_monitor;
+        log_info!("check endpoints @ localhost:3000 and 9091");
         let prometheus_enabled: bool = true;
         let (metrics_tx, metrics_rx) = metrics_channel().await;
-
         if prometheus_enabled {
-            let metrics_rx_ws = Arc::new(&metrics_rx);
-            let metrics_rx_http = Arc::new(&metrics_rx);
+            let (stream, socket_addr) = listener.accept().await?;
+            let io = TokioIo::new(stream);
+            let metrics_tx_http = Arc::new(RwLock::new(metrics_tx));
             let storage_registry = prometheus_metric_storage::StorageRegistry::default();
-            let registry = RpcMetrics::init(&storage_registry);
-            let registry_arc = Arc::new(RwLock::new(registry));
+            let registry = RpcMetrics::init(&storage_registry).unwrap();
+            let registry_arc = Arc::new(RwLock::new(&storage_registry));
+            // let registry_clone = Arc::clone(&registry_arc);
+            //TODO: figure ownership of registry
             tokio::task::spawn(async move {
-                let _ = metrics_monitor(metrics_rx, storage_registry).await;
+                let _ = metrics_monitor(metrics_rx, &storage_registry).await;
             });
+            // accept_prometheusd!(io, &metrics_tx_http, &registry_clone, metrics_tx,);
         } else {
             #[cfg(not(feature = "prometheusd"))]
             {
