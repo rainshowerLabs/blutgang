@@ -7,12 +7,19 @@ use crate::{
     ConnectionParams,
 };
 
-use std::sync::Arc;
+use std::{
+    sync::Arc,
+    convert::Infallible,
+};
 
 use hyper::{
-    body::Incoming,
+    body::{
+        Incoming,
+        Bytes,
+    },
     Request,
 };
+use http_body_util::Full;
 
 use tokio::sync::{
     mpsc,
@@ -34,9 +41,7 @@ use zerocopy::AsBytes; // Impls AsBytes trait for u64
 /// The enclosing struct contains the request and a oneshot sender
 /// for sending back a response.
 pub type RequestBus = mpsc::UnboundedSender<DbRequest>;
-pub type RequestSender = oneshot::Sender<Value>;
-
-pub type Error = Box<dyn std::error::Error>;
+pub type RequestSender = oneshot::Sender<Result<hyper::Response<Full<Bytes>>, Infallible>>;
 
 /// Specifies if the request we're sending is intended to be cached
 /// of if we're sending a new request to the DB.

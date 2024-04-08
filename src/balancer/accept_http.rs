@@ -82,6 +82,7 @@ use std::{
 /// to fulfil an incoming request.
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
+    pub rpc_list: Arc<RwLock<Vec<Rpc>>>,
     pub channels: RequestChannels,
     pub config: Arc<RwLock<Settings>>,
 }
