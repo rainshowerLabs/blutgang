@@ -147,12 +147,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let io = TokioIo::new(stream);
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage_registry = prometheus_metric_storage::StorageRegistry::default();
-        let metrics = RpcMetrics::init(&storage_registry).unwrap();
+        let registry_rwlock = Arc::new(RwLock::new(storage_registry));
+        let registry_clone = Arc::clone(&registry_rwlock);
         tokio::task::spawn(async move {
             log_info!("Prometheus enabled, accepting metrics at prometheus port");
-            let _ = metrics_monitor(metrics_rx, storage_registry).await;
+            let _ = metrics_monitor(metrics_rx, registry_rwlock).await;
         });
-        // accept_prometheusd!(io, &metrics_tx_rwlock, &storage_registry, metrics_tx,);
+        accept_prometheusd!(io, &metrics_tx_rwlock, &registry_clone, metrics_tx,);
     }
     #[cfg(not(feature = "prometheusd"))]
     {

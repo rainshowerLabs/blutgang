@@ -212,10 +212,18 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     String::from_utf8(buffer).unwrap()
 }
 #[cfg(feature = "prometheusd")]
-pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: StorageRegistry) {
+pub async fn metrics_monitor(
+    metrics_rx: MetricReceiver,
+    storage_registry: Arc<RwLock<StorageRegistry>>,
+) {
     //TODO: figure ownership mess here
+    let registry;
+    {
+        let registry_guard = storage_registry.read().unwrap();
+        registry = registry_guard;
+    }
     let metrics_status = Arc::new(RwLock::new(
-        RpcMetrics::instance(&storage_registry).unwrap().to_owned(),
+        RpcMetrics::instance(&registry).unwrap().to_owned(),
     ));
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
