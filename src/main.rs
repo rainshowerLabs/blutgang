@@ -135,34 +135,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
+    let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
 
-    // TODO: using this for testing because of ownership eval of rx under feature flag
+    // TODO: prometheus flag is blocking things
     #[cfg(feature = "prometheusd")]
     {
         use crate::admin::metrics::metrics_channel;
         use crate::admin::metrics::metrics_monitor;
-        log_info!("check endpoints @ localhost:3000 and 9091");
-        let prometheus_enabled: bool = true;
-        let (metrics_tx, metrics_rx) = metrics_channel().await;
-        if prometheus_enabled {
-            let (stream, socket_addr) = listener.accept().await?;
-            let io = TokioIo::new(stream);
-            let metrics_tx_http = Arc::new(RwLock::new(metrics_tx));
-            let storage_registry = prometheus_metric_storage::StorageRegistry::default();
-            let registry = RpcMetrics::init(&storage_registry).unwrap();
-            let registry_arc = Arc::new(RwLock::new(&storage_registry));
-            // let registry_clone = Arc::clone(&registry_arc);
-            //TODO: figure ownership of registry
-            tokio::task::spawn(async move {
-                let _ = metrics_monitor(metrics_rx, storage_registry).await;
-            });
-            // accept_prometheusd!(io, &metrics_tx_http, &registry_clone, metrics_tx,);
-        } else {
-            #[cfg(not(feature = "prometheusd"))]
-            {
-                tokio::task::spawn(metrics_update_sink(metrics_rx));
-            }
-        }
+        log_info!("Grafana: check endpoints @ localhost:3000 and 9091");
+        let (stream, socket_addr) = listener.accept().await?;
+        let io = TokioIo::new(stream);
+        let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
+        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+        let metrics = RpcMetrics::init(&storage_registry).unwrap();
+        tokio::task::spawn(async move {
+            log_info!("Prometheus enabled, accepting metrics at prometheus port");
+            let _ = metrics_monitor(metrics_rx, storage_registry).await;
+        });
+        // accept_prometheusd!(io, &metrics_tx_rwlock, &storage_registry, metrics_tx,);
+    }
+    #[cfg(not(feature = "prometheusd"))]
+    {
+        use crate::admin::metrics::metrics_update_sink;
+        tokio::task::spawn(metrics_update_sink(metrics_rx));
     }
 
     // Spawn a thread for the admin namespace if enabled
