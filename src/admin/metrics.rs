@@ -96,6 +96,30 @@ pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
         }
     }
 }
+
+#[cfg(feature = "prometheusd")]
+pub async fn listen_for_metrics_requests(
+    metrics_rx: MetricReceiver,
+    registry_status: Arc<RwLock<StorageRegistry>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let address = "127.0.0.1:9091";
+    let _address = address.parse().unwrap();
+    let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
+    let registry = Default::default();
+    {
+        let registry = registry_status.read().unwrap();
+    }
+    let _metrics_request_tx = Arc::new(RwLock::new(metrics_request_tx.clone()));
+    tokio::spawn(metrics_monitor(metrics_rx, registry));
+    metrics_server(
+        tokio::net::TcpListener::bind(address).await?,
+        _metrics_request_tx,
+        registry_status,
+        metrics_request_tx,
+        _address,
+    )
+    .await
+}
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_listener(
     mut metrics_rx: MetricReceiver,
@@ -188,10 +212,10 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     String::from_utf8(buffer).unwrap()
 }
 #[cfg(feature = "prometheusd")]
-pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: &StorageRegistry) {
+pub async fn metrics_monitor(metrics_rx: MetricReceiver, storage_registry: StorageRegistry) {
     //TODO: figure ownership mess here
     let metrics_status = Arc::new(RwLock::new(
-        RpcMetrics::instance(storage_registry).unwrap().to_owned(),
+        RpcMetrics::instance(&storage_registry).unwrap().to_owned(),
     ));
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
@@ -210,8 +234,7 @@ pub async fn close(rx: &mut MetricReceiver) {
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_server(
     io: tokio::net::TcpListener,
-    http_tx: Arc<RwLock<MetricSender>>,
-    ws_tx: Arc<RwLock<MetricSender>>,
+    metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
     metrics_request_tx: MetricSender,
     address: std::net::SocketAddr,
@@ -230,10 +253,10 @@ pub async fn metrics_server(
         let (stream, socket_addr) = listener.accept().await?;
         log_info!("Admin::metrics connection from: {}", socket_addr);
         let io = TokioIo::new(stream);
-        let http_clone = Arc::clone(&http_tx);
+        let tx_clone = Arc::clone(&metrics_tx);
         let registry_clone = Arc::clone(&registry_state);
         tokio::task::spawn(async move {
-            accept_prometheusd!(io, &http_clone, &registry_clone, metrics_request_tx,);
+            accept_prometheusd!(io, &tx_clone, &registry_clone, metrics_request_tx,);
         });
     }
 }

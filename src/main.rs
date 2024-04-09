@@ -154,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // let registry_clone = Arc::clone(&registry_arc);
             //TODO: figure ownership of registry
             tokio::task::spawn(async move {
-                let _ = metrics_monitor(metrics_rx, &storage_registry).await;
+                let _ = metrics_monitor(metrics_rx, storage_registry).await;
             });
             // accept_prometheusd!(io, &metrics_tx_http, &registry_clone, metrics_tx,);
         } else {
