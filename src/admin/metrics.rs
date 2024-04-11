@@ -28,26 +28,16 @@ use tokio::sync::{
     oneshot,
 };
 
-use thiserror::Error;
-
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
 // #[cfg(feature = "prometheusd")]
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum MetricsError {
-    #[error(transparent)]
-    WSError(#[from] crate::websocket::error::WsError),
-    #[error(transparent)]
-    RPCError(#[from] crate::rpc::error::RpcError),
+    WSError(String),
+    RpcError(String),
 }
 
-// #[cfg(feature = "prometheusd")]
-impl From<MetricsError> for String {
-    fn from(error: MetricsError) -> Self {
-        error.to_string()
-    }
-}
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
@@ -102,8 +92,14 @@ pub async fn listen_for_metrics_requests(
     metrics_rx: MetricReceiver,
     registry_status: Arc<RwLock<StorageRegistry>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let address = "127.0.0.1:9091";
-    let _address = address.parse().unwrap();
+    use crate::config::{
+        cache_setup::setup_data,
+        cli_args::create_match,
+        types::Settings,
+    };
+    let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+    let config_guard = config.read().unwrap();
+    let address = config_guard.metrics.address;
     let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
     let registry = Default::default();
     {
@@ -116,7 +112,7 @@ pub async fn listen_for_metrics_requests(
         _metrics_request_tx,
         registry_status,
         metrics_request_tx,
-        _address,
+        address,
     )
     .await
 }
@@ -164,24 +160,12 @@ pub async fn accept_metrics_request(
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    // if tx.uri().path() == "/ws_metrics" {
-    //     return accept_ws_metrics(metrics_tx).await;
-    // } else if tx.uri().path() == "/http_metrics" {
-    //     return accept_http_metrics(metrics_tx).await;
-    // }
     use crate::balancer::format::incoming_to_value;
     use serde_json::{
         json,
         Value,
         Value::Null,
     };
-    // let mut tx = incoming_to_value(tx).await;
-    //     tx = json!({
-    //         "path": tx["path"],
-    //         "method": tx["method"],
-    //         "status": tx["status"],
-    //         "duration": tx["duration"],
-    //     });
 
     let metrics_report = metrics_encoder(registry_state).await;
     let response = Ok(hyper::Response::builder()
@@ -218,10 +202,8 @@ pub async fn metrics_monitor(
 ) {
     //TODO: figure ownership mess here
     let registry;
-    {
-        let registry_guard = storage_registry.read().unwrap();
-        registry = registry_guard;
-    }
+    let registry_guard = storage_registry.read().unwrap();
+    registry = registry_guard;
     let metrics_status = Arc::new(RwLock::new(
         RpcMetrics::instance(&registry).unwrap().to_owned(),
     ));

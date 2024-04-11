@@ -32,6 +32,28 @@ pub struct AdminSettings {
     pub jwt: bool,
     pub key: DecodingKey,
 }
+#[derive(Clone)]
+pub struct MetricsSettings {
+    pub enabled: bool,
+    pub address: SocketAddr,
+}
+impl Default for MetricsSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+        }
+    }
+}
+
+impl Debug for MetricsSettings {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MetricsSettings {{")?;
+        write!(f, " enabled: {:?}", self.enabled)?;
+        write!(f, ", address: {:?}", self.address)?;
+        write!(f, " }}")
+    }
+}
 
 impl Default for AdminSettings {
     fn default() -> Self {
@@ -72,6 +94,7 @@ pub struct Settings {
     pub health_check_ttl: u64,
     pub sled_config: Config,
     pub admin: AdminSettings,
+    pub metrics: MetricsSettings,
 }
 
 impl Default for Settings {
@@ -91,6 +114,7 @@ impl Default for Settings {
             health_check_ttl: 1000,
             sled_config: sled::Config::default(),
             admin: AdminSettings::default(),
+            metrics: MetricsSettings::default(),
         }
     }
 }
@@ -280,7 +304,11 @@ impl Settings {
 
         let mut rpc_list: Vec<Rpc> = Vec::new();
         for table_name in table_names {
-            if table_name != "blutgang" && table_name != "sled" && table_name != "admin" {
+            if table_name != "blutgang"
+                && table_name != "sled"
+                && table_name != "admin"
+                && table_name != "metrics"
+            {
                 let rpc_table = parsed_toml.get(table_name).unwrap().as_table().unwrap();
 
                 let max_consecutive = rpc_table
@@ -394,6 +422,33 @@ impl Settings {
                 key: DecodingKey::from_secret(b""),
             }
         };
+        let metrics_table = parsed_toml
+            .get("metrics")
+            .expect("\x1b[31mErr:\x1b[0m Missing metrics table!")
+            .as_table()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse metrics table!");
+        let enabled = admin_table
+            .get("enabled")
+            .expect("\x1b[31mErr:\x1b[0m Missing metrics enabled toggle!")
+            .as_bool()
+            .expect("\x1b[31mErr:\x1b[0m Could not parse metrics enabled as bool!");
+        let metrics = if enabled {
+            let address = metrics_table
+                .get("address")
+                .expect("\x1b[31mErr:\x1b[0m Missing address!")
+                .as_str()
+                .expect("\x1b[31mErr:\x1b[0m Could not parse metrics address!");
+            let address = address.replace("localhost", "127.0.0.1");
+            MetricsSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+            }
+        } else {
+            MetricsSettings {
+                enabled: false,
+                address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+            }
+        };
 
         let mut poverty_list = Vec::new();
         if sort_on_startup {
@@ -422,6 +477,7 @@ impl Settings {
             supress_rpc_check,
             sled_config,
             admin,
+            metrics,
         }
     }
 
@@ -556,6 +612,21 @@ impl Settings {
                 key: DecodingKey::from_secret(b""),
             }
         };
+        let metrics_enabled = matches.get_occurrences::<String>("metrics").is_some();
+        let metrics = if enabled {
+            let address = matches
+                .get_one::<String>("metrics_address")
+                .expect("Invalid metrics_address");
+            MetricsSettings {
+                enabled,
+                address: address.parse::<SocketAddr>().unwrap(),
+            }
+        } else {
+            MetricsSettings {
+                enabled: false,
+                address: "::1:9091".parse::<SocketAddr>().unwrap(),
+            }
+        };
 
         Settings {
             rpc_list,
@@ -572,6 +643,7 @@ impl Settings {
             health_check_ttl,
             sled_config,
             admin,
+            metrics,
         }
     }
 }
