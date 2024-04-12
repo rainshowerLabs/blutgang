@@ -209,7 +209,6 @@ pub async fn metrics_monitor(
     ));
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
-    //metrics_processor(metrics_rx, metrics_status, "test", "test", &200, Duration::from_millis(100)).await;
 }
 // #[cfg(feature = "prometheusd")]
 pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
@@ -302,17 +301,26 @@ pub mod test_mocks {
 
 #[cfg(test)]
 mod tests {
-
-    //TODO: remove this after tests
-    //sorry, im too lazy to make proper tests for this
-
+    use super::*;
+    use crate::admin::listener::listen_for_admin_requests;
+    use crate::log_info;
+    #[cfg(feature = "prometheusd")]
     #[tokio::test]
-    async fn test_prometheus_log() {
-        // let rpc1 = Rpc::default();
-        // let registry  = get_storage_registry();
-        // let metrics = RpcMetrics::inst(registry);
-        // let expected = "prometheus_metrics";
-        // assert_eq!(report, expected);
-        todo!()
+    //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_listener --nocapture
+    async fn test_prometheus_listener() {
+        let storage = StorageRegistry::default();
+        let storage_arc = Arc::new(RwLock::new(storage));
+        let dt = std::time::Instant::now();
+        log_info!(
+            "Initial metrics state: {:?}",
+            storage_arc.read().unwrap().gather()
+        );
+        let dt = std::time::Instant::now();
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let storage_guard = storage_arc.read().unwrap();
+        let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
+        rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
+        let test_report = metrics_encoder(storage_arc.clone()).await;
+        log_info!("metrics state: {:?}", test_report);
     }
 }
