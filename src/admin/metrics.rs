@@ -28,6 +28,8 @@ use tokio::sync::{
     oneshot,
 };
 
+
+type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 
@@ -317,10 +319,47 @@ mod tests {
         );
         let dt = std::time::Instant::now();
         let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let storage_clone = Arc::clone(&storage_arc);
         let storage_guard = storage_arc.read().unwrap();
         let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
         rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
+        listen_for_metrics_requests(metrics_rx, storage_clone);
         let test_report = metrics_encoder(storage_arc.clone()).await;
         log_info!("metrics state: {:?}", test_report);
     }
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_server --nocapture
+    async fn test_prometheus_server() {
+        use hyper_util_blutgang::rt::TokioIo;
+        use crate::Settings;
+        use crate::create_match;
+        use tokio::net::TcpListener;
+        let config_file = "../../metrics_config.toml";
+        let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+        let config_guard = config.read().unwrap();
+        let addr = config_guard.metrics.address;
+
+        log_info!("metrics server test listening on {:?}", addr);
+        let listener = TcpListener::bind(addr).await.unwrap();
+        let (stream, socket_addr) = listener.accept().await.unwrap();
+        let io = TokioIo::new(stream);
+        let storage = StorageRegistry::default();
+        let storage_arc = Arc::new(RwLock::new(storage));
+        let dt = std::time::Instant::now();
+        log_info!(
+            "Initial metrics state: {:?}",
+            storage_arc.read().unwrap().gather()
+        );
+        let dt = std::time::Instant::now();
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let storage_clone = Arc::clone(&storage_arc);
+        let storage_guard = storage_arc.read().unwrap();
+        // metrics_server();
+        // let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
+
+
+
+    }
+
 }
