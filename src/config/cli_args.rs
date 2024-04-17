@@ -135,4 +135,9 @@ pub fn create_match() -> clap::Command {
             .num_args(1..)
             .default_value("127.0.0.1")
             .help("Address to listen to for the metrics namespace"))
+        .arg(Arg::new("metrics_interval")
+             .long("metrics_interval")
+             .num_args(1..)
+            .default_value("10")
+            .help("Interval in seconds to collect metrics"))
 }

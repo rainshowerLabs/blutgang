@@ -45,6 +45,7 @@ key = ""
 [metrics]
 enabled = true
 address = "127.0.0.1:9091"
+count_update_interval = 10
 # Sled config
 # Sled is the database we use for our cache, for more info check their docs
 [sled]

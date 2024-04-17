@@ -36,11 +36,13 @@ pub struct AdminSettings {
 pub struct MetricsSettings {
     pub enabled: bool,
     pub address: SocketAddr,
+    pub count_update_interval: u64,
 }
 impl Default for MetricsSettings {
     fn default() -> Self {
         Self {
             enabled: true,
+            count_update_interval: 10,
             address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
         }
     }
@@ -51,6 +53,7 @@ impl Debug for MetricsSettings {
         write!(f, "MetricsSettings {{")?;
         write!(f, " enabled: {:?}", self.enabled)?;
         write!(f, ", address: {:?}", self.address)?;
+        write!(f, ", interval: {:?}", self.count_update_interval)?;
         write!(f, " }}")
     }
 }
@@ -442,11 +445,18 @@ impl Settings {
             MetricsSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
+                count_update_interval: metrics_table
+                    .get("count_update_interval")
+                    .expect("\x1b[31mErr:\x1b[0m Missing count_update_interval!")
+                    .as_integer()
+                    .expect("\x1b[31mErr:\x1b[0m Could not parse count_update_interval as int!")
+                    as u64,
             }
         } else {
             MetricsSettings {
                 enabled: false,
                 address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+                count_update_interval: 10,
             }
         };
 
@@ -617,14 +627,21 @@ impl Settings {
             let address = matches
                 .get_one::<String>("metrics_address")
                 .expect("Invalid metrics_address");
+            let interval = matches
+                .get_one::<String>("count_update_interval")
+                .expect("Invalid count_update_interval")
+                .parse::<u64>()
+                .expect("Invalid count_update_interval");
             MetricsSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
+                count_update_interval: interval,
             }
         } else {
             MetricsSettings {
                 enabled: false,
                 address: "::1:9091".parse::<SocketAddr>().unwrap(),
+                count_update_interval: 10,
             }
         };
 
