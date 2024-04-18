@@ -178,15 +178,17 @@ async fn liveness_request_processor_metrics(
 ) {
     loop {
         while let Some(incoming) = liveness_request_receiver.recv().await {
-            let current_status_health = liveness_status.read().unwrap().health;
-            let current_status_readiness = liveness_status.read().unwrap().readiness;
-            let current_status_metrics = liveness_status.read().unwrap().metrics.clone();
+            let liveness_status_guard = liveness_status.read().unwrap();
+
+            let mut liveness_status_metrics_clone = liveness_status_guard.metrics.clone();
             let current_liveready = LiveReadyMetrics {
-                health: current_status_health,
-                readiness: current_status_readiness,
-                metrics: current_status_metrics,
+                health: liveness_status_guard.health,
+                readiness: liveness_status_guard.readiness,
+                metrics: liveness_status_metrics_clone,
             };
             let _ = incoming.send(current_liveready);
+            liveness_status_guard.metrics.requests.collect();
+            liveness_status_guard.metrics.duration.collect();
         }
     }
 }
@@ -345,6 +347,7 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::admin::metrics::metrics_channel;
     use crate::Rpc;
     use prometheus::core::Collector;
 
@@ -407,34 +410,63 @@ mod tests {
             health: HealthState::Healthy,
             metrics: _metrics.clone(),
         }));
-        tokio::spawn(liveness_request_processor_metrics(
-            request_recv,
-            metrics_recv,
-            liveness_status.clone(),
-        ));
+        let liveness_status_clone = Arc::clone(&liveness_status);
+        log_info!("initial liveness_status: {:?}", liveness_status);
+        tokio::spawn(async move {
+            liveness_request_processor_metrics(request_recv, metrics_recv, liveness_status.clone())
+                .await;
+        });
+        log_info!("liveness_request_processor_metrics: after processor call");
         let response = accept_readiness_request_metrics(request_snd.clone(), metrics_tx.clone())
             .await
             .unwrap();
-        let lr_metric = liveness_status.write().unwrap().clone();
-        on_accept_metrics_write_readiness(response.clone(), lr_metric, dt.elapsed());
+        log_info!("liveness_request_processor_metrics: after accept request call");
+
+        let lr_metric = liveness_status_clone.read().unwrap();
+        on_accept_metrics_write_readiness(response.clone(), lr_metric.clone(), dt.elapsed());
         log_info!(
             "readiness response status for healthy rpc: {:?}, on_accept_metrics_write_readiness: metrics: {:?}",
             response.status(),
-            liveness_status.read().unwrap().metrics.requests.collect()
+            liveness_status_clone.read().unwrap().metrics.requests.collect()
         );
         let dt = std::time::Instant::now();
         //TODO: Not sure if this is good
         let (tx, _rx) = oneshot::channel::<LiveReadyMetrics>();
         metrics_tx
-            .send(liveness_status.read().unwrap().metrics.clone())
+            .send(liveness_status_clone.read().unwrap().metrics.clone())
             .unwrap();
-        liveness_status.write().unwrap().readiness = ReadinessState::Setup;
-        liveness_status.write().unwrap().metrics.requests_complete(
-            "/liveready_health",
-            "LiveReadyUpdate::Health::Setup",
-            &503,
-            dt.elapsed(),
+        log_info!("liveness_request_processor_metrics: after metrics_tx send");
+        let new_liveness_status = Arc::new(RwLock::new(LiveReadyMetrics {
+            readiness: ReadinessState::Setup,
+            health: HealthState::Healthy,
+            metrics: _metrics.clone(),
+        }));
+        metrics_tx
+            .send(new_liveness_status.read().unwrap().metrics.clone())
+            .unwrap();
+        // liveness_status_clone.write().unwrap().readiness = ReadinessState::Setup;
+        log_info!(
+            "liveness_request_processor_metrics readiness: {:?} : after new lr metric status",
+            new_liveness_status.read().unwrap().readiness
         );
+        // tokio::spawn( async move {
+        // liveness_request_processor_metrics(
+        // request_recv,
+        // metrics_recv,
+        // new_liveness_status.clone()).await;
+        // });
+
+        // request_snd.send(LiveReadyUpdate::Readiness(ReadinessState::Ready));
+        new_liveness_status
+            .read()
+            .unwrap()
+            .metrics
+            .requests_complete(
+                "/liveready_health",
+                "LiveReadyUpdate::Health::Setup",
+                &503,
+                dt.elapsed(),
+            );
         let response = accept_readiness_request_metrics(request_snd, metrics_tx)
             .await
             .unwrap();
@@ -442,7 +474,12 @@ mod tests {
         log_info!(
             "readiness response status for setup: {:?}, metrics: {:?}",
             response.status(),
-            liveness_status.read().unwrap().metrics.requests.collect()
+            new_liveness_status
+                .read()
+                .unwrap()
+                .metrics
+                .requests
+                .collect()
         );
     }
     #[cfg(not(feature = "prometheusd"))]
@@ -580,6 +617,11 @@ mod tests {
             true,
             "Successfully discarded updates without affecting the test flow"
         );
+    }
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    async fn test_metrics_update_concurrent() {
+        let (tx, rx) = metrics_channel().await;
     }
 
     #[tokio::test]
