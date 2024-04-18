@@ -47,7 +47,6 @@ impl Default for MetricsSettings {
         }
     }
 }
-
 impl Debug for MetricsSettings {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "MetricsSettings {{")?;
@@ -436,6 +435,7 @@ impl Settings {
             .as_bool()
             .expect("\x1b[31mErr:\x1b[0m Could not parse metrics enabled as bool!");
         let metrics = if enabled {
+            log_info!("Metrics enabled!");
             let address = metrics_table
                 .get("address")
                 .expect("\x1b[31mErr:\x1b[0m Missing address!")
@@ -459,7 +459,6 @@ impl Settings {
                 count_update_interval: 10,
             }
         };
-
         let mut poverty_list = Vec::new();
         if sort_on_startup {
             println!("Sorting RPCs by latency...");
@@ -622,7 +621,7 @@ impl Settings {
                 key: DecodingKey::from_secret(b""),
             }
         };
-        let metrics_enabled = matches.get_occurrences::<String>("metrics").is_some();
+        let enabled = matches.get_occurrences::<String>("metrics").is_some();
         let metrics = if enabled {
             let address = matches
                 .get_one::<String>("metrics_address")

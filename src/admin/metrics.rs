@@ -31,7 +31,7 @@ use tokio::time::interval;
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
-
+const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))];
 // #[cfg(feature = "prometheusd")]
 #[derive(Debug)]
 pub enum MetricsError {
@@ -115,7 +115,7 @@ pub async fn listen_for_metrics_requests(
         registry_status,
         metrics_request_tx,
         address,
-        interval
+        interval,
     )
     .await
 }
@@ -223,7 +223,7 @@ pub async fn metrics_server(
     registry_state: Arc<RwLock<StorageRegistry>>,
     metrics_request_tx: MetricSender,
     address: std::net::SocketAddr,
-    update_interval: u64
+    update_interval: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::accept_prometheusd;
     use crate::log_info;
@@ -249,6 +249,15 @@ pub async fn metrics_server(
         });
     }
 }
+
+// #[cfg(feature = "prometheusd")]
+// #[macro_export]
+// macro_rules! set_metric {
+//     ($data: expr, $version:expr  $type_label:expr) => {
+
+//     };
+// }
+
 #[cfg(feature = "prometheusd")]
 #[macro_export]
 macro_rules! accept_prometheusd {
@@ -346,6 +355,11 @@ mod tests {
         let storage_clone = Arc::clone(&storage_arc);
         let storage_guard = storage_arc.read().unwrap();
         let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
-        listen_for_metrics_requests(metrics_rx, storage_clone);
+        for _ in 0..3 {
+            rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
+            // listen_for_metrics_requests(metrics_rx, storage_clone.clone());
+            let test_report = metrics_encoder(storage_arc.clone()).await;
+            log_info!("metrics state: {:?}", test_report);
+        }
     }
 }
