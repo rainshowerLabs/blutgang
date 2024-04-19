@@ -107,19 +107,15 @@ pub async fn listen_for_metrics_requests(
         )
     };
     let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
-    let registry = Default::default();
-    {
-        let registry = registry_status.read().unwrap();
-    }
+    // let registry = registry_status.read().unwrap();
     let _metrics_request_tx = Arc::new(RwLock::new(metrics_request_tx.clone()));
-    tokio::spawn(metrics_monitor(metrics_rx, registry));
+    // tokio::spawn(metrics_monitor(metrics_rx, registry));
     metrics_server(
-        tokio::net::TcpListener::bind(address).await?,
         _metrics_request_tx,
         registry_status,
         metrics_request_tx,
         address,
-        interval,
+        config,
     )
     .await
 }
@@ -222,12 +218,11 @@ pub async fn close(rx: &mut MetricReceiver) {
 }
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_server(
-    io: tokio::net::TcpListener,
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
     metrics_request_tx: MetricSender,
     address: std::net::SocketAddr,
-    update_interval: u64,
+    config: Arc<RwLock<Settings>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::accept_prometheusd;
     use crate::log_info;
@@ -236,9 +231,12 @@ pub async fn metrics_server(
         net::TcpListener,
         sync::mpsc,
     };
-
+    let update_interval = {
+        let config_guard = config.read().unwrap();
+        config_guard.metrics.count_update_interval
+    };
     let listener = TcpListener::bind(address).await?;
-    log_info!("Bound prometheus metrics to : {}", address);
+    log_info!("Bound metrics to : {}", address);
     let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
 
     loop {

@@ -148,7 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
 
     #[cfg(feature = "prometheusd")]
-    if metrics_enabled {
+    {
         use crate::admin::metrics::{
             listen_for_metrics_requests,
             metrics_channel,
@@ -168,9 +168,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             metrics_addr,
             update_interval
         );
-        let metrics_listener = TcpListener::bind(metrics_addr).await?;
-        let (stream, socket_addr) = metrics_listener.accept().await?;
-        let io = TokioIo::new(stream);
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage_registry = prometheus_metric_storage::StorageRegistry::default();
         let registry_rwlock = Arc::new(RwLock::new(storage_registry));
@@ -179,7 +176,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             log_info!("Prometheus enabled, accepting metrics at prometheus port");
             let _ = listen_for_metrics_requests(config_metrics, metrics_rx, registry_rwlock).await;
         });
-        accept_prometheusd!(io, &metrics_tx_rwlock, &registry_clone, metrics_tx,);
+        // accept_prometheusd!(io, &metrics_tx_rwlock, &registry_clone, metrics_tx,);
     }
     #[cfg(not(feature = "prometheusd"))]
     {
