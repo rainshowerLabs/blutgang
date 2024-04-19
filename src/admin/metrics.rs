@@ -27,6 +27,7 @@ use tokio::sync::{
     },
     oneshot,
 };
+use crate::Settings;
 use tokio::time::interval;
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
@@ -90,18 +91,18 @@ pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
 
 #[cfg(feature = "prometheusd")]
 pub async fn listen_for_metrics_requests(
+    config: Arc<RwLock<Settings>>,
     metrics_rx: MetricReceiver,
     registry_status: Arc<RwLock<StorageRegistry>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::config::{
         cache_setup::setup_data,
         cli_args::create_match,
-        types::Settings,
     };
-    let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
-    let config_guard = config.read().unwrap();
-    let address = config_guard.metrics.address;
-    let interval = config_guard.metrics.count_update_interval;
+    let (address, interval) = {
+        let config_guard = config.read().unwrap();
+        (config_guard.metrics.address, config_guard.metrics.count_update_interval)
+    };
     let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
     let registry = Default::default();
     {
@@ -311,7 +312,6 @@ pub mod test_mocks {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admin::listener::listen_for_admin_requests;
     use crate::log_info;
     #[cfg(feature = "prometheusd")]
     #[tokio::test]

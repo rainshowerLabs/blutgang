@@ -85,13 +85,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
 
     // Copy the configuration values we need
-    let (addr, do_clear, do_health_check, admin_enabled, is_ws, expected_block_time) = {
+    let (addr, do_clear, do_health_check, admin_enabled, metrics_enabled, is_ws, expected_block_time) = {
         let config_guard = config.read().unwrap();
         (
             config_guard.address,
             config_guard.do_clear,
             config_guard.health_check,
             config_guard.admin.enabled,
+            config_guard.metrics.enabled,
             config_guard.is_ws,
             config_guard.expected_block_time,
         )
@@ -135,15 +136,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
-    let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
 
-    // TODO: prometheus flag is blocking things
+   let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
+    
     #[cfg(feature = "prometheusd")]
-    {
-        use crate::admin::metrics::metrics_channel;
-        use crate::admin::metrics::metrics_monitor;
-        log_info!("Grafana: check endpoints @ localhost:3000 and 9091");
-        let (stream, socket_addr) = listener.accept().await?;
+    if metrics_enabled {
+
+        use crate::admin::metrics::{metrics_monitor, metrics_channel, listen_for_metrics_requests};
+        log_info!("metrics enabled");
+        let config_metrics = Arc::clone(&config);
+        let metrics_addr = config_metrics.read().unwrap().metrics.address.clone();
+        let update_interval = config_metrics.read().unwrap().metrics.count_update_interval.clone();
+        log_info!("metrics settings: address: {}, update interval: {}", metrics_addr, update_interval);
+        let metrics_listener = TcpListener::bind(metrics_addr).await?;
+        let (stream, socket_addr) = metrics_listener.accept().await?;
         let io = TokioIo::new(stream);
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage_registry = prometheus_metric_storage::StorageRegistry::default();
@@ -151,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let registry_clone = Arc::clone(&registry_rwlock);
         tokio::task::spawn(async move {
             log_info!("Prometheus enabled, accepting metrics at prometheus port");
-            let _ = metrics_monitor(metrics_rx, registry_rwlock).await;
+            let _ = listen_for_metrics_requests(config_metrics, metrics_rx, registry_rwlock, ).await;
         });
         accept_prometheusd!(io, &metrics_tx_rwlock, &registry_clone, metrics_tx,);
     }
