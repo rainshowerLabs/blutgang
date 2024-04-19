@@ -19,6 +19,7 @@ use std::{
     time::Duration,
 };
 
+use crate::Settings;
 use tokio::sync::{
     mpsc::{
         unbounded_channel,
@@ -27,7 +28,6 @@ use tokio::sync::{
     },
     oneshot,
 };
-use crate::Settings;
 use tokio::time::interval;
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
@@ -101,7 +101,10 @@ pub async fn listen_for_metrics_requests(
     };
     let (address, interval) = {
         let config_guard = config.read().unwrap();
-        (config_guard.metrics.address, config_guard.metrics.count_update_interval)
+        (
+            config_guard.metrics.address,
+            config_guard.metrics.count_update_interval,
+        )
     };
     let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
     let registry = Default::default();
