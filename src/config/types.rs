@@ -43,7 +43,7 @@ impl Default for MetricsSettings {
         Self {
             enabled: true,
             count_update_interval: 10,
-            address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+            address: "127.0.0.1:9091".parse::<SocketAddr>().unwrap(),
         }
     }
 }
@@ -455,7 +455,7 @@ impl Settings {
         } else {
             MetricsSettings {
                 enabled: false,
-                address: "127.0.0.1:3001".parse::<SocketAddr>().unwrap(),
+                address: "127.0.0.1:9091".parse::<SocketAddr>().unwrap(),
                 count_update_interval: 10,
             }
         };
