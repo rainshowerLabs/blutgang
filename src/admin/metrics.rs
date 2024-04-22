@@ -29,6 +29,8 @@ use tokio::sync::{
     oneshot,
 };
 use tokio::time::interval;
+
+//TODO: have fns accept a refernce to StorageRegistry
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
@@ -183,7 +185,7 @@ async fn accept_http_metrics(
     unimplemented!()
 }
 #[cfg(feature = "prometheusd")]
-async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> String {
+async fn metrics_encoder(storage_registry: Arc<RwLock<&StorageRegistry>>) -> String {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
     let mut buffer = vec![];
@@ -238,14 +240,12 @@ pub async fn metrics_server(
     let listener = TcpListener::bind(address).await?;
     log_info!("Bound metrics to : {}", address);
     let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
-
+    let registry_clone = registry_state.clone();
     loop {
-        //TODO: add interval here
         interval.tick().await;
         let (stream, socket_addr) = listener.accept().await?;
         let io = TokioIo::new(stream);
         let tx_clone = Arc::clone(&metrics_tx);
-        let registry_clone = Arc::clone(&registry_state);
         tokio::task::spawn(async move {
             accept_prometheusd!(io, &tx_clone, &registry_clone, metrics_request_tx,);
         });
@@ -291,7 +291,9 @@ macro_rules! accept_prometheusd {
 
 pub mod test_mocks {
     use super::*;
+    use crate::admin::metrics::RpcMetrics;
     use crate::Rpc;
+    use rand::Rng;
     //borrowed from admin
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
@@ -303,10 +305,74 @@ pub mod test_mocks {
         )]))
     }
 
-    pub struct MockMetrics {
+    #[derive(Debug)]
+    struct MockRpcs {
         pub rpc_list: Arc<RwLock<Vec<Rpc>>>,
-        pub requests: HashMap<String, u64>,
-        pub duration: HashMap<String, f64>,
+    }
+
+    // #[derive(Debug, MetricStorage)]
+    // #[metric(subsystem = "test")]
+    // pub struct MockMetrics {
+    //     #[metric(labels("path", "method", "status"), help = "Total number of requests")]
+    //     pub requests: prometheus::IntCounterVec,
+    //     #[metric(labels("path", "method"), help = "latency of request")]
+    //     #[metric(buckets(0.1, 0.2, 0.5, 1, 2, 4, 8))]
+    //     pub request_duration: prometheus::HistogramVec,
+    //     }
+    // }
+    // impl MockMetrics {
+
+    //     fn gen_metrics(&self, rng: &rand::rngs::OsRng) {
+    //         unimplemented!()
+    //     }
+    // }
+
+    #[derive(Debug)]
+    pub struct MockRpcMetrics {
+        inner: RpcMetrics,
+    }
+
+    impl MockRpcMetrics {
+        fn gen_metrics(&self, mut rng: rand::rngs::StdRng) {
+            for _ in 0..5 {
+                let rand_status = rng.gen_range(0..=2);
+                let rand_duration = rng.gen_range(1..=100);
+                match rand_status {
+                    0 => {
+                        self.inner.requests_complete(
+                            "test",
+                            "test",
+                            &200,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    1 => {
+                        self.inner.requests_complete(
+                            "test",
+                            "test",
+                            &202,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    2 => {
+                        self.inner.requests_complete(
+                            "test",
+                            "test",
+                            &503,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    _ => {
+                        self.inner.requests_complete(
+                            "test",
+                            "test",
+                            &500,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
