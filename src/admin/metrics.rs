@@ -377,8 +377,14 @@ pub mod test_mocks {
 }
 
 #[cfg(test)]
+#[cfg(feature = "prometheusd")]
 mod tests {
     use self::test_mocks::MockRpcMetrics;
+    use crate::admin::metrics::{
+        listen_for_metrics_requests,
+        metrics_channel,
+        metrics_monitor,
+    };
 
     use super::*;
     use crate::config::{
@@ -391,19 +397,45 @@ mod tests {
     async fn mock_setup() {
         let (metrics_tx, metrics_rx) = metrics_channel().await;
         let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+        let config_metrics = Arc::clone(&config);
+        let metrics_addr = config_metrics.read().unwrap().metrics.address.clone();
+        let update_interval = config_metrics
+            .read()
+            .unwrap()
+            .metrics
+            .count_update_interval
+            .clone();
+        log_info!(
+            "mock metrics settings: address: {}, update interval: {}",
+            metrics_addr,
+            update_interval
+        );
+
         let storage_registry = prometheus_metric_storage::StorageRegistry::default();
         //TODO: why do i gotta clone this?
         let mock_metrics = MockRpcMetrics {
             inner: RpcMetrics::init(&storage_registry).unwrap().clone(),
         };
+        let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
+        let registry_rwlock = Arc::new(RwLock::new(storage_registry));
+        let registry_clone = Arc::clone(&registry_rwlock);
+        tokio::task::spawn(async move {
+            log_info!("Prometheus enabled, accepting metrics at prometheus port");
+            let _ = listen_for_metrics_requests(config_metrics, metrics_rx, registry_rwlock).await;
+        });
     }
     async fn assert_metrics() {}
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
     //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_listener --nocapture
     async fn test_prometheus_listener() {
+        use crate::config::cli_args::create_match;
+
         let storage = StorageRegistry::default();
         let storage_arc = Arc::new(RwLock::new(storage));
+        let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+        let config_metrics = Arc::clone(&config);
+
         let dt = std::time::Instant::now();
         log_info!(
             "Initial metrics state: {:?}",
@@ -415,7 +447,7 @@ mod tests {
         let storage_guard = storage_arc.read().unwrap();
         let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
         rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
-        listen_for_metrics_requests(metrics_rx, storage_clone);
+        listen_for_metrics_requests(config_metrics, metrics_rx, storage_clone);
         let test_report = metrics_encoder(storage_arc.clone()).await;
         log_info!("metrics state: {:?}", test_report);
     }

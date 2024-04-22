@@ -62,6 +62,10 @@ flush_every_ms = 24000
 # Add separate RPCs as TOML tables
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
 
+[metrics]
+address = "127.0.0.1:9091"
+count_update_interval = 10
+
 [merkle]
 url = "https://eth.merkle.io"
 ws_url = "wss://eth.merkle.io"

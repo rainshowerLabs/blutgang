@@ -21,7 +21,7 @@ pub fn create_match() -> clap::Command {
             .long("config")
             .short('c')
             .num_args(1..)
-            .default_value("config.toml")
+            .default_value("example_config.toml")
             .conflicts_with("rpc_list")
             .help("TOML config file for blutgang"))
         .arg(Arg::new("port")
