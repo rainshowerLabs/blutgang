@@ -56,3 +56,21 @@ pub fn setup_data(cache: Arc<Db>) {
         }
     }
 }
+
+mod tests {
+    use sled::Db;
+
+    #[derive(Debug)]
+    struct MockDb {
+        inner: Db,
+    }
+
+    impl Default for MockDb {
+        fn default() -> Self {
+            MockDb {
+                inner: sled::open("test_db").unwrap(),
+            }
+        }
+    }
+    impl MockDb {}
+}

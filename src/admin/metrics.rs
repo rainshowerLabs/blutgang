@@ -185,7 +185,7 @@ async fn accept_http_metrics(
     unimplemented!()
 }
 #[cfg(feature = "prometheusd")]
-async fn metrics_encoder(storage_registry: Arc<RwLock<&StorageRegistry>>) -> String {
+async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> String {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
     let mut buffer = vec![];
@@ -240,12 +240,12 @@ pub async fn metrics_server(
     let listener = TcpListener::bind(address).await?;
     log_info!("Bound metrics to : {}", address);
     let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
-    let registry_clone = registry_state.clone();
     loop {
         interval.tick().await;
         let (stream, socket_addr) = listener.accept().await?;
         let io = TokioIo::new(stream);
         let tx_clone = Arc::clone(&metrics_tx);
+        let registry_clone = Arc::clone(&registry_state);
         tokio::task::spawn(async move {
             accept_prometheusd!(io, &tx_clone, &registry_clone, metrics_request_tx,);
         });
@@ -329,7 +329,7 @@ pub mod test_mocks {
 
     #[derive(Debug)]
     pub struct MockRpcMetrics {
-        inner: RpcMetrics,
+        pub inner: RpcMetrics,
     }
 
     impl MockRpcMetrics {
@@ -378,8 +378,26 @@ pub mod test_mocks {
 
 #[cfg(test)]
 mod tests {
+    use self::test_mocks::MockRpcMetrics;
+
     use super::*;
+    use crate::config::{
+        cache_setup::setup_data,
+        cli_args::create_match,
+        types::Settings,
+    };
     use crate::log_info;
+
+    async fn mock_setup() {
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+        //TODO: why do i gotta clone this?
+        let mock_metrics = MockRpcMetrics {
+            inner: RpcMetrics::init(&storage_registry).unwrap().clone(),
+        };
+    }
+    async fn assert_metrics() {}
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
     //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_listener --nocapture
@@ -429,4 +447,8 @@ mod tests {
             log_info!("metrics state: {:?}", test_report);
         }
     }
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_server --nocapture
+    async fn test_metrics_e2e() {}
 }
