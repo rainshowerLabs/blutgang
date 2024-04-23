@@ -345,16 +345,80 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod test_mocks {
     use super::*;
     use crate::admin::metrics::metrics_channel;
     use crate::Rpc;
     use prometheus::core::Collector;
+    use rand::Rng;
 
     use tokio::sync::{
         mpsc,
         oneshot,
     };
+    use tokio::time::sleep;
+    use tokio::time::Duration;
+
+    #[derive(Debug)]
+    pub struct MockLRMetrics {
+        pub inner: LiveReadyMetrics,
+    }
+
+    impl MockLRMetrics {
+        fn gen_liveready(&self, mut rng: rand::rngs::StdRng) {}
+        fn gen_metrics(&self, mut rng: rand::rngs::StdRng) {
+            for _ in 0..5 {
+                let rand_status = rng.gen_range(0..=2);
+                let rand_duration = rng.gen_range(1..=100);
+                match rand_status {
+                    0 => {
+                        self.inner.metrics.requests_complete(
+                            "test",
+                            "test",
+                            &200,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    1 => {
+                        self.inner.metrics.requests_complete(
+                            "test",
+                            "test",
+                            &202,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    2 => {
+                        self.inner.metrics.requests_complete(
+                            "test",
+                            "test",
+                            &503,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                    _ => {
+                        self.inner.metrics.requests_complete(
+                            "test",
+                            "test",
+                            &500,
+                            Duration::from_millis(rand_duration),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Rpc;
+    use prometheus::core::Collector;
+    use tokio::sync::{
+        mpsc,
+        oneshot,
+    };
+    use crate::admin::metrics::metrics_channel;
     use tokio::time::sleep;
     use tokio::time::Duration;
     // RUST_LOG=info cargo test --features prometheusd -- test_liveness_listener_with_metrics --nocapture

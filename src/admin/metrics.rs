@@ -481,6 +481,6 @@ mod tests {
     }
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
-    //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_server --nocapture
+    //RUST_LOG=info cargo test --features prometheusd -- test_metrics_e2e --nocapture
     async fn test_metrics_e2e() {}
 }
