@@ -327,7 +327,6 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
     }
 }
 
-#[cfg(test)]
 pub mod test_mocks {
     use super::*;
     use crate::admin::metrics::metrics_channel;
@@ -341,6 +340,7 @@ pub mod test_mocks {
     };
     use tokio::time::sleep;
     use tokio::time::Duration;
+    use hex;
 
     #[derive(Debug)]
     pub struct MockLRMetrics {
@@ -348,6 +348,21 @@ pub mod test_mocks {
     }
 
     impl MockLRMetrics {
+        pub fn gen_rx(&mut self, mut rng: rand::rngs::StdRng) {
+            //Refer to https://github.com/diem/diem/blob/latest/json-rpc/src/fuzzing.rs
+            //TODO: rand gen these
+            let rand_val_request = rng.gen_range(0..=2);
+            let rand_val_params = rng.gen_range(0..=2);
+            let request = hex::encode("test");
+            let params = hex::encode("test");
+            let rx = serde_json::json!({
+                    "id": serde_json::Value::Null,    
+                    "jsonrpc": "2.0",
+                    "method": [request],
+                    "params": [params],                 
+        });
+        }
+        
         fn gen_metrics(&mut self, mut rng: rand::rngs::StdRng) {
             for _ in 0..5 {
                 let rand_status = rng.gen_range(0..=2);
