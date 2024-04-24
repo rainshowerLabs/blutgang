@@ -31,16 +31,16 @@ use tokio::sync::{
 use tokio::time::interval;
 
 //TODO: have fns accept a refernce to StorageRegistry
+// refer to https://docs.rs/prometheus-metric-storage/latest/prometheus_metric_storage/#metric-storage-registry
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
 const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))];
-// #[cfg(feature = "prometheusd")]
-#[derive(Debug)]
-pub enum MetricsError {
-    WSError(String),
-    RpcError(String),
-}
+// #[derive(Debug)]
+// pub enum MetricsError {
+//     WSError(String),
+//     RpcError(String),
+// }
 
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
@@ -63,24 +63,24 @@ impl RpcMetrics {
             .observe(dt.as_millis() as f64)
     }
 }
-#[cfg(feature = "prometheusd")]
-#[derive(Debug)]
-pub enum MetricsCommand<'a> {
-    Flush(),
-    Channel(&'a MetricSender, &'a MetricReceiver),
-    PushLatency(&'a RpcMetrics, &'a str, &'a str, f64),
-    PushRequest(&'a RpcMetrics, &'a str, &'a str, &'a u16, Duration),
-    PushError(&'a RpcMetrics, &'a str, &'a str, &'a u16, Duration),
-    Push(&'a RpcMetrics),
-    Pull(&'a RpcMetrics),
-}
+// #[cfg(feature = "prometheusd")]
+// #[derive(Debug)]
+// pub enum MetricsCommand<'a> {
+//     Flush(),
+//     Channel(&'a MetricSender, &'a MetricReceiver),
+//     PushLatency(&'a RpcMetrics, &'a str, &'a str, f64),
+//     PushRequest(&'a RpcMetrics, &'a str, &'a str, &'a u16, Duration),
+//     PushError(&'a RpcMetrics, &'a str, &'a str, &'a u16, Duration),
+//     Push(&'a RpcMetrics),
+//     Pull(&'a RpcMetrics),
+// }
 
-#[cfg(feature = "prometheusd")]
-#[derive(Debug)]
-pub enum MetricChannelCommand {
-    AdminMsg(oneshot::Sender<RpcMetrics>),
-    StatsMsg(oneshot::Sender<RpcMetrics>),
-}
+// #[cfg(feature = "prometheusd")]
+// #[derive(Debug)]
+// pub enum MetricChannelCommand {
+//     AdminMsg(oneshot::Sender<RpcMetrics>),
+//     StatsMsg(oneshot::Sender<RpcMetrics>),
+// }
 
 #[cfg(not(feature = "prometheusd"))]
 pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
@@ -109,9 +109,7 @@ pub async fn listen_for_metrics_requests(
         )
     };
     let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
-    // let registry = registry_status.read().unwrap();
     let _metrics_request_tx = Arc::new(RwLock::new(metrics_request_tx.clone()));
-    // tokio::spawn(metrics_monitor(metrics_rx, registry));
     metrics_server(
         _metrics_request_tx,
         registry_status,
@@ -127,10 +125,6 @@ pub async fn metrics_listener(
     metrics_status: Arc<RwLock<RpcMetrics>>,
 ) {
     while let Some(update) = metrics_rx.recv().await {
-        //TODO: match for metrics type, latency, errors, requests
-        //match metric {
-        //MetricsType::Latency => {
-        //}
         let mut metrics = metrics_status.write().unwrap();
         *metrics = update;
     }
@@ -153,7 +147,7 @@ pub async fn metrics_processor(
 }
 /// Accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
-pub async fn accept_metrics_request(
+pub async fn write_metrics_response(
     tx: Request<hyper::body::Incoming>,
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
@@ -173,18 +167,6 @@ pub async fn accept_metrics_request(
     (response)
 }
 #[cfg(feature = "prometheusd")]
-async fn accept_ws_metrics(
-    _metrics_tx: Arc<MetricSender>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    unimplemented!()
-}
-#[cfg(feature = "prometheusd")]
-async fn accept_http_metrics(
-    _metrics_tx: Arc<MetricSender>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    unimplemented!()
-}
-#[cfg(feature = "prometheusd")]
 async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> String {
     use prometheus::Encoder;
     let encoder = prometheus::TextEncoder::new();
@@ -198,7 +180,6 @@ pub async fn metrics_monitor(
     metrics_rx: MetricReceiver,
     storage_registry: Arc<RwLock<StorageRegistry>>,
 ) {
-    //TODO: figure ownership mess here
     let registry;
     let registry_guard = storage_registry.read().unwrap();
     registry = registry_guard;
@@ -208,7 +189,6 @@ pub async fn metrics_monitor(
     let metrics_stat_listener = metrics_status.clone();
     tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
 }
-// #[cfg(feature = "prometheusd")]
 pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
     (tx, rx)
@@ -255,7 +235,7 @@ pub async fn metrics_server(
 // #[cfg(feature = "prometheusd")]
 // #[macro_export]
 // macro_rules! set_metric {
-//     ($data: expr, $version:expr  $type_label:expr) => {
+//     ($data: expr, $version:expr , $type_label:expr) => {
 
 //     };
 // }
@@ -269,12 +249,12 @@ macro_rules! accept_prometheusd {
      $registry_state:expr,
      $metrics_request_tx:expr,
     ) => {
-        use crate::admin::metrics::accept_metrics_request;
+        use crate::admin::metrics::write_metrics_response;
         if let Err(err) = http1::Builder::new()
             .serve_connection(
                 $io,
                 service_fn(|req| {
-                    let response = accept_metrics_request(
+                    let response = write_metrics_response(
                         req,
                         Arc::clone($http_tx),
                         Arc::clone($registry_state),
@@ -318,12 +298,6 @@ pub mod test_mocks {
     //     #[metric(labels("path", "method"), help = "latency of request")]
     //     #[metric(buckets(0.1, 0.2, 0.5, 1, 2, 4, 8))]
     //     pub request_duration: prometheus::HistogramVec,
-    //     }
-    // }
-    // impl MockMetrics {
-
-    //     fn gen_metrics(&self, rng: &rand::rngs::OsRng) {
-    //         unimplemented!()
     //     }
     // }
 

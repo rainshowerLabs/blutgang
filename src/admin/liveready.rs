@@ -70,11 +70,8 @@ pub type LiveReadySnd = oneshot::Sender<LiveReady>;
 pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
-// #[cfg(feature = "prometheusd")]
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
-// #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
-// #[cfg(feature = "prometheusd")]
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
 
 // Macros to make returning statuses less ugly in code
@@ -135,24 +132,11 @@ async fn liveness_listener_metrics(
                 let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.readiness = state;
-                //liveness.metrics.requests_complete(
-                //    "/liveready_readiness",
-                //    "LiveReadyUpdate::Readiness",
-                //    //should I try using ok! macro here?
-                //    &200,
-                //    dt.elapsed(),
-                // );
             }
             LiveReadyUpdate::Health(state) => {
                 let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.health = state;
-                // liveness.metrics.requests_complete(
-                //     "/liveready_health",
-                //     "LiveReadyUpdate::Health",
-                //     &200,
-                //     dt.elapsed(),
-                // );
             }
         }
     }
@@ -271,7 +255,6 @@ pub async fn accept_readiness_request_metrics(
     metrics_sender: MetricSender,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     use crate::admin::metrics::metrics_channel;
-    //unbounded with metrics_channel or oneshot channel here?
     let dt = std::time::Instant::now();
     let (tx, rx) = oneshot::channel();
 
@@ -516,14 +499,7 @@ mod tests {
             "liveness_request_processor_metrics readiness: {:?} : after new lr metric status",
             new_liveness_status.read().unwrap().readiness
         );
-        // tokio::spawn( async move {
-        // liveness_request_processor_metrics(
-        // request_recv,
-        // metrics_recv,
-        // new_liveness_status.clone()).await;
-        // });
 
-        // request_snd.send(LiveReadyUpdate::Readiness(ReadinessState::Ready));
         new_liveness_status
             .read()
             .unwrap()
