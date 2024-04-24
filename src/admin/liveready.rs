@@ -297,12 +297,12 @@ pub async fn accept_health_request(
 }
 #[cfg(feature = "prometheusd")]
 pub async fn accept_health_request_metrics(
-    liveness_request_sender: LiveReadyRequestSnd,
+    lr_metric_request_sender: LRMetricsRequestTx,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     use crate::admin::metrics::metrics_channel;
     let (tx, rx) = oneshot::channel();
 
-    let _ = liveness_request_sender.send(tx).await;
+    let _ = lr_metric_request_sender.send(tx).await;
 
     let rax = match rx.await {
         Ok(v) => v,

@@ -131,17 +131,6 @@ async fn admin_flush_cache(cache: Arc<Db>) -> Result<Value, AdminError> {
     Ok(rx)
 }
 
-#[cfg(feature = "prometheusd")]
-use crate::admin::metrics::MetricsError;
-// async fn admin_flush_metrics(
-//     channel: &RegistryChannel,
-//     tx: MetricSender,
-// ) -> Result<(), MetricsError> {
-//     let dt = Instant::now();
-
-//     Ok(())
-// }
-
 // Respond with the config we started blutgang with
 fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();

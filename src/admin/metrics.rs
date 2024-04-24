@@ -5,6 +5,7 @@ use hyper::{
     service::service_fn,
     Request,
 };
+use prometheus::Error;
 use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
@@ -17,6 +18,12 @@ use std::{
         RwLock,
     },
     time::Duration,
+};
+
+use serde_json::{
+    json,
+    Value,
+    Value::Null,
 };
 
 use crate::Settings;
@@ -62,6 +69,23 @@ impl RpcMetrics {
             .with_label_values(&[path, method])
             .observe(dt.as_millis() as f64)
     }
+}
+
+fn metrics_config(config: Arc<RwLock<Settings>>) -> Result<Value, Error> {
+    let guard = config.read().unwrap();
+    let rx = json!({
+        "id": Null,
+        "jsonrpc": "2.0",
+        "result": {
+            "metrics": {
+                "enabled": guard.metrics.enabled,
+                "address": guard.metrics.address,
+                "interval": guard.metrics.count_update_interval,
+            },
+        },
+
+    });
+    Ok(rx)
 }
 // #[cfg(feature = "prometheusd")]
 // #[derive(Debug)]
