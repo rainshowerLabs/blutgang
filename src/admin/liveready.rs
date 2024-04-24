@@ -365,8 +365,7 @@ pub mod test_mocks {
     }
 
     impl MockLRMetrics {
-        fn gen_liveready(&self, mut rng: rand::rngs::StdRng) {}
-        fn gen_metrics(&self, mut rng: rand::rngs::StdRng) {
+        fn gen_metrics(&mut self, mut rng: rand::rngs::StdRng) {
             for _ in 0..5 {
                 let rand_status = rng.gen_range(0..=2);
                 let rand_duration = rng.gen_range(1..=100);
@@ -377,7 +376,9 @@ pub mod test_mocks {
                             "test",
                             &200,
                             Duration::from_millis(rand_duration),
-                        )
+                        );
+                        self.inner.readiness = ReadinessState::Ready;
+                        self.inner.health = HealthState::Healthy;
                     }
                     1 => {
                         self.inner.metrics.requests_complete(
@@ -385,7 +386,8 @@ pub mod test_mocks {
                             "test",
                             &202,
                             Duration::from_millis(rand_duration),
-                        )
+                        );
+                        self.inner.health = HealthState::MissingRpcs;
                     }
                     2 => {
                         self.inner.metrics.requests_complete(
@@ -393,7 +395,8 @@ pub mod test_mocks {
                             "test",
                             &503,
                             Duration::from_millis(rand_duration),
-                        )
+                        );
+                        self.inner.health = HealthState::Unhealthy;
                     }
                     _ => {
                         self.inner.metrics.requests_complete(
@@ -412,13 +415,13 @@ pub mod test_mocks {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::admin::metrics::metrics_channel;
     use crate::Rpc;
     use prometheus::core::Collector;
     use tokio::sync::{
         mpsc,
         oneshot,
     };
-    use crate::admin::metrics::metrics_channel;
     use tokio::time::sleep;
     use tokio::time::Duration;
     // RUST_LOG=info cargo test --features prometheusd -- test_liveness_listener_with_metrics --nocapture
