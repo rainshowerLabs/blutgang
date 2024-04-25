@@ -391,6 +391,7 @@ mod tests {
         types::Settings,
     };
     use crate::log_info;
+    
 
     async fn mock_setup() {
         let (metrics_tx, metrics_rx) = metrics_channel().await;
@@ -425,7 +426,7 @@ mod tests {
     async fn assert_metrics() {}
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
-    //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_listener --nocapture
+    //RUST_LOG=info cargo test --config example_config.toml -F prometheusd 
     async fn test_prometheus_listener() {
         use crate::config::cli_args::create_match;
 
