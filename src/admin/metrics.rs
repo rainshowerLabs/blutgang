@@ -26,7 +26,11 @@ use serde_json::{
     Value::Null,
 };
 
-use crate::Settings;
+use crate::{
+    admin::error::AdminError,
+    Settings,
+};
+
 use tokio::sync::{
     mpsc::{
         unbounded_channel,
@@ -61,7 +65,7 @@ impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
     }
-    pub fn requests_complete(&self, path: &str, method: &str, status: &u16, dt: Duration) {
+    pub fn requests_complete(&self, path: &str, method: &str, status: &str, dt: Duration) {
         self.requests
             .with_label_values(&[path, method, &status.to_string()])
             .inc();
@@ -162,7 +166,7 @@ pub async fn metrics_processor(
     let _metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
     loop {
         while let Some(incoming) = metrics_rx.recv().await {
-            incoming.requests_complete("test", "test", &200, Duration::from_millis(100));
+            incoming.requests_complete("test", "test", &"200", Duration::from_millis(100));
             let test_report = metrics_encoder(registry_state.clone()).await;
             log_info!("prometheus metrics: {:?}", test_report);
             let _registry = registry_state.read().unwrap();
@@ -171,12 +175,49 @@ pub async fn metrics_processor(
 }
 /// Accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
+pub async fn write_metrics_val(
+    tx: Value,
+
+    metrics_tx: Arc<RwLock<MetricSender>>,
+    registry_state: Arc<RwLock<StorageRegistry>>,
+    dt: Duration,
+) -> Result<Value, AdminError> {
+    use crate::log_info;
+    let method = tx["method"].as_str().unwrap();
+    let path = tx["path"].as_str().unwrap();
+    let registry_clone = Arc::clone(&registry_state);
+    // let metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
+    let status = tx["status"].as_str().unwrap();
+    let metrics = Arc::new(RwLock::new(
+        RpcMetrics::instance(&registry_state.read().unwrap())
+            .unwrap()
+            .to_owned(),
+    ));
+    metrics
+        .read()
+        .unwrap()
+        .requests_complete(method, path, &"200", dt);
+
+    let metrics_report = metrics_encoder(registry_clone).await;
+    let rx = json!({
+        "jsonrpc": "2.0",
+        "metrics_result": metrics_report,
+    });
+    log_info!("metrics response: {:?}", rx);
+    Ok(rx)
+}
+
+/// Accepts metrics request, encodes and prints
+#[cfg(feature = "prometheusd")]
 pub async fn write_metrics_response(
     tx: Request<hyper::body::Incoming>,
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    use crate::balancer::format::incoming_to_value;
+    use crate::{
+        balancer::format::incoming_to_value,
+        log_info,
+    };
     use serde_json::{
         json,
         Value,
@@ -188,6 +229,7 @@ pub async fn write_metrics_response(
         .status(200)
         .body(Full::from(Bytes::from(metrics_report)))
         .unwrap());
+    log_info!("metrics response: {:?}", response);
     (response)
 }
 #[cfg(feature = "prometheusd")]
@@ -340,7 +382,7 @@ pub mod test_mocks {
                         self.inner.requests_complete(
                             "test",
                             "test",
-                            &200,
+                            &"200",
                             Duration::from_millis(rand_duration),
                         )
                     }
@@ -348,7 +390,7 @@ pub mod test_mocks {
                         self.inner.requests_complete(
                             "test",
                             "test",
-                            &202,
+                            &"202",
                             Duration::from_millis(rand_duration),
                         )
                     }
@@ -356,7 +398,7 @@ pub mod test_mocks {
                         self.inner.requests_complete(
                             "test",
                             "test",
-                            &503,
+                            &"503",
                             Duration::from_millis(rand_duration),
                         )
                     }
@@ -364,7 +406,7 @@ pub mod test_mocks {
                         self.inner.requests_complete(
                             "test",
                             "test",
-                            &500,
+                            &"500",
                             Duration::from_millis(rand_duration),
                         )
                     }
@@ -391,7 +433,6 @@ mod tests {
         types::Settings,
     };
     use crate::log_info;
-    
 
     async fn mock_setup() {
         let (metrics_tx, metrics_rx) = metrics_channel().await;
@@ -426,9 +467,11 @@ mod tests {
     async fn assert_metrics() {}
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
-    //RUST_LOG=info cargo test --config example_config.toml -F prometheusd 
+    //RUST_LOG=info cargo test --config example_config.toml -F prometheusd
     async fn test_prometheus_listener() {
         use crate::config::cli_args::create_match;
+        let mut config = Settings::default();
+        Arc::new(RwLock::new(config));
 
         let storage = StorageRegistry::default();
         let storage_arc = Arc::new(RwLock::new(storage));
@@ -445,7 +488,7 @@ mod tests {
         let storage_clone = Arc::clone(&storage_arc);
         let storage_guard = storage_arc.read().unwrap();
         let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
-        rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
+        rpc_metrics.requests_complete("test", "test", &"200", dt.elapsed());
         listen_for_metrics_requests(config_metrics, metrics_rx, storage_clone);
         let test_report = metrics_encoder(storage_arc.clone()).await;
         log_info!("metrics state: {:?}", test_report);
@@ -472,7 +515,7 @@ mod tests {
         let storage_guard = storage_arc.read().unwrap();
         let mut rpc_metrics = RpcMetrics::init(&storage_guard).unwrap();
         for _ in 0..3 {
-            rpc_metrics.requests_complete("test", "test", &200, dt.elapsed());
+            rpc_metrics.requests_complete("test", "test", &"200", dt.elapsed());
             // listen_for_metrics_requests(metrics_rx, storage_clone.clone());
             let test_report = metrics_encoder(storage_arc.clone()).await;
             log_info!("metrics state: {:?}", test_report);

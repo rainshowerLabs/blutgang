@@ -12,6 +12,7 @@ use std::{
     time::Instant,
 };
 
+use prometheus_metric_storage::StorageRegistry;
 use serde_json::{
     json,
     Value,
@@ -33,7 +34,7 @@ pub async fn execute_method(
 
     // Check if write protection is enabled
     let write_protection_enabled = config.read().unwrap().admin.readonly;
-
+    let metrics_enabled = config.read().unwrap().metrics.enabled;
     match method {
         Some("blutgang_quit") => {
             if write_protection_enabled {
@@ -393,8 +394,8 @@ fn admin_blutgang_set_ttl(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::RpcMetrics;
     use jsonwebtoken::DecodingKey;
-
     // Helper function to create a test RPC list
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
@@ -431,6 +432,41 @@ mod tests {
         let db = db.open().unwrap();
 
         Arc::new(db)
+    }
+
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    async fn test_execute_methods_metrics_rpc_config() {
+        use crate::admin::metrics::metrics_channel;
+        use crate::admin::metrics::write_metrics_val;
+        use crate::log_info;
+        let cache = create_test_cache();
+        let config = create_test_settings_config();
+        let guard = config.read().unwrap();
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
+        let storage = StorageRegistry::default();
+        let storage_rwlock = Arc::new(RwLock::new(storage));
+        let dt = Instant::now();
+        let rx = json!({
+            "id": Null,
+            "jsonrpc": "2.0",
+            "method": "blutgang_config",
+            "path": "/rpc",
+            "status": "200",
+            "result": {
+                "address": guard.address,
+                "do_clear": guard.do_clear,
+                "health_check": guard.health_check,
+                "admin": {
+                    "enabled": guard.admin.enabled,
+                    "readonly": guard.admin.readonly,
+                },
+                "ttl": guard.ttl,
+                "health_check_ttl": guard.health_check_ttl,
+            },
+        });
+        let metrics = write_metrics_val(rx, metrics_tx_rwlock, storage_rwlock, dt.elapsed()).await;
     }
 
     #[tokio::test]

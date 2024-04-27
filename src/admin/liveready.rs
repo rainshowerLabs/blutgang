@@ -226,20 +226,26 @@ pub async fn on_accept_metrics_write_readiness(
 ) -> Result<(), Infallible> {
     let rax = match response.status().as_str() {
         "200" => {
-            LRMetrics
-                .metrics
-                .requests_complete("/liveready_health", "Readiness::Ready", &200, dt);
+            LRMetrics.metrics.requests_complete(
+                "/liveready_health",
+                "Readiness::Ready",
+                &"200",
+                dt,
+            );
         }
         "503" => {
-            LRMetrics
-                .metrics
-                .requests_complete("/liveready_health", "Readiness::Setup", &503, dt);
+            LRMetrics.metrics.requests_complete(
+                "/liveready_health",
+                "Readiness::Setup",
+                &"503",
+                dt,
+            );
         }
         _ => {
             LRMetrics.metrics.requests_complete(
                 "/liveready_health",
                 "Readiness::Unknown",
-                &500,
+                &"500",
                 dt,
             );
         }
@@ -334,13 +340,13 @@ pub mod test_mocks {
     use prometheus::core::Collector;
     use rand::Rng;
 
+    use hex;
     use tokio::sync::{
         mpsc,
         oneshot,
     };
     use tokio::time::sleep;
     use tokio::time::Duration;
-    use hex;
 
     #[derive(Debug)]
     pub struct MockLRMetrics {
@@ -351,18 +357,19 @@ pub mod test_mocks {
         pub fn gen_rx(&mut self, mut rng: rand::rngs::StdRng) {
             //Refer to https://github.com/diem/diem/blob/latest/json-rpc/src/fuzzing.rs
             //TODO: rand gen these
-            let rand_val_request = rng.gen_range(0..=2);
-            let rand_val_params = rng.gen_range(0..=2);
-            let request = hex::encode("test");
-            let params = hex::encode("test");
+            let rand_val_request = rng.gen_range(0..=1);
+            let request = match rand_val_request {
+                0 => hex::encode("LiveReadyUpdate::Readiness"),
+                1 => hex::encode("LiveReadyUpdate::Health"),
+                _ => hex::encode("test"),
+            };
             let rx = serde_json::json!({
-                    "id": serde_json::Value::Null,    
-                    "jsonrpc": "2.0",
-                    "method": [request],
-                    "params": [params],                 
-        });
+                        "id": serde_json::Value::Null,
+                        "jsonrpc": "2.0",
+                        "method": [request],
+            });
         }
-        
+
         fn gen_metrics(&mut self, mut rng: rand::rngs::StdRng) {
             for _ in 0..5 {
                 let rand_status = rng.gen_range(0..=2);
@@ -372,7 +379,7 @@ pub mod test_mocks {
                         self.inner.metrics.requests_complete(
                             "test",
                             "test",
-                            &200,
+                            &"200",
                             Duration::from_millis(rand_duration),
                         );
                         self.inner.readiness = ReadinessState::Ready;
@@ -382,7 +389,7 @@ pub mod test_mocks {
                         self.inner.metrics.requests_complete(
                             "test",
                             "test",
-                            &202,
+                            &"202",
                             Duration::from_millis(rand_duration),
                         );
                         self.inner.health = HealthState::MissingRpcs;
@@ -391,7 +398,7 @@ pub mod test_mocks {
                         self.inner.metrics.requests_complete(
                             "test",
                             "test",
-                            &503,
+                            &"503",
                             Duration::from_millis(rand_duration),
                         );
                         self.inner.health = HealthState::Unhealthy;
@@ -400,7 +407,7 @@ pub mod test_mocks {
                         self.inner.metrics.requests_complete(
                             "test",
                             "test",
-                            &500,
+                            &"500",
                             Duration::from_millis(rand_duration),
                         )
                     }
@@ -509,7 +516,6 @@ mod tests {
         metrics_tx
             .send(new_liveness_status.read().unwrap().metrics.clone())
             .unwrap();
-        // liveness_status_clone.write().unwrap().readiness = ReadinessState::Setup;
         log_info!(
             "liveness_request_processor_metrics readiness: {:?} : after new lr metric status",
             new_liveness_status.read().unwrap().readiness
@@ -522,7 +528,7 @@ mod tests {
             .requests_complete(
                 "/liveready_health",
                 "LiveReadyUpdate::Health::Setup",
-                &503,
+                &"503",
                 dt.elapsed(),
             );
         let response = accept_readiness_request_metrics(request_snd, metrics_tx)
@@ -676,11 +682,16 @@ mod tests {
             "Successfully discarded updates without affecting the test flow"
         );
     }
-    #[cfg(feature = "prometheusd")]
-    #[tokio::test]
-    async fn test_metrics_update_concurrent() {
-        let (tx, rx) = metrics_channel().await;
-    }
+    // #[cfg(feature = "prometheusd")]
+    // #[tokio::test]
+    // async fn test_metrics_update_concurrent() {
+    //     let (request_snd, request_recv) = mpsc::channel(1);
+    //     let storage = StorageRegistry::default();
+    //     let metrics = RpcMetrics::init(&storage).unwrap();
+    //     let dt = std::time::Instant::now();
+    //     let (metrics_tx, metrics_recv) = metrics_channel().await;
+
+    // }
 
     #[tokio::test]
     async fn test_update_and_request_liveness_status_concurrently() {
