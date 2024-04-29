@@ -65,12 +65,12 @@ impl RpcMetrics {
     pub fn init(registry: &StorageRegistry) -> Result<&Self, prometheus::Error> {
         RpcMetrics::instance(registry)
     }
-    pub fn requests_complete(&self, path: &str, method: &str, status: &str, dt: Duration) {
+    pub fn requests_complete(&self, url: &str, method: &str, status: &str, dt: Duration) {
         self.requests
-            .with_label_values(&[path, method, &status.to_string()])
+            .with_label_values(&[url, method, &status.to_string()])
             .inc();
         self.duration
-            .with_label_values(&[path, method])
+            .with_label_values(&[url, method])
             .observe(dt.as_millis() as f64)
     }
 }
@@ -286,12 +286,14 @@ pub async fn metrics_server(
     let listener = TcpListener::bind(address).await?;
     log_info!("Bound metrics to : {}", address);
     let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
+
     loop {
-        interval.tick().await;
-        let (stream, socket_addr) = listener.accept().await?;
+        let (stream, socketaddr) = listener.accept().await?;
+        log_info!("Metrics connection from: {}", socketaddr);
         let io = TokioIo::new(stream);
-        let tx_clone = Arc::clone(&metrics_tx);
+        let config_clone = Arc::clone(&config);
         let registry_clone = Arc::clone(&registry_state);
+        let tx_clone = Arc::clone(&metrics_tx);
         tokio::task::spawn(async move {
             accept_prometheusd!(io, &tx_clone, &registry_clone, metrics_request_tx,);
         });

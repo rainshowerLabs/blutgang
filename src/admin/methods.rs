@@ -97,6 +97,8 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
+        Some("blutgang_metrics") => admin_metrics(config),
+
         Some(_) => Err(AdminError::InvalidMethod),
         _ => Ok(().into()),
     }
@@ -142,6 +144,11 @@ fn admin_config(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
             "address": guard.address,
             "do_clear": guard.do_clear,
             "health_check": guard.health_check,
+            "metrics": {
+                "enabled": guard.metrics.enabled,
+                "address": guard.metrics.address,
+                "count_update_interval": guard.metrics.count_update_interval,
+            },
             "admin": {
                 "enabled": guard.admin.enabled,
                 "readonly": guard.admin.readonly,
@@ -389,6 +396,12 @@ fn admin_blutgang_set_ttl(
     });
 
     Ok(rx)
+}
+
+fn admin_metrics(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
+    let guard = config.read().unwrap();
+    // let metrics_report =
+    unimplemented!()
 }
 
 #[cfg(test)]

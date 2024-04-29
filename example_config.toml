@@ -29,12 +29,12 @@ supress_rpc_check = false
 # should not be exposed publicly.
 [admin]
 # Enable the admin namespace
-enabled = false
+enabled = true
 # Address for the admin RPC
 address = "127.0.0.1:5715"
 # Only allow read-only methods
 # Recommended `true` unless you 100% need write methods
-readonly = true
+readonly = false
 # Enable the use of JWT for auth
 # Should be on if exposing to the internet
 jwt = false
@@ -63,6 +63,7 @@ flush_every_ms = 24000
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
 
 [metrics]
+enabled = true
 address = "127.0.0.1:9091"
 count_update_interval = 10
 
