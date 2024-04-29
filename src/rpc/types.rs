@@ -59,8 +59,6 @@ fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
     Ok(sanitized.to_string())
 }
 
-unsafe impl Sync for Rpc {}
-
 impl Default for Rpc {
     fn default() -> Self {
         Self {
