@@ -23,8 +23,6 @@ pub struct Status {
     // pub throughput: f64,
 }
 
-unsafe impl Sync for Status {}
-
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,           // sanitized name for appearing in logs
