@@ -1,3 +1,4 @@
+use crate::Rpc;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -10,6 +11,11 @@ use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
+use serde_json::{
+    json,
+    Value,
+    Value::Null,
+};
 use std::convert::Infallible;
 use std::{
     collections::hash_map::HashMap,
@@ -18,12 +24,6 @@ use std::{
         RwLock,
     },
     time::Duration,
-};
-
-use serde_json::{
-    json,
-    Value,
-    Value::Null,
 };
 
 use crate::{
@@ -46,6 +46,9 @@ use tokio::time::interval;
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
 pub type MetricSender = UnboundedSender<RpcMetrics>;
 pub type MetricReceiver = UnboundedReceiver<RpcMetrics>;
+pub type MetricUpdateSender = tokio::sync::mpsc::Sender<MetricsUpdate>;
+pub type MetricUpdateReciever = tokio::sync::mpsc::Receiver<MetricsUpdate>;
+
 const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))];
 // #[derive(Debug)]
 // pub enum MetricsError {
@@ -56,9 +59,9 @@ const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]
 pub struct RpcMetrics {
-    #[metric(labels("path", "method", "status"), help = "Total number of requests")]
+    #[metric(labels("url", "method", "status"), help = "Total number of requests")]
     pub requests: prometheus::IntCounterVec,
-    #[metric(labels("path", "method"), help = "latency of request")]
+    #[metric(labels("url", "method"), help = "latency of request")]
     pub duration: prometheus::HistogramVec,
 }
 impl RpcMetrics {
@@ -73,6 +76,16 @@ impl RpcMetrics {
             .with_label_values(&[url, method])
             .observe(dt.as_millis() as f64)
     }
+}
+
+pub async fn execute_metric_method(
+    tx: Value,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    config: Arc<RwLock<Settings>>,
+    registry_state: Arc<RwLock<StorageRegistry>>,
+    cache: sled::Db,
+) -> Result<Value, Error> {
+    unimplemented!()
 }
 
 fn metrics_config(config: Arc<RwLock<Settings>>) -> Result<Value, Error> {
@@ -110,6 +123,13 @@ fn metrics_config(config: Arc<RwLock<Settings>>) -> Result<Value, Error> {
 //     StatsMsg(oneshot::Sender<RpcMetrics>),
 // }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum MetricsUpdate {
+    Http,
+    Websocket,
+    Database,
+}
+
 #[cfg(not(feature = "prometheusd"))]
 pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
     loop {
@@ -122,8 +142,10 @@ pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
 #[cfg(feature = "prometheusd")]
 pub async fn listen_for_metrics_requests(
     config: Arc<RwLock<Settings>>,
-    metrics_rx: MetricReceiver,
+    metrics_rx: MetricUpdateReciever,
     registry_status: Arc<RwLock<StorageRegistry>>,
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    dt: Duration,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::config::{
         cache_setup::setup_data,
@@ -136,12 +158,20 @@ pub async fn listen_for_metrics_requests(
             config_guard.metrics.count_update_interval,
         )
     };
-    let (metrics_request_tx, metrics_request_rx) = metrics_channel().await;
-    let _metrics_request_tx = Arc::new(RwLock::new(metrics_request_tx.clone()));
+    let (metrics_request_tx, metrics_request_rx) = metrics_update_channel().await;
+    let (metrics_tx, metrics_rx) = metrics_channel().await;
+    let metrics_request_tx_rwlock = Arc::new(RwLock::new(metrics_request_tx.clone()));
+    let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx.clone()));
+    tokio::spawn(metrics_monitor(
+        metrics_request_rx,
+        registry_status.clone(),
+        rpc_list.clone(),
+        dt,
+    ));
     metrics_server(
-        _metrics_request_tx,
+        metrics_tx_rwlock,
         registry_status,
-        metrics_request_tx,
+        metrics_tx,
         address,
         config,
     )
@@ -149,12 +179,27 @@ pub async fn listen_for_metrics_requests(
 }
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_listener(
-    mut metrics_rx: MetricReceiver,
+    mut metrics_rx: MetricUpdateReciever,
     metrics_status: Arc<RwLock<RpcMetrics>>,
+    rpc_list_str: &str,
+    _method: &str,
+    dt: Duration,
 ) {
     while let Some(update) = metrics_rx.recv().await {
-        let mut metrics = metrics_status.write().unwrap();
-        *metrics = update;
+        match update {
+            MetricsUpdate::Http => {
+                let mut metrics_guard = metrics_status.write().unwrap();
+                metrics_guard.requests_complete(rpc_list_str, &"http", &"200", dt);
+            }
+            MetricsUpdate::Websocket => {
+                let mut metrics_guard = metrics_status.write().unwrap();
+                metrics_guard.requests_complete(rpc_list_str, &"WebSocket", &"200", dt);
+            }
+            MetricsUpdate::Database => {
+                let mut metrics_guard = metrics_status.write().unwrap();
+                metrics_guard.requests_complete(rpc_list_str, &"Database", &"200", dt);
+            }
+        }
     }
 }
 #[cfg(feature = "prometheusd")]
@@ -177,7 +222,6 @@ pub async fn metrics_processor(
 #[cfg(feature = "prometheusd")]
 pub async fn write_metrics_val(
     tx: Value,
-
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
     dt: Duration,
@@ -241,10 +285,14 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     encoder.encode(&registry, &mut buffer).unwrap();
     String::from_utf8(buffer).unwrap()
 }
+
+//listens for updates to metrics and updates the storage registry based on interval
 #[cfg(feature = "prometheusd")]
-pub async fn metrics_monitor(
-    metrics_rx: MetricReceiver,
+pub(in crate::r#admin) async fn metrics_monitor(
+    metrics_rx: MetricUpdateReciever,
     storage_registry: Arc<RwLock<StorageRegistry>>,
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    dt: Duration,
 ) {
     let registry;
     let registry_guard = storage_registry.read().unwrap();
@@ -252,11 +300,33 @@ pub async fn metrics_monitor(
     let metrics_status = Arc::new(RwLock::new(
         RpcMetrics::instance(&registry).unwrap().to_owned(),
     ));
+    let rpc_list = rpc_list
+        .read()
+        .map_err(|_| AdminError::Inaccessible)
+        .unwrap();
+    let mut rpc_list_str = String::new();
+    rpc_list_str.push('[');
+    for rpc in rpc_list.iter() {
+        rpc_list_str.push_str(&format!("{{\"name\": \"{}\", }}", rpc.name,));
+    }
+    rpc_list_str.push(']');
+
     let metrics_stat_listener = metrics_status.clone();
-    tokio::spawn(metrics_listener(metrics_rx, metrics_stat_listener));
+    tokio::spawn(metrics_listener(
+        metrics_rx,
+        metrics_stat_listener,
+        "www.example.com",
+        &"metrics",
+        dt,
+    ));
 }
 pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
+    (tx, rx)
+}
+
+pub async fn metrics_update_channel() -> (MetricUpdateSender, MetricUpdateReciever) {
+    let (tx, rx) = tokio::sync::mpsc::channel(16);
     (tx, rx)
 }
 
@@ -435,6 +505,29 @@ mod tests {
         types::Settings,
     };
     use crate::log_info;
+    fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
+        Arc::new(RwLock::new(vec![Rpc::new(
+            "http://example.com".to_string(),
+            None,
+            5,
+            1000,
+            0.5,
+        )]))
+    }
+    fn create_test_settings_config() -> Arc<RwLock<Settings>> {
+        let mut config = Settings::default();
+        config.do_clear = true;
+        config.admin.key = DecodingKey::from_secret(b"some-key");
+        Arc::new(RwLock::new(config))
+    }
+
+    // Helper function to create a test cache
+    fn create_test_cache() -> Db {
+        let db = sled::Config::new().temporary(true);
+        let db = db.open().unwrap();
+
+        (db)
+    }
 
     async fn mock_setup() {
         let (metrics_tx, metrics_rx) = metrics_channel().await;
@@ -495,6 +588,7 @@ mod tests {
         let test_report = metrics_encoder(storage_arc.clone()).await;
         log_info!("metrics state: {:?}", test_report);
     }
+
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
     //RUST_LOG=info cargo test --features prometheusd -- test_prometheus_server --nocapture
@@ -523,6 +617,41 @@ mod tests {
             log_info!("metrics state: {:?}", test_report);
         }
     }
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    async fn test_execute_methods_metrics_rpc_config() {
+        use crate::admin::metrics::metrics_channel;
+        use crate::admin::metrics::write_metrics_val;
+        use crate::log_info;
+        let cache = create_test_cache();
+        let config = create_test_settings_config();
+        let guard = config.read().unwrap();
+        let (metrics_tx, metrics_rx) = metrics_channel().await;
+        let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
+        let storage = StorageRegistry::default();
+        let storage_rwlock = Arc::new(RwLock::new(storage));
+        let dt = Instant::now();
+        let rx = json!({
+            "id": Null,
+            "jsonrpc": "2.0",
+            "method": "blutgang_config",
+            "path": "/rpc",
+            "status": "200",
+            "result": {
+                "address": guard.address,
+                "do_clear": guard.do_clear,
+                "health_check": guard.health_check,
+                "admin": {
+                    "enabled": guard.admin.enabled,
+                    "readonly": guard.admin.readonly,
+                },
+                "ttl": guard.ttl,
+                "health_check_ttl": guard.health_check_ttl,
+            },
+        });
+        let metrics = write_metrics_val(rx, metrics_tx_rwlock, storage_rwlock, dt.elapsed()).await;
+    }
+
     #[cfg(feature = "prometheusd")]
     #[tokio::test]
     //RUST_LOG=info cargo test --features prometheusd -- test_metrics_e2e --nocapture

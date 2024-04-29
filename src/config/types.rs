@@ -37,6 +37,7 @@ pub struct MetricsSettings {
     pub enabled: bool,
     pub address: SocketAddr,
     pub count_update_interval: u64,
+    pub readonly: bool,
 }
 impl Default for MetricsSettings {
     fn default() -> Self {
@@ -44,6 +45,7 @@ impl Default for MetricsSettings {
             enabled: true,
             count_update_interval: 10,
             address: "127.0.0.1:9091".parse::<SocketAddr>().unwrap(),
+            readonly: false,
         }
     }
 }
@@ -53,6 +55,8 @@ impl Debug for MetricsSettings {
         write!(f, " enabled: {:?}", self.enabled)?;
         write!(f, ", address: {:?}", self.address)?;
         write!(f, ", interval: {:?}", self.count_update_interval)?;
+        write!(f, " readonly: {:?}", self.readonly)?;
+
         write!(f, " }}")
     }
 }
@@ -442,8 +446,14 @@ impl Settings {
                 .as_str()
                 .expect("\x1b[31mErr:\x1b[0m Could not parse metrics address!");
             let address = address.replace("localhost", "127.0.0.1");
+            let readonly = metrics_table
+                .get("readonly")
+                .expect("\x1b[31mErr:\x1b[0m Missing readonly toggle!")
+                .as_bool()
+                .expect("\x1b[31mErr:\x1b[0m Could not parse readonly as bool!");
             MetricsSettings {
                 enabled,
+
                 address: address.parse::<SocketAddr>().unwrap(),
                 count_update_interval: metrics_table
                     .get("count_update_interval")
@@ -451,10 +461,12 @@ impl Settings {
                     .as_integer()
                     .expect("\x1b[31mErr:\x1b[0m Could not parse count_update_interval as int!")
                     as u64,
+                readonly,
             }
         } else {
             MetricsSettings {
                 enabled: false,
+                readonly: false,
                 address: "127.0.0.1:9091".parse::<SocketAddr>().unwrap(),
                 count_update_interval: 10,
             }
@@ -631,16 +643,22 @@ impl Settings {
                 .expect("Invalid count_update_interval")
                 .parse::<u64>()
                 .expect("Invalid count_update_interval");
+            let readonly = matches
+                .get_occurrences::<String>("metrics_readonly")
+                .is_some();
+
             MetricsSettings {
                 enabled,
                 address: address.parse::<SocketAddr>().unwrap(),
                 count_update_interval: interval,
+                readonly,
             }
         } else {
             MetricsSettings {
                 enabled: false,
                 address: "::1:9091".parse::<SocketAddr>().unwrap(),
                 count_update_interval: 10,
+                readonly: false,
             }
         };
 

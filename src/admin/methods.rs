@@ -97,7 +97,7 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        Some("blutgang_metrics") => admin_metrics(config),
+        Some("blutgang_add_rpc_metric") => admin_add_rpc_metric(config, rpc_list),
 
         Some(_) => Err(AdminError::InvalidMethod),
         _ => Ok(().into()),
@@ -398,9 +398,14 @@ fn admin_blutgang_set_ttl(
     Ok(rx)
 }
 
-fn admin_metrics(config: Arc<RwLock<Settings>>) -> Result<Value, AdminError> {
+//Set rpc to be collected by metrics
+fn admin_add_rpc_metric(
+    config: Arc<RwLock<Settings>>,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+) -> Result<Value, AdminError> {
     let guard = config.read().unwrap();
-    // let metrics_report =
+    //pass it down to metrics
+    let rpc_list = rpc_list.read().map_err(|_| AdminError::Inaccessible);
     unimplemented!()
 }
 

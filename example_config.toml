@@ -34,7 +34,7 @@ enabled = true
 address = "127.0.0.1:5715"
 # Only allow read-only methods
 # Recommended `true` unless you 100% need write methods
-readonly = false
+readonly = true
 # Enable the use of JWT for auth
 # Should be on if exposing to the internet
 jwt = false
@@ -65,6 +65,7 @@ flush_every_ms = 24000
 [metrics]
 enabled = true
 address = "127.0.0.1:9091"
+readonly = true
 count_update_interval = 10
 
 [merkle]
