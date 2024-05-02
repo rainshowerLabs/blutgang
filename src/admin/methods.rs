@@ -97,6 +97,7 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
+        #[cfg(feature = "prometheusd")]
         Some("blutgang_add_rpc_metric") => admin_add_rpc_metric(config, rpc_list),
 
         Some(_) => Err(AdminError::InvalidMethod),
@@ -398,17 +399,6 @@ fn admin_blutgang_set_ttl(
     Ok(rx)
 }
 
-//Set rpc to be collected by metrics
-fn admin_add_rpc_metric(
-    config: Arc<RwLock<Settings>>,
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-) -> Result<Value, AdminError> {
-    let guard = config.read().unwrap();
-    //pass it down to metrics
-    let rpc_list = rpc_list.read().map_err(|_| AdminError::Inaccessible);
-    unimplemented!()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,7 +460,7 @@ mod tests {
             "id": Null,
             "jsonrpc": "2.0",
             "method": "blutgang_config",
-            "path": "/rpc",
+            "url": "/rpc",
             "status": "200",
             "result": {
                 "address": guard.address,

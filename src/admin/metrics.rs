@@ -158,6 +158,7 @@ pub async fn listen_for_metrics_requests(
             config_guard.metrics.count_update_interval,
         )
     };
+
     let (metrics_request_tx, metrics_request_rx) = metrics_update_channel().await;
     let (metrics_tx, metrics_rx) = metrics_channel().await;
     let metrics_request_tx_rwlock = Arc::new(RwLock::new(metrics_request_tx.clone()));
@@ -220,27 +221,30 @@ pub async fn metrics_processor(
 }
 /// Accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
-pub async fn write_metrics_val(
+pub async fn execute_write_metrics(
     tx: Value,
     metrics_tx: Arc<RwLock<MetricSender>>,
     registry_state: Arc<RwLock<StorageRegistry>>,
+    metrics: Arc<RwLock<RpcMetrics>>,
     dt: Duration,
 ) -> Result<Value, AdminError> {
     use crate::log_info;
     let method = tx["method"].as_str().unwrap();
-    let path = tx["path"].as_str().unwrap();
-    let registry_clone = Arc::clone(&registry_state);
-    // let metrics = RpcMetrics::init(&registry_state.read().unwrap()).unwrap();
-    let status = tx["status"].as_str().unwrap();
-    let metrics = Arc::new(RwLock::new(
-        RpcMetrics::instance(&registry_state.read().unwrap())
-            .unwrap()
-            .to_owned(),
-    ));
-    metrics
-        .read()
-        .unwrap()
-        .requests_complete(method, path, &"200", dt);
+    match method {
+        Some("blutgang_set_ttl") => {
+            if write_protection_enabled {
+                Err(AdminError::WriteProtectionEnabled)
+            } else {
+                //write + collect metrics after matching for method
+                let dt = std::time::Instant::now();
+                admin_blutgang_set_ttl(config, tx["params"].as_array());
+                metrics
+                    .read()
+                    .unwrap()
+                    .requests_complete(method, url, &"200", dt.elapsed());
+            }
+        }
+    }
 
     let metrics_report = metrics_encoder(registry_clone).await;
     let rx = json!({
