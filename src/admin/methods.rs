@@ -1,5 +1,8 @@
 use crate::{
-    admin::error::AdminError,
+    admin::{
+        error::AdminError,
+        metrics,
+    },
     Rpc,
     Settings,
 };
@@ -97,8 +100,6 @@ pub async fn execute_method(
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        #[cfg(feature = "prometheusd")]
-        Some("blutgang_add_rpc_metric") => admin_add_rpc_metric(config, rpc_list),
 
         Some(_) => Err(AdminError::InvalidMethod),
         _ => Ok(().into()),
@@ -455,26 +456,26 @@ mod tests {
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage = StorageRegistry::default();
         let storage_rwlock = Arc::new(RwLock::new(storage));
+        let metrics = RpcMetrics::new();
+        let metrics_rwlock = Arc::new(RwLock::new(metrics));
+        let tx = json!({ "id":1,"method": "blutgang_rpc_list" });
         let dt = Instant::now();
-        let rx = json!({
-            "id": Null,
-            "jsonrpc": "2.0",
-            "method": "blutgang_config",
-            "url": "/rpc",
-            "status": "200",
-            "result": {
-                "address": guard.address,
-                "do_clear": guard.do_clear,
-                "health_check": guard.health_check,
-                "admin": {
-                    "enabled": guard.admin.enabled,
-                    "readonly": guard.admin.readonly,
-                },
-                "ttl": guard.ttl,
-                "health_check_ttl": guard.health_check_ttl,
-            },
-        });
-        let metrics = write_metrics_val(rx, metrics_tx_rwlock, storage_rwlock, dt.elapsed()).await;
+        let method = execute_method(
+            tx,
+            &create_test_rpc_list(),
+            &create_test_poverty_list(),
+            create_test_settings_config(),
+            cache,
+        )
+        .await;
+        metrics.read().unwrap().request_complete(
+            "/admin",
+            "blutgang_rpc_list",
+            &"200",
+            dt.elapsed(),
+        );
+
+        // let metrics = write_metrics_val(rx, metrics_tx_rwlock, storage_rwlock, dt.elapsed()).await;
     }
 
     #[tokio::test]

@@ -182,40 +182,6 @@ pub async fn metrics_listener(
 }
 /// Matches for command, accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
-pub async fn execute_write_metrics(
-    tx: Value,
-    metrics_tx: Arc<RwLock<MetricSender>>,
-    registry_state: Arc<RwLock<StorageRegistry>>,
-    metrics: Arc<RwLock<RpcMetrics>>,
-    dt: Duration,
-) -> Result<Value, AdminError> {
-    use crate::log_info;
-    let method = tx["method"].as_str().unwrap();
-    match method {
-        Some("blutgang_set_ttl") => {
-            if write_protection_enabled {
-                Err(AdminError::WriteProtectionEnabled)
-            } else {
-                //write + collect metrics after matching for method
-                let dt = std::time::Instant::now();
-                admin_blutgang_set_ttl(config, tx["params"].as_array());
-                metrics
-                    .read()
-                    .unwrap()
-                    .requests_complete(method, url, &"200", dt.elapsed());
-            }
-        }
-    }
-
-    let metrics_report = metrics_encoder(registry_clone).await;
-    let rx = json!({
-        "jsonrpc": "2.0",
-        "metrics_result": metrics_report,
-    });
-    log_info!("metrics response: {:?}", rx);
-    Ok(rx)
-}
-
 /// Accepts metrics request, encodes and prints
 #[cfg(feature = "prometheusd")]
 pub async fn write_metrics_response(
