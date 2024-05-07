@@ -128,6 +128,7 @@ pub async fn listen_for_metrics_requests(
         cache_setup::setup_data,
         cli_args::create_match,
     };
+    use crate::log_info;
     let (address, interval) = {
         let config_guard = config.read().unwrap();
         (
@@ -148,12 +149,21 @@ pub async fn listen_for_metrics_requests(
     ));
     metrics_server(
         metrics_tx_rwlock,
-        registry_status,
+        registry_status.clone(),
         metrics_tx,
         address,
-        config,
+        interval,
     )
-    .await
+    .await;
+    let metrics_report = metrics_encoder(registry_status).await;
+    // let body = hyper::body::Bytes::from(metrics_report);
+    // let body = Full::from(body);
+    // let response = Ok(hyper::Response::builder()
+    //     .status(200)
+    //     .body(body)
+    //     .unwrap());
+    log_info!("metrics response: {:?}", metrics_report);
+    Ok(())
 }
 #[cfg(feature = "prometheusd")]
 pub async fn metrics_listener(
@@ -267,7 +277,7 @@ pub async fn metrics_server(
     registry_state: Arc<RwLock<StorageRegistry>>,
     metrics_request_tx: MetricSender,
     address: std::net::SocketAddr,
-    config: Arc<RwLock<Settings>>,
+    update_interval: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::accept_prometheusd;
     use crate::log_info;
@@ -276,19 +286,14 @@ pub async fn metrics_server(
         net::TcpListener,
         sync::mpsc,
     };
-    let update_interval = {
-        let config_guard = config.read().unwrap();
-        config_guard.metrics.count_update_interval
-    };
     let listener = TcpListener::bind(address).await?;
     log_info!("Bound metrics to : {}", address);
     let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
-
     loop {
+        interval.tick().await;
         let (stream, socketaddr) = listener.accept().await?;
         log_info!("Metrics connection from: {}", socketaddr);
         let io = TokioIo::new(stream);
-        let config_clone = Arc::clone(&config);
         let registry_clone = Arc::clone(&registry_state);
         let tx_clone = Arc::clone(&metrics_tx);
         tokio::task::spawn(async move {
