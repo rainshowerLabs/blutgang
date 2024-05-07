@@ -11,6 +11,7 @@ use prometheus_metric_storage::{
     MetricStorage,
     StorageRegistry,
 };
+use reqwest::Body;
 use serde_json::{
     json,
     Value,
@@ -31,6 +32,10 @@ use crate::{
     Settings,
 };
 
+use measured::{
+    text::BufferedTextEncoder,
+    MetricGroup,
+};
 use tokio::sync::{
     mpsc::{
         unbounded_channel,
@@ -40,7 +45,6 @@ use tokio::sync::{
     oneshot,
 };
 use tokio::time::interval;
-
 //TODO: have fns accept a refernce to StorageRegistry
 // refer to https://docs.rs/prometheus-metric-storage/latest/prometheus_metric_storage/#metric-storage-registry
 type CounterMap = HashMap<(String, u64), RpcMetrics>;
@@ -50,6 +54,19 @@ pub type MetricUpdateSender = tokio::sync::mpsc::Sender<MetricsUpdate>;
 pub type MetricUpdateReciever = tokio::sync::mpsc::Receiver<MetricsUpdate>;
 
 const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))];
+
+struct PrometheusHandle {
+    encoder: Arc<RwLock<BufferedTextEncoder>>,
+    metrics: Arc<RwLock<RpcMetrics>>,
+    registry: Arc<RwLock<StorageRegistry>>,
+}
+
+async fn metrics_handler(
+    rx: Value,
+    metrics_state: PrometheusHandle,
+) -> Result<hyper::Response<Full<Body>>, Error> {
+    unimplemented!()
+}
 
 #[derive(MetricStorage, Clone, Debug)]
 #[metric(subsystem = "rpc")]

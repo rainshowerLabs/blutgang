@@ -48,6 +48,7 @@ prometheus-metric-storage = "0.5.0"
 atomic_refcell = "0.1.13"
 crossbeam-channel = "0.5.12"
 hex = "0.4.3"
+measured = "0.0.21"
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
 [profile.maxperf]
