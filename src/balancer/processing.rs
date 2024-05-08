@@ -7,8 +7,12 @@ use crate::{
         },
     },
     health::safe_block::NamedBlocknumbers,
+
     Rpc,
 };
+
+#[cfg(feature = "prometheusd")]
+use crate::RpcMetrics;
 
 use std::{
     collections::BTreeMap,
@@ -81,6 +85,35 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
                 .insert(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice())
                 .unwrap();
         }
+    }
+}
+#[cfg(feature = "prometheusd")]
+pub fn update_rpc_latency_metrics(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    rpc_position: usize,
+    time: Duration,
+    metrics: Arc<RwLock<RpcMetrics>>,
+) {
+    let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
+        // Handle the case where the RwLock is poisoned
+        e.into_inner()
+    });
+    if !rpc_list_guard.is_empty() {
+        let index = if rpc_position >= rpc_list_guard.len() {
+            rpc_list_guard.len() - 1
+        } else {
+            rpc_position
+        };
+        rpc_list_guard[index].update_latency(time.as_nanos() as f64);
+        rpc_list_guard[index].last_used = time.as_micros();
+        let name = rpc_list_guard[index].name.clone();
+        let latency = rpc_list_guard[index].status.latency;
+        metrics.write().unwrap().requests_complete(
+            &name,
+            &"rpc",
+            &"200",
+            Duration::from_secs_f64(latency),
+        );
     }
 }
 

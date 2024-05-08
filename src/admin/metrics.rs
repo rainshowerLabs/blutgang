@@ -90,16 +90,6 @@ impl RpcMetrics {
     }
 }
 
-pub async fn execute_metric_method(
-    tx: Value,
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    config: Arc<RwLock<Settings>>,
-    registry_state: Arc<RwLock<StorageRegistry>>,
-    cache: sled::Db,
-) -> Result<Value, Error> {
-    unimplemented!()
-}
-
 fn metrics_config(config: Arc<RwLock<Settings>>) -> Result<Value, Error> {
     let guard = config.read().unwrap();
     let rx = json!({
@@ -124,6 +114,32 @@ pub enum MetricsUpdate {
     Database,
 }
 
+pub async fn rpc_metrics_handler(
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    rpc_position: usize,
+    metrics: PrometheusHandle,
+    status: &str,
+    method: &str,
+    dt: u64,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::rpc::types::Rpc;
+    let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| e.into_inner());
+    if !rpc_list_guard.is_empty() {
+        let index = if rpc_position >= rpc_list_guard.len() {
+            rpc_list_guard.len() - 1
+        } else {
+            rpc_position
+        };
+        metrics.metrics.write().unwrap().requests_complete(
+            &rpc_list_guard[index].name,
+            method,
+            status,
+            Duration::from_secs(dt),
+        );
+    }
+    Ok(())
+}
+
 #[cfg(not(feature = "prometheusd"))]
 pub async fn metrics_update_sink(mut metrics_rx: MetricReceiver) {
     loop {
@@ -139,6 +155,7 @@ pub async fn listen_for_metrics_requests(
     metrics_rx: MetricUpdateReciever,
     registry_status: Arc<RwLock<StorageRegistry>>,
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    rpc_position: usize,
     dt: Duration,
 ) -> Result<(), Box<dyn std::error::Error>> {
     use crate::config::{
@@ -162,6 +179,7 @@ pub async fn listen_for_metrics_requests(
         metrics_request_rx,
         registry_status.clone(),
         rpc_list.clone(),
+        rpc_position,
         dt,
     ));
     metrics_server(
@@ -173,12 +191,6 @@ pub async fn listen_for_metrics_requests(
     )
     .await;
     let metrics_report = metrics_encoder(registry_status).await;
-    // let body = hyper::body::Bytes::from(metrics_report);
-    // let body = Full::from(body);
-    // let response = Ok(hyper::Response::builder()
-    //     .status(200)
-    //     .body(body)
-    //     .unwrap());
     log_info!("metrics response: {:?}", metrics_report);
     Ok(())
 }
@@ -186,23 +198,41 @@ pub async fn listen_for_metrics_requests(
 pub async fn metrics_listener(
     mut metrics_rx: MetricUpdateReciever,
     metrics_status: Arc<RwLock<RpcMetrics>>,
-    rpc_list_str: &str,
-    _method: &str,
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    position: usize,
     dt: Duration,
 ) {
     while let Some(update) = metrics_rx.recv().await {
         match update {
             MetricsUpdate::Http => {
                 let mut metrics_guard = metrics_status.write().unwrap();
-                metrics_guard.requests_complete(rpc_list_str, &"http", &"200", dt);
+                let rpc_list_guard = rpc_list.read().unwrap_or_else(|e| e.into_inner());
+                metrics_guard.requests_complete(
+                    &rpc_list_guard[position].name,
+                    &"http",
+                    &"200",
+                    dt,
+                );
             }
             MetricsUpdate::Websocket => {
                 let mut metrics_guard = metrics_status.write().unwrap();
-                metrics_guard.requests_complete(rpc_list_str, &"WebSocket", &"200", dt);
+                let rpc_list_guard = rpc_list.read().unwrap_or_else(|e| e.into_inner());
+                metrics_guard.requests_complete(
+                    &rpc_list_guard[position].name,
+                    &"WebSocket",
+                    &"200",
+                    dt,
+                );
             }
             MetricsUpdate::Database => {
                 let mut metrics_guard = metrics_status.write().unwrap();
-                metrics_guard.requests_complete(rpc_list_str, &"Database", &"200", dt);
+                let rpc_list_guard = rpc_list.read().unwrap_or_else(|e| e.into_inner());
+                metrics_guard.requests_complete(
+                    &rpc_list_guard[position].name,
+                    &"Database",
+                    &"200",
+                    dt,
+                );
             }
         }
     }
@@ -244,12 +274,13 @@ async fn metrics_encoder(storage_registry: Arc<RwLock<StorageRegistry>>) -> Stri
     String::from_utf8(buffer).unwrap()
 }
 
-//listens for updates to metrics and updates the storage registry based on interval
+//listens for updates to metrics and updates the storage registry
 #[cfg(feature = "prometheusd")]
 pub(in crate::r#admin) async fn metrics_monitor(
     metrics_rx: MetricUpdateReciever,
     storage_registry: Arc<RwLock<StorageRegistry>>,
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    rpc_postion: usize,
     dt: Duration,
 ) {
     let registry;
@@ -258,25 +289,18 @@ pub(in crate::r#admin) async fn metrics_monitor(
     let metrics_status = Arc::new(RwLock::new(
         RpcMetrics::instance(&registry).unwrap().to_owned(),
     ));
-    let rpc_list = rpc_list
-        .read()
-        .map_err(|_| AdminError::Inaccessible)
-        .unwrap();
-    let mut rpc_list_str = String::new();
-    rpc_list_str.push('[');
-    for rpc in rpc_list.iter() {
-        rpc_list_str.push_str(&format!("{{\"name\": \"{}\", }}", rpc.name,));
-    }
-    rpc_list_str.push(']');
-
     let metrics_stat_listener = metrics_status.clone();
-    tokio::spawn(metrics_listener(
-        metrics_rx,
-        metrics_stat_listener,
-        "www.example.com",
-        &"metrics",
-        dt,
-    ));
+    let rpc_list_clone = Arc::clone(&rpc_list);
+    tokio::spawn(async move {
+        let _ = metrics_listener(
+            metrics_rx,
+            metrics_stat_listener,
+            &rpc_list_clone,
+            rpc_postion,
+            dt,
+        )
+        .await;
+    });
 }
 pub async fn metrics_channel() -> (MetricSender, MetricReceiver) {
     let (tx, rx) = unbounded_channel();
@@ -313,6 +337,7 @@ pub async fn metrics_server(
         let io = TokioIo::new(stream);
         let registry_clone = Arc::clone(&registry_state);
         let tx_clone = Arc::clone(&metrics_tx);
+
         tokio::task::spawn(async move {
             accept_prometheusd!(io, &tx_clone, &registry_clone, metrics_request_tx,);
         });

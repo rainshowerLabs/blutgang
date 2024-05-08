@@ -170,23 +170,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             metrics_addr,
             update_interval
         );
-        let rpc_list_metrics = Arc::clone(&rpc_list_rwlock);
-
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage_registry = prometheus_metric_storage::StorageRegistry::default();
+        let rpc_list_clone = Arc::clone(&rpc_list_rwlock);
         let registry_rwlock = Arc::new(RwLock::new(storage_registry));
         let registry_clone = Arc::clone(&registry_rwlock);
+        // let rpc_metrics_rwlock = Arc::new(RwLock::new(RpcMetrics::init(&storage_registry)));
+
         tokio::task::spawn(async move {
             log_info!("Prometheus enabled, accepting metrics at prometheus port");
             let _ = listen_for_metrics_requests(
                 config_metrics,
                 metrics_request_rx,
                 registry_rwlock,
-                rpc_list_metrics,
+                rpc_list_clone,
+                0,
                 dt.elapsed(),
             )
             .await;
         });
+        // rpc_metrics_rwlock.read().unwrap();
+
         // accept_prometheusd!(io, &metrics_tx_rwlock, &registry_clone, metrics_tx,);
     }
     #[cfg(not(feature = "prometheusd"))]
