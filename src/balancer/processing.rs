@@ -92,7 +92,7 @@ pub fn update_rpc_latency_metrics(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     rpc_position: usize,
     time: Duration,
-    metrics: Arc<RwLock<RpcMetrics>>,
+    metrics: Arc<RwLock<&RpcMetrics>>,
 ) {
     let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
         // Handle the case where the RwLock is poisoned
@@ -200,6 +200,48 @@ mod tests {
         assert_eq!(rpcs[1].status.latency, 200.0);
     }
 
+    //RUST_LOG=info cargo test --features prometheusd -- test_update_rpc_latency_metrics --nocapture
+    #[cfg(feature = "prometheusd")]
+    #[tokio::test]
+    async fn test_update_rpc_latency_metrics() {
+        use crate::admin::metrics::RpcMetrics;
+        use crate::log_info;
+        use prometheus_metric_storage::StorageRegistry;
+        let rpc_list = Arc::new(RwLock::new(vec![
+            Rpc::new(
+                "http://test_rpc1".to_string(),
+                Some("ws://test_rpc1".to_string()),
+                0,
+                0,
+                1.0,
+            ),
+            Rpc::new(
+                "http://test_rpc2".to_string(),
+                Some("ws://test_rpc2".to_string()),
+                0,
+                0,
+                1.0,
+            ),
+        ]));
+        let storage = StorageRegistry::default();
+        let metrics = RpcMetrics::init(&storage).unwrap();
+        let metrics_rwlock = Arc::new(RwLock::new(metrics));
+        let metrics_clone = metrics_rwlock.clone();
+        log_info!(
+            "metrics before latency update {:?}",
+            metrics_clone.read().unwrap()
+        );
+        update_rpc_latency_metrics(
+            &rpc_list,
+            1,
+            Duration::from_nanos(200),
+            metrics_rwlock.clone(),
+        );
+        log_info!(
+            "metrics after latency update {:?}",
+            metrics_clone.read().unwrap()
+        );
+    }
     #[tokio::test]
     async fn test_update_rpc_latency_with_invalid_position() {
         let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(

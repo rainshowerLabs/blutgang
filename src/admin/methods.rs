@@ -447,7 +447,6 @@ mod tests {
     #[tokio::test]
     async fn test_execute_methods_metrics_rpc_config() {
         use crate::admin::metrics::metrics_channel;
-        use crate::admin::metrics::write_metrics_val;
         use crate::log_info;
         let cache = create_test_cache();
         let config = create_test_settings_config();
@@ -455,9 +454,9 @@ mod tests {
         let (metrics_tx, metrics_rx) = metrics_channel().await;
         let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
         let storage = StorageRegistry::default();
-        let storage_rwlock = Arc::new(RwLock::new(storage));
-        let metrics = RpcMetrics::new();
-        let metrics_rwlock = Arc::new(RwLock::new(metrics));
+        let storage_rwlock = Arc::new(RwLock::new(&storage));
+        let metrics = RpcMetrics::init(&storage);
+        let metrics_rwlock = Arc::new(RwLock::new(&metrics));
         let tx = json!({ "id":1,"method": "blutgang_rpc_list" });
         let dt = Instant::now();
         let method = execute_method(
@@ -468,14 +467,9 @@ mod tests {
             cache,
         )
         .await;
-        metrics.read().unwrap().request_complete(
-            "/admin",
-            "blutgang_rpc_list",
-            &"200",
-            dt.elapsed(),
-        );
-
-        // let metrics = write_metrics_val(rx, metrics_tx_rwlock, storage_rwlock, dt.elapsed()).await;
+        metrics
+            .unwrap()
+            .requests_complete("/admin", "blutgang_rpc_list", &"200", dt.elapsed());
     }
 
     #[tokio::test]
