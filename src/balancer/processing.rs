@@ -206,6 +206,7 @@ mod tests {
     async fn test_update_rpc_latency_metrics() {
         use crate::admin::metrics::RpcMetrics;
         use crate::log_info;
+        use prometheus::core::Collector;
         use prometheus_metric_storage::StorageRegistry;
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
@@ -239,7 +240,7 @@ mod tests {
         );
         log_info!(
             "metrics after latency update {:?}",
-            metrics_clone.read().unwrap()
+            metrics_clone.read().unwrap().requests.collect()
         );
     }
     #[tokio::test]
