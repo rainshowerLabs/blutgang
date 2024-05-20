@@ -1,4 +1,5 @@
 use crate::Rpc;
+use hex::encode;
 use http_body_util::Full;
 use hyper::{
     body::Bytes,
@@ -59,13 +60,39 @@ struct PrometheusHandle {
     encoder: Arc<RwLock<BufferedTextEncoder>>,
     metrics: Arc<RwLock<RpcMetrics>>,
     registry: Arc<RwLock<StorageRegistry>>,
+    config: Arc<RwLock<Settings>>,
 }
 
-async fn metrics_handler(
-    rx: Value,
-    metrics_state: PrometheusHandle,
-) -> Result<hyper::Response<Full<Body>>, Error> {
+impl PrometheusHandle {
+    pub fn new(
+        encoder: Arc<RwLock<BufferedTextEncoder>>,
+        metrics: Arc<RwLock<RpcMetrics>>,
+        registry: Arc<RwLock<StorageRegistry>>,
+        config: Arc<RwLock<Settings>>,
+    ) -> Self {
+        Self {
+            encoder,
+            metrics,
+            registry,
+            config,
+        }
+    }
+    pub fn get_registry(&self) -> Arc<RwLock<StorageRegistry>> {
+        Arc::clone(&self.registry)
+    }
+}
+
+pub(crate) async fn metrics_handler(handle: PrometheusHandle) -> Result<Value, Error> {
+    let mut buffer = String::new();
+    let registry_guard = handle.get_registry();
+
     unimplemented!()
+}
+
+pub(crate) async fn metrics_service(
+    registry_rwlock: Arc<RwLock<StorageRegistry>>,
+    config_rwlock: Arc<RwLock<Settings>>,
+) {
 }
 
 #[derive(MetricStorage, Clone, Debug)]
@@ -73,7 +100,7 @@ async fn metrics_handler(
 pub struct RpcMetrics {
     #[metric(labels("url", "method", "status"), help = "Total number of requests")]
     pub requests: prometheus::IntCounterVec,
-    #[metric(labels("url", "method"), help = "latency of request")]
+    #[metric(buckets(0.1, 0.2, 0.5, 1, 2, 4, 8), help = "Latency of request")]
     pub duration: prometheus::HistogramVec,
 }
 impl RpcMetrics {
@@ -88,23 +115,6 @@ impl RpcMetrics {
             .with_label_values(&[url, method])
             .observe(dt.as_millis() as f64)
     }
-}
-
-fn metrics_config(config: Arc<RwLock<Settings>>) -> Result<Value, Error> {
-    let guard = config.read().unwrap();
-    let rx = json!({
-        "id": Null,
-        "jsonrpc": "2.0",
-        "result": {
-            "metrics": {
-                "enabled": guard.metrics.enabled,
-                "address": guard.metrics.address,
-                "interval": guard.metrics.count_update_interval,
-            },
-        },
-
-    });
-    Ok(rx)
 }
 
 #[derive(Debug, PartialEq, Clone, Copy)]
