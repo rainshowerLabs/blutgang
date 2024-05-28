@@ -1,9 +1,9 @@
 use crate::Rpc;
 use hex::encode;
 use http_body_util::Full;
+use hyper::server::conn::http1;
 use hyper::{
     body::Bytes,
-    server::conn::http1,
     service::service_fn,
     Request,
 };
@@ -82,17 +82,54 @@ impl PrometheusHandle {
     }
 }
 
-pub(crate) async fn metrics_handler(handle: PrometheusHandle) -> Result<Value, Error> {
-    let mut buffer = String::new();
+#[cfg(feature = "prometheusd")]
+pub(crate) async fn metrics_handler(handle: PrometheusHandle) {
     let registry_guard = handle.get_registry();
-
-    unimplemented!()
+    metrics_encoder(registry_guard);
 }
 
+#[cfg(feature = "prometheusd")]
 pub(crate) async fn metrics_service(
     registry_rwlock: Arc<RwLock<StorageRegistry>>,
     config_rwlock: Arc<RwLock<Settings>>,
 ) {
+    use crate::log_info;
+    use hyper_util_blutgang::rt::TokioIo;
+    use tokio::{
+        net::TcpListener,
+        sync::mpsc,
+    };
+
+    let (metrics_request_tx, metrics_request_rx) = metrics_update_channel().await;
+    let (metrics_tx, metrics_rx) = metrics_channel().await;
+    let (addr, update_interval) = {
+        let config_guard = config_rwlock.read().unwrap();
+        (
+            config_guard.metrics.address,
+            config_guard.metrics.count_update_interval,
+        )
+    };
+    let registry_guard = registry_rwlock.read().unwrap();
+    let metrics = RpcMetrics::init(&registry_guard).unwrap().to_owned();
+    let metrics_rwlock = Arc::new(RwLock::new(metrics));
+    let encoder_rwlock = Arc::new(RwLock::new(BufferedTextEncoder::new()));
+    let service = PrometheusHandle::new(
+        encoder_rwlock,
+        metrics_rwlock,
+        registry_rwlock.clone(),
+        config_rwlock,
+    );
+    let listener = TcpListener::bind(addr).await;
+
+    log_info!("Bound metrics to : {}", addr);
+    let mut interval = tokio::time::interval(Duration::from_secs(update_interval));
+    let (stream) = listener.unwrap().accept().await;
+    let io = TokioIo::new(stream.unwrap());
+    // http1::Builder::new()
+    //     .serve_connection(io , service_fn(|req| {
+    //         let response = metrics_handler(service.clone());
+    //         response
+    //                 });
 }
 
 #[derive(MetricStorage, Clone, Debug)]
