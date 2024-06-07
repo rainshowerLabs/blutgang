@@ -1,4 +1,5 @@
 use crate::{
+    admin::metrics::RpcMetrics,
     balancer::{
         format::{
             incoming_to_value,
@@ -447,7 +448,17 @@ pub async fn accept_request(
     .await;
     let time = time.elapsed();
     log_info!("Request time: {:?}", time);
+    #[cfg(feature = "prometheusd")]
+    {
+        use crate::admin::metrics::forward_metrics;
+        use crate::admin::metrics::RpcMetrics;
 
+        let metrics_rwlock = Arc::new(RwLock::new(RpcMetrics::new("accept_http")));
+        // let metrics_resp = forward_metrics(
+        //    tx   ,
+        //     metrics_rwlock
+        //     ).await;
+    }
     // `rpc_position` is an Option<> that either contains the index of the RPC
     // we forwarded our request to, or is None if the result was cached.
     //

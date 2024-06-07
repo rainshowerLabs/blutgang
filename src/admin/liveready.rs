@@ -4,7 +4,6 @@ use crate::admin::metrics::{
 };
 use crate::RpcMetrics;
 use prometheus::core::Collector;
-use prometheus_metric_storage::StorageRegistry;
 use std::fmt;
 use std::time::Duration;
 use std::{
@@ -57,6 +56,12 @@ pub enum LiveReadyUpdate {
     Readiness(ReadinessState),
     Health(HealthState),
 }
+#[derive(Debug, Clone)]
+pub enum LiveReadyMetricsUpdate {
+    Readiness(ReadinessState),
+    Health(HealthState),
+    Metrics(RpcMetrics),
+}
 
 // These 2 are used to send and receive updates related to the current
 // health of blutgang.
@@ -71,8 +76,11 @@ pub type LiveReadyRequestRecv = mpsc::Receiver<LiveReadySnd>;
 pub type LiveReadyRequestSnd = mpsc::Sender<LiveReadySnd>;
 
 pub type LRMetricsTx = oneshot::Sender<LiveReadyMetrics>;
+
 pub type LRMetricsRequestRx = mpsc::Receiver<LRMetricsTx>;
 pub type LRMetricsRequestTx = mpsc::Sender<LRMetricsTx>;
+pub type LRMetricsUpdateRx = mpsc::Receiver<LiveReadyMetricsUpdate>;
+pub type LRMetricsUpdateTx = mpsc::Sender<LiveReadyMetricsUpdate>;
 
 // Macros to make returning statuses less ugly in code
 macro_rules! ok {
@@ -129,12 +137,10 @@ async fn liveness_listener_metrics(
     while let Some(update) = liveness_receiver.recv().await {
         match update {
             LiveReadyUpdate::Readiness(state) => {
-                let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.readiness = state;
             }
             LiveReadyUpdate::Health(state) => {
-                let dt = std::time::Instant::now();
                 let mut liveness = liveness_status.write().unwrap();
                 liveness.health = state;
             }
@@ -171,7 +177,6 @@ async fn liveness_request_processor_metrics(
                 metrics: liveness_status_metrics_clone,
             };
             let _ = incoming.send(current_liveready);
-            liveness_status_guard.metrics.requests.collect();
             liveness_status_guard.metrics.duration.collect();
         }
     }
@@ -250,7 +255,6 @@ pub async fn on_accept_metrics_write_readiness(
             );
         }
     };
-    LRMetrics.metrics.requests.collect();
     LRMetrics.metrics.duration.collect();
     Ok(rax)
 }
@@ -260,7 +264,6 @@ pub async fn accept_readiness_request_metrics(
     liveness_request_sender: LRMetricsRequestTx,
     metrics_sender: MetricSender,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    use crate::admin::metrics::metrics_channel;
     let dt = std::time::Instant::now();
     let (tx, rx) = oneshot::channel();
 
@@ -332,10 +335,16 @@ pub async fn liveness_update_sink(mut liveness_rx: LiveReadyUpdateRecv) {
         }
     }
 }
+pub async fn liveness_metrics_update_sink(mut liveness_rx: LRMetricsUpdateRx) {
+    loop {
+        while (liveness_rx.recv().await).is_some() {
+            continue;
+        }
+    }
+}
 
 pub mod test_mocks {
     use super::*;
-    use crate::admin::metrics::metrics_channel;
     use crate::Rpc;
     use prometheus::core::Collector;
     use rand::Rng;
@@ -420,7 +429,6 @@ pub mod test_mocks {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::admin::metrics::metrics_channel;
     use crate::Rpc;
     use prometheus::core::Collector;
     use tokio::sync::{
@@ -549,20 +557,21 @@ mod tests {
     #[cfg(not(feature = "prometheusd"))]
     #[tokio::test]
     async fn test_metrics_sink_discards_updates() {
-        let (tx, rx) = mpsc::channel(10);
-        let storage = StorageRegistry::default();
-        let _metrics = RpcMetrics::init(&storage).unwrap();
-        let dt = std::time::Instant::now();
-        let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
-
+        let (metrics_tx, metrics_rx) = mpsc::channel(10);
         // Simulate a sink that discards updates
         tokio::spawn(async move {
-            crate::admin::metrics::metrics_update_sink(metrics_rx).await;
+            liveness_metrics_update_sink(metrics_rx).await;
         });
-        tx.send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+        metrics_tx
+            .send(LiveReadyMetricsUpdate::Metrics((RpcMetrics::new("dummy"))))
             .await
             .unwrap();
-        tx.send(LiveReadyUpdate::Health(HealthState::MissingRpcs))
+        metrics_tx
+            .send(LiveReadyMetricsUpdate::Health(HealthState::Healthy))
+            .await
+            .unwrap();
+        metrics_tx
+            .send(LiveReadyMetricsUpdate::Readiness(ReadinessState::Ready))
             .await
             .unwrap();
         assert!(

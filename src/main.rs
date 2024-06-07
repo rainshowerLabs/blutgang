@@ -145,17 +145,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
-    let (metrics_tx, metrics_rx) = crate::admin::metrics::metrics_channel().await;
-    let (metrics_request_tx, metrics_request_rx) =
+    let (metrics_update_tx, metrics_update_rx) =
         crate::admin::metrics::metrics_update_channel().await;
-
     #[cfg(feature = "prometheusd")]
     {
-        use crate::admin::metrics::{
-            listen_for_metrics_requests,
-            metrics_channel,
-        };
-        let dt = std::time::Instant::now();
         log_info!("metrics enabled");
         let config_metrics = Arc::clone(&config);
         let metrics_addr = config_metrics.read().unwrap().metrics.address.clone();
@@ -170,22 +163,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             metrics_addr,
             update_interval
         );
-        let metrics_tx_rwlock = Arc::new(RwLock::new(metrics_tx));
-        let storage_registry = prometheus_metric_storage::StorageRegistry::default();
-        let rpc_list_clone = Arc::clone(&rpc_list_rwlock);
-        let registry_rwlock = Arc::new(RwLock::new(storage_registry));
-        let registry_clone = Arc::clone(&registry_rwlock);
-        // let rpc_metrics_rwlock = Arc::new(RwLock::new(RpcMetrics::init(&storage_registry)));
+        let rpc_metrics_rwlock = Arc::new(RwLock::new(RpcMetrics::new("rpc")));
 
         tokio::task::spawn(async move {
             log_info!("Prometheus enabled, accepting metrics at prometheus port");
-            let _ = listen_for_metrics_requests(
-                config_metrics,
-                metrics_request_rx,
-                registry_rwlock,
-                rpc_list_clone,
-                0,
-                dt.elapsed(),
+            let _ = crate::admin::metrics::metrics_server(
+                rpc_metrics_rwlock,
+                metrics_addr,
+                update_interval,
             )
             .await;
         });
