@@ -63,7 +63,7 @@
             valgrind
             python311Packages.requests
             python311Packages.websocket-client
-            (rust-bin.stable.latest.default.override {
+            (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
           ];
