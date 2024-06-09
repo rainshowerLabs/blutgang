@@ -136,7 +136,7 @@ async fn handle_incoming_message(
     } else {
         let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
             // Handle the case where the rpc_list RwLock is poisoned
-            log_err!("{}", e);
+            log_err!("handle_incoming_message poison: {}", e);
             e.into_inner()
         });
 
