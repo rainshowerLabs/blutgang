@@ -147,7 +147,9 @@ async fn handle_incoming_message(
                 //
                 // We do this because we want to send it to a buffer
                 // in case we have no available RPCs.
-                if incoming["method"] == "eth_subscription" {
+                if incoming["method"] == "eth_subscription" || incoming["method"] == "eth_subscribe"
+                {
+                    println!("in none: {:?}", incoming);
                     ws_buffer.push(incoming);
                 }
                 log_err!("No RPC position available");
