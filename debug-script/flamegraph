@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+
+OUTFILE="flamegraph.blutgang.`git describe --always --dirty`-`date +%s`"
+
+CARGO_PROFILE_RELEASE_DEBUG=true \
+cargo flamegraph \
+  --bin=blutgang \
+  -o "${OUTFILE}.svg" \
+  --release   \
+  -- --config example_config.toml
+
