@@ -138,14 +138,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if admin_enabled {
         let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
         let poverty_list_admin = Arc::clone(&rpc_poverty_list);
-        let cache_admin = cache.clone();
         let config_admin = Arc::clone(&config);
         tokio::task::spawn(async move {
             log_info!("Admin namespace enabled, accepting admin methods at admin port");
             let _ = listen_for_admin_requests(
                 rpc_list_admin,
                 poverty_list_admin,
-                cache_admin,
                 config_admin,
                 liveness_rx,
             )
@@ -159,7 +157,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
-    let cache_clone = cache.clone();
     let finalized_rxclone = Arc::clone(&finalized_rx_arc);
     tokio::task::spawn(async move {
         let _ = manage_cache(
