@@ -6,7 +6,7 @@ COPY . /app
 
 RUN apt-get update && apt-get install -y libssl-dev pkg-config
 # Docker is a pos
-RUN cargo build --profile maxperf --features debug-verbose
+RUN cargo build --profile maxperf
 
 FROM debian:bookworm
 
