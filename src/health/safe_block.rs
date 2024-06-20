@@ -217,7 +217,10 @@ pub async fn subscribe_to_new_heads(
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap();
                     let a = hex_to_decimal(sub["params"]["result"]["number"].as_str().unwrap())
                         .unwrap();
-                    subscription_id = sub["params"]["subscription"].as_str().unwrap().to_owned();
+                    sub["params"]["subscription"]
+                        .as_str()
+                        .unwrap()
+                        .clone_into(&mut subscription_id);
                     log_info!("New chain head: {}", a);
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
