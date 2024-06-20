@@ -1,4 +1,5 @@
 use crate::{
+    log_err,
     balancer::{
         accept_http::{
             ConnectionParams,
@@ -20,9 +21,14 @@ use crate::{
 
 use std::{
     convert::Infallible,
-    sync::Arc,
+    sync::{
+        Arc,
+        RwLock,
+    },
     time::Instant,
 };
+
+use sled::Db;
 
 use blake3::Hash;
 use serde_json::Value;
@@ -82,7 +88,13 @@ pub async fn accept_request(
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry(method: Value, rx: &mut str, tx_hash: &Hash, cache_args: Arc<CacheArgs>) {
+pub fn cache_querry(
+    method: Value,
+    rx: &mut str,
+    tx_hash: &Hash,
+    cache_args: Arc<CacheArgs>,
+    cache: Arc<RwLock<Db>>,
+) {
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -102,7 +114,13 @@ pub fn cache_querry(method: Value, rx: &mut str, tx_hash: &Hash, cache_args: Arc
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
             rx_value["id"] = Value::Null;
 
-            cache_args
+            let mut guard = cache.write().unwrap_or_else(|e| {
+                // Handle the case where the named_numbers RwLock is poisoned
+                log_err!("{}", e);
+                e.into_inner()
+            });
+
+            guard
                 .cache
                 .insert(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice())
                 .unwrap();
