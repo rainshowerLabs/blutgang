@@ -1,6 +1,19 @@
 #!/bin/sh
 set -e
 
+if [ ! -x "$(command -v perf)" ]
+then
+    echo "Cannot find perf, please make sure it's installed."
+    exit 1
+fi
+
+
+INSTALLED=0
+if [ ! -x "$(command -v cargo-flamegraph)" ]; then
+    echo "cargo-flamegraph not installed; installing ..."
+    cargo install flamegraph
+    INSTALLED=1
+fi
 OUTFILE="flamegraph.blutgang.`git describe --always --dirty`-`date +%s`"
 
 CARGO_PROFILE_RELEASE_DEBUG=true \
@@ -10,3 +23,10 @@ cargo flamegraph \
   --release   \
   -- --config example_config.toml
 
+if [ $INSTALLED == 1 ]; then
+    read -p "Would you like to uninstall cargo-flamegraph? [Y/n] " -n 1 -r
+    echo
+    if [[ "$REPLY" =~ ^[^Nn]*$ ]]; then
+        cargo uninstall flamegraph
+    fi
+fi
