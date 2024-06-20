@@ -119,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Insert data about blutgang and our settings into the DB
     //
     // Print any relevant warnings about a misconfigured DB. Check docs for more
-    setup_data(cache.clone());
+    setup_data(&cache);
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
