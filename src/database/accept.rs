@@ -1,3 +1,4 @@
+use sled::Db;
 use crate::{
     database::processing::{
         accept_request,
@@ -9,7 +10,10 @@ use crate::{
 
 use std::{
     convert::Infallible,
-    sync::Arc,
+    sync::{
+        Arc,
+        RwLock,
+    },
 };
 
 use http_body_util::Full;
@@ -59,25 +63,33 @@ pub struct DbRequest {
     sender: RequestSender,
 }
 
-async fn process_incoming(incoming: DbRequest, cache_args: Arc<CacheArgs>) {
+async fn process_incoming(
+    incoming: DbRequest,
+    cache_args: Arc<CacheArgs>,
+    cache: Arc<RwLock<Db>>,
+) {
     match incoming.request {
         RequestKind::UserRequest(req, params) => {
             accept_request(req, incoming.sender, params, cache_args).await
         }
-        RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args),
+        RequestKind::Cache(key, value, mut rx) => cache_querry(value, &mut rx, &key, cache_args, cache),
     };
 }
 
 /// Processes incoming requests from clients and return responses
 pub async fn database_processing(
     cache_args: Arc<CacheArgs>,
+    cache: Db,
     mut rax: mpsc::UnboundedReceiver<DbRequest>,
 ) {
+    let cache = Arc::new(RwLock::new(cache));
+
     loop {
         while let Some(incoming) = rax.recv().await {
             let cache_args_clone = cache_args.clone();
+            let cache_clone = cache.clone();
             tokio::spawn(async move {
-                process_incoming(incoming, cache_args_clone).await;
+                process_incoming(incoming, cache_args_clone, cache_clone).await;
             });
         }
     }
