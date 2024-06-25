@@ -1,5 +1,4 @@
-// TODO: nuke admin while we work on the other parts!
-// mod admin;
+mod admin;
 mod balancer;
 mod config;
 mod database;
@@ -8,14 +7,14 @@ mod rpc;
 mod websocket;
 
 use crate::{
-    // admin::{
-    //     listener::listen_for_admin_requests,
-    //     liveready::{
-    //         liveness_update_sink,
-    //         LiveReadyUpdate,
-    //         ReadinessState,
-    //     },
-    // },
+    admin::{
+        listener::listen_for_admin_requests,
+        liveready::{
+            liveness_update_sink,
+            LiveReadyUpdate,
+            ReadinessState,
+        },
+    },
     balancer::{
         accept_http::{
             accept_request,
@@ -152,7 +151,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //         .await;
     //     });
     // } else {
-    //     tokio::task::spawn(liveness_update_sink(liveness_rx));
+    // dont want to deal with potentially dropped channels if admin is disabled?
+    // create a sink to immediately drop all messages you receive!
+    tokio::task::spawn(liveness_update_sink(liveness_rx));
     // }
 
     // Spawn a thread for the head cache
@@ -274,9 +275,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Send an update to change the state to ready
-    // let _ = liveness_tx
-    //     .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
-    //     .await;
+    let _ = liveness_tx
+        .send(LiveReadyUpdate::Readiness(ReadinessState::Ready))
+        .await;
 
     // We start a loop to continuously accept incoming connections
     loop {
