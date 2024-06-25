@@ -223,7 +223,6 @@ pub async fn forward_body(
     (Ok(res), position)
 }
 
-
 /// Forward the request to *a* RPC picked by the algo set by the user.
 /// Measures the time needed for a request, and updates the respective
 /// RPC lself.

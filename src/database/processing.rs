@@ -1,5 +1,4 @@
 use crate::{
-    log_err,
     balancer::{
         accept_http::{
             ConnectionParams,
@@ -15,6 +14,7 @@ use crate::{
         accept::RequestSender,
         querry_processing::forward_body,
     },
+    log_err,
     log_info,
     CacheArgs,
 };
@@ -72,7 +72,7 @@ pub async fn accept_request(
     (response, rpc_position) = forward_body(tx, &connection_params, &cache_args, params).await;
     let time = time.elapsed();
 
-    // Send the resul
+    // Send the result
     sender.send(response);
 
     log_info!("Request time: {:?}", time);

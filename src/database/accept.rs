@@ -1,6 +1,6 @@
 use sled::{
     Db,
-    InlineArray
+    InlineArray,
 };
 
 use tokio::sync::{
@@ -31,10 +31,7 @@ pub struct DbRequest {
 }
 
 /// Processes incoming requests from clients and return responses
-pub async fn database_processing(
-    mut rax: mpsc::UnboundedReceiver<DbRequest>,
-    cache: Db,
-) {
+pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, cache: Db) {
     loop {
         while let Some(incoming) = rax.recv().await {
             let rax = match incoming.request {

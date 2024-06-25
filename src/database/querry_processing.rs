@@ -32,8 +32,8 @@ use blake3::hash;
 
 use http_body_util::Full;
 use hyper::{
-    header::HeaderValue,
     body::Bytes,
+    header::HeaderValue,
     Request,
 };
 
