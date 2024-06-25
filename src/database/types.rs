@@ -1,6 +1,4 @@
-use sled::{
-    InlineArray,
-};
+use sled::InlineArray;
 
 use tokio::sync::{
     mpsc,
@@ -32,9 +30,6 @@ pub struct DbRequest {
 
 impl DbRequest {
     pub fn new(request: RequestKind, sender: RequestSender) -> Self {
-        DbRequest {
-            request,
-            sender,
-        }
+        DbRequest { request, sender }
     }
 }

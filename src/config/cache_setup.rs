@@ -4,8 +4,8 @@ use crate::{
         VERSION_STR,
     },
     log_err,
-    log_wrn,
     log_info,
+    log_wrn,
 };
 use sled::Db;
 
@@ -16,7 +16,6 @@ pub fn setup_data(cache: &Db, do_clear: bool) {
         cache.clear().unwrap();
         log_wrn!("All data cleared from the database.");
     }
-
 
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",

@@ -1,12 +1,8 @@
-use crate::database::types::RequestKind;
 use crate::database::types::DbRequest;
-use sled::{
-    Db,
-};
+use crate::database::types::RequestKind;
+use sled::Db;
 
-use tokio::sync::{
-    mpsc,
-};
+use tokio::sync::mpsc;
 
 /// Processes incoming requests from clients and return responses
 pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, cache: Db) {

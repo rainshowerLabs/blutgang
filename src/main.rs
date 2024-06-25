@@ -151,9 +151,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //         .await;
     //     });
     // } else {
-        // dont want to deal with potentially dropped channels if admin is disabled?
-        // create a sink to immediately drop all messages you receive!
-        tokio::task::spawn(liveness_update_sink(liveness_rx));
+    // dont want to deal with potentially dropped channels if admin is disabled?
+    // create a sink to immediately drop all messages you receive!
+    tokio::task::spawn(liveness_update_sink(liveness_rx));
     // }
 
     // Spawn a thread for the head cache
