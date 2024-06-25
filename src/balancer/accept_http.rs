@@ -1,4 +1,3 @@
-use crate::database::accept::RequestBus;
 use crate::{
     balancer::{
         format::{
@@ -21,6 +20,7 @@ use crate::{
     rpc::types::Rpc,
     rpc_response,
     timed_out,
+    database::types::RequestBus,
     websocket::{
         server::serve_websocket,
         types::{
@@ -83,9 +83,13 @@ use std::{
 /// to fulfil an incoming request.
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-    pub rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    pub channels: RequestChannels,
-    pub config: Arc<RwLock<Settings>>,
+        rpc_list: Arc<RwLock<Vec<Rpc>>>,
+        channels: RequestChannels,
+        named_numbers: Arc<RwLock<NamedBlocknumbers>>,
+        head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+        sub_data: Arc<SubscriptionData>,
+        cache: RequestBus,
+        config: Arc<RwLock<Settings>>,
 }
 
 impl ConnectionParams {
@@ -99,7 +103,7 @@ impl ConnectionParams {
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
-            rpc_list_rwlock: rpc_list_rwlock.clone(),
+            rpc_list: rpc_list_rwlock.clone(),
             channels,
             named_numbers: named_numbers.clone(),
             head_cache: head_cache.clone(),
