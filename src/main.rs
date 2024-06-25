@@ -6,7 +6,6 @@ mod health;
 mod rpc;
 mod websocket;
 
-use crate::database::accept::database_processing;
 use crate::{
     admin::{
         listener::listen_for_admin_requests,
@@ -29,6 +28,7 @@ use crate::{
         cli_args::create_match,
         types::Settings,
     },
+    database::accept::database_processing,
     health::{
         check::{
             dropped_listener,

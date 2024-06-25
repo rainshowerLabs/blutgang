@@ -1,11 +1,16 @@
-use crate::database::error::DbError;
-use crate::database::types::DbRequest;
-use crate::database::types::RequestBus;
-use crate::database::types::RequestKind;
 use crate::{
+    database::{
+        error::DbError,
+        types::{
+            DbRequest,
+            RequestBus,
+            RequestKind,
+        },
+    },
     log_info,
     log_wrn,
 };
+
 use tokio::sync::oneshot;
 
 use std::{

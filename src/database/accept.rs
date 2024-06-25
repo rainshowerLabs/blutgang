@@ -1,5 +1,8 @@
-use crate::database::types::DbRequest;
-use crate::database::types::RequestKind;
+use crate::database::types::{
+    DbRequest,
+    RequestKind,
+};
+
 use sled::Db;
 
 use tokio::sync::mpsc;
