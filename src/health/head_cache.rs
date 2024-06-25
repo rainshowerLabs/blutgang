@@ -1,3 +1,8 @@
+use crate::database::types::DbRequest;
+use crate::database::types::RequestKind;
+use tokio::sync::oneshot;
+use crate::database::error::DbError;
+use crate::database::types::RequestBus;
 use crate::{
     log_info,
     log_wrn,
@@ -22,8 +27,8 @@ pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
-    cache: sled::Db,
-) -> Result<(), sled::Error> {
+    cache: RequestBus,
+) -> Result<(), DbError> {
     let mut block_number = 0;
     let mut last_finalized = 0;
 
@@ -61,8 +66,8 @@ fn handle_reorg(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
     new_block: u64,
-    cache: sled::Db,
-) -> Result<(), sled::Error> {
+    cache: RequestBus,
+) -> Result<(), DbError> {
     // sled batch
     let mut batch = Batch::default();
 
@@ -78,8 +83,11 @@ fn handle_reorg(
         }
     }
 
-    // Apply the batch to the cache
-    cache.apply_batch(batch)?;
+    // Send the batch to the cache
+    let (tx, _) = oneshot::channel();
+    let req = DbRequest::new(RequestKind::Batch(batch), tx);
+
+    cache.send(req);
 
     Ok(())
 }
@@ -91,7 +99,7 @@ fn handle_reorg(
 fn remove_stale(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
-) -> Result<(), sled::Error> {
+) -> Result<(), DbError> {
     // Get the lowest block_number from the BTreeMap
     let mut head_cache_guard = head_cache.write().unwrap();
 
