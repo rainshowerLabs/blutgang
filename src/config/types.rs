@@ -240,7 +240,7 @@ impl Settings {
         let compression = sled_table
             .get("compression")
             .expect("\x1b[31mErr:\x1b[0m Missing compression toggle!")
-            .as_bool()
+            .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse compression as bool!");
         let print_profile = sled_table
             .get("print_profile")
@@ -259,20 +259,19 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing sled_mode!")
             .as_str()
             .expect("\x1b[31mErr:\x1b[0m Could not parse sled_mode as str!");
-        let mut sled_mode = sled::Mode::HighThroughput;
+        // TODO: Replace with fanout!
+        // let mut sled_mode = sled::Mode::HighThroughput;
 
-        if sled_mode_str == "LowSpace" {
-            sled_mode = sled::Mode::LowSpace;
-        }
+        // if sled_mode_str == "LowSpace" {
+        //     sled_mode = sled::Mode::LowSpace;
+        // }
 
         // Create sled config
         let sled_config = Config::new()
             .path(db_path)
-            .cache_capacity(cache_capacity.try_into().unwrap())
-            .mode(sled_mode)
-            .flush_every_ms(Some(flush_every_ms as u64))
-            .print_profile_on_drop(print_profile)
-            .use_compression(compression);
+            .cache_capacity_bytes(cache_capacity.try_into().unwrap())
+            .zstd_compression_level(compression.try_into().unwrap())
+            .flush_every_ms(Some((flush_every_ms as u64).try_into().unwrap()));
 
         // Parse all the other tables as RPCs and put them in a Vec<Rpc>
         //
@@ -496,11 +495,9 @@ impl Settings {
         // Set config for sled
         let sled_config = Config::default()
             .path(db_path)
-            .mode(sled::Mode::HighThroughput)
-            .cache_capacity(cache_capacity)
-            .use_compression(compression)
-            .print_profile_on_drop(print_profile)
-            .flush_every_ms(Some(flush_every_ms));
+            .cache_capacity_bytes(cache_capacity.try_into().unwrap())
+            .zstd_compression_level(compression.try_into().unwrap())
+            .flush_every_ms(Some((flush_every_ms as u64).try_into().unwrap()));
 
         let health_check = matches.get_occurrences::<String>("health_check").is_some();
         let header_check = matches.get_occurrences::<String>("header_check").is_some();

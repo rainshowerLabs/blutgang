@@ -12,6 +12,7 @@ use crate::{
         selection::select::pick,
     },
     cache_error,
+    database::types::RequestBus,
     log_err,
     log_info,
     log_wrn,
@@ -20,7 +21,6 @@ use crate::{
     rpc::types::Rpc,
     rpc_response,
     timed_out,
-    database::types::RequestBus,
     websocket::{
         server::serve_websocket,
         types::{
@@ -83,13 +83,13 @@ use std::{
 /// to fulfil an incoming request.
 #[derive(Debug, Clone)]
 pub struct ConnectionParams {
-        rpc_list: Arc<RwLock<Vec<Rpc>>>,
-        channels: RequestChannels,
-        named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-        head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-        sub_data: Arc<SubscriptionData>,
-        cache: RequestBus,
-        config: Arc<RwLock<Settings>>,
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    channels: RequestChannels,
+    named_numbers: Arc<RwLock<NamedBlocknumbers>>,
+    head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    sub_data: Arc<SubscriptionData>,
+    cache: RequestBus,
+    config: Arc<RwLock<Settings>>,
 }
 
 impl ConnectionParams {
