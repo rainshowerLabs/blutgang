@@ -111,15 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Cache for storing querries near the tip
     let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
 
-    // Clear database if specified
-    if do_clear {
-        cache.clear().unwrap();
-        log_wrn!("All data cleared from the database.");
-    }
-    // Insert data about blutgang and our settings into the DB
+    // Insert data about blutgang and our settings into the DB. Clears if specified.
     //
     // Print any relevant warnings about a misconfigured DB. Check docs for more
-    setup_data(&cache);
+    setup_data(&cache, do_clear);
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
@@ -134,26 +129,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We need liveness status channels even if admin is unused
     let (liveness_tx, liveness_rx) = mpsc::channel(16);
 
+    // TODO: temp nuke admin for now
     // Spawn a thread for the admin namespace if enabled
-    if admin_enabled {
-        let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
-        let poverty_list_admin = Arc::clone(&rpc_poverty_list);
-        let config_admin = Arc::clone(&config);
-        tokio::task::spawn(async move {
-            log_info!("Admin namespace enabled, accepting admin methods at admin port");
-            let _ = listen_for_admin_requests(
-                rpc_list_admin,
-                poverty_list_admin,
-                config_admin,
-                liveness_rx,
-            )
-            .await;
-        });
-    } else {
+    // if admin_enabled {
+    //     let rpc_list_admin = Arc::clone(&rpc_list_rwlock);
+    //     let poverty_list_admin = Arc::clone(&rpc_poverty_list);
+    //     let config_admin = Arc::clone(&config);
+    //     tokio::task::spawn(async move {
+    //         log_info!("Admin namespace enabled, accepting admin methods at admin port");
+    //         let _ = listen_for_admin_requests(
+    //             rpc_list_admin,
+    //             poverty_list_admin,
+    //             config_admin,
+    //             liveness_rx,
+    //         )
+    //         .await;
+    //     });
+    // } else {
         // dont want to deal with potentially dropped channels if admin is disabled?
         // create a sink to immediately drop all messages you receive!
         tokio::task::spawn(liveness_update_sink(liveness_rx));
-    }
+    // }
 
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);

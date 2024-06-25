@@ -4,12 +4,20 @@ use crate::{
         VERSION_STR,
     },
     log_err,
+    log_wrn,
     log_info,
 };
 use sled::Db;
 
 /// Sets up the cache with various basic data about our current blutgang instance.
-pub fn setup_data(cache: &Db) {
+pub fn setup_data(cache: &Db, do_clear: bool) {
+    // Clear database if specified
+    if do_clear {
+        cache.clear().unwrap();
+        log_wrn!("All data cleared from the database.");
+    }
+
+
     let version_json = format!(
         "{{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"{}; {}\"}}",
         VERSION_STR, TAGLINE
