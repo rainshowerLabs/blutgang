@@ -6,6 +6,7 @@ mod health;
 mod rpc;
 mod websocket;
 
+use crate::database::accept::database_processing;
 use crate::{
     admin::{
         listener::listen_for_admin_requests,
@@ -113,8 +114,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Insert data about blutgang and our settings into the DB. Clears if specified.
     //
-    // Print any relevant warnings about a misconfigured DB. Check docs for more
+    // Print any relevant warnings about a misconfigured DB. Check docs for more.
     setup_data(&cache, do_clear);
+
+    // Starts the database task.
+    let (db_tx, db_rx) = mpsc::unbounded_channel();
+    tokio::task::spawn(database_processing(db_rx, cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
@@ -154,12 +159,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Spawn a thread for the head cache
     let head_cache_clone = Arc::clone(&head_cache);
     let finalized_rxclone = Arc::clone(&finalized_rx_arc);
+    let db_tx_clone = db_tx.clone();
     tokio::task::spawn(async move {
         let _ = manage_cache(
             &head_cache_clone,
             blocknum_rx,
             finalized_rxclone,
-            cache_clone,
+            db_tx_clone,
         )
         .await;
     });
@@ -196,6 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sub_data = Arc::new(SubscriptionData::new());
     if is_ws {
         let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
+        let db_tx_clone = db_tx.clone();
 
         let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
         // TODO: make this more ergonomic
@@ -250,7 +257,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let cache_args = CacheArgs {
                 finalized_rx: finalized_rx.clone(),
                 named_numbers: named_blocknumbers.clone(),
-                cache: cache.clone(),
                 head_cache: head_cache.clone(),
             };
 
@@ -294,7 +300,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &named_blocknumbers,
             &head_cache,
             &sub_data,
-            cache.clone(),
+            &db_tx,
             &config,
         );
 

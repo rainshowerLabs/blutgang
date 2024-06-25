@@ -1,3 +1,4 @@
+use crate::database::accept::RequestBus;
 use crate::{
     balancer::{
         format::{
@@ -94,7 +95,7 @@ impl ConnectionParams {
         named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
         head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: Db,
+        cache: &RequestBus,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
