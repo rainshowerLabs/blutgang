@@ -81,6 +81,7 @@ use hyper_util_blutgang::rt::TokioIo;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 #[tokio::main]
+#[allow(warnings)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Get all the cli args and set them
     let config = Arc::new(RwLock::new(Settings::new(create_match()).await));

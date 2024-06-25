@@ -1,4 +1,9 @@
 use crate::{
+    database::types::{
+        RequestBus,
+        DbRequest,
+        RequestKind,
+    },
     balancer::{
         format::get_block_number_from_request,
         selection::cache_rules::{
@@ -20,26 +25,33 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::watch;
+use tokio::sync::{
+    watch,
+    mpsc,
+    oneshot,
+};
 
 use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
 
 #[derive(Clone)]
-pub struct CacheArgs {
+pub struct CacheArgs<K, V>{
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    pub cache: RequestBus<K, V>,
 }
 
 impl CacheArgs {
     #[allow(dead_code)]
     pub fn default() -> Self {
+        let (tx, _) = mpsc::unbounded_channel();
         CacheArgs {
             finalized_rx: watch::channel(0).1,
             named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
             head_cache: Arc::new(RwLock::new(BTreeMap::new())),
+            cache: tx,
         }
     }
 }
@@ -73,10 +85,11 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
             rx_value["id"] = Value::Null;
 
+            let (tx, _) = oneshot::channel();
+            let req = DbRequest::new(RequestKind::Write(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()), tx);
             cache_args
                 .cache
-                .insert(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice())
-                .unwrap();
+                .send(req);
         }
     }
 }

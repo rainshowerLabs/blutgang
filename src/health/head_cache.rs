@@ -21,19 +21,26 @@ use std::{
     },
 };
 
-use sled::Batch;
+use sled::{
+    Batch,
+    InlineArray,
+};
 use tokio_stream::{
     wrappers::WatchStream,
     StreamExt,
 };
 
 /// Check if we need to do a reorg or if a new block has finalized.
-pub async fn manage_cache(
+pub async fn manage_cache<K, V>(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
-    cache: RequestBus,
-) -> Result<(), DbError> {
+    cache: RequestBus<K, V>,
+) -> Result<(), DbError>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     let mut block_number = 0;
     let mut last_finalized = 0;
 
@@ -67,12 +74,16 @@ pub async fn manage_cache(
 /// We use the head_cache to store keys of querries we made near the tip
 /// If a reorg happens, we need to remove all querries in the reorg range
 /// from the sled database.
-fn handle_reorg(
+fn handle_reorg<K, V>(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
     new_block: u64,
-    cache: RequestBus,
-) -> Result<(), DbError> {
+    cache: RequestBus<K, V>,
+) -> Result<(), DbError>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     // sled batch
     let mut batch = Batch::default();
 

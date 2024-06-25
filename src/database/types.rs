@@ -1,5 +1,4 @@
 use sled::InlineArray;
-
 use tokio::sync::{
     mpsc,
     oneshot,
@@ -9,27 +8,39 @@ use tokio::sync::{
 ///
 /// The enclosing struct contains the request and a oneshot sender
 /// for sending back a response.
-pub type RequestBus = mpsc::UnboundedSender<DbRequest>;
-pub type RequestSender = oneshot::Sender<Option<InlineArray>>;
-pub type RequestReceiver = oneshot::Receiver<Option<InlineArray>>;
+pub type RequestBus<K, V> = mpsc::UnboundedSender<DbRequest<K, V>>;
+pub type RequestSender<V> = oneshot::Sender<Option<V>>;
+pub type RequestReceiver<V> = oneshot::Receiver<Option<V>>;
 
 /// Specifies if we are reading or writing to the DB.
 #[derive(Debug)]
-pub enum RequestKind {
-    Read(String),
-    Write(String, String),
+pub enum RequestKind<K, V>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
+    Read(K),
+    Write(K, V),
     Batch(sled::Batch),
 }
 
 /// Contains data to be sent to the DB thread for processing.
 #[derive(Debug)]
-pub struct DbRequest {
-    pub request: RequestKind,
-    pub sender: RequestSender,
+pub struct DbRequest<K, V>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
+    pub request: RequestKind<K, V>,
+    pub sender: RequestSender<V>,
 }
 
-impl DbRequest {
-    pub fn new(request: RequestKind, sender: RequestSender) -> Self {
+impl<K, V> DbRequest<K, V>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
+    pub fn new(request: RequestKind<K, V>, sender: RequestSender<V>) -> Self {
         DbRequest { request, sender }
     }
 }

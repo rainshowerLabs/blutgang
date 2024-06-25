@@ -61,7 +61,10 @@ use hyper_tungstenite::{
     upgrade,
 };
 
-use sled::Db;
+use sled::{
+    Db,
+    InlineArray,
+};
 
 use tokio::time::timeout;
 
@@ -82,24 +85,32 @@ use std::{
 /// `ConnectionParams` contains the necessary data needed for blutgang
 /// to fulfil an incoming request.
 #[derive(Debug, Clone)]
-pub struct ConnectionParams {
+pub struct ConnectionParams<K, V>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     channels: RequestChannels,
     named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sub_data: Arc<SubscriptionData>,
-    cache: RequestBus,
+    cache: RequestBus<K, V>,
     config: Arc<RwLock<Settings>>,
 }
 
-impl ConnectionParams {
+impl<K, V> ConnectionParams<K, V>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     pub fn new(
         rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
         channels: RequestChannels,
         named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
         head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: &RequestBus,
+        cache: &RequestBus<K, V>,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
@@ -178,15 +189,19 @@ macro_rules! accept {
 
 /// Pick RPC and send request to it. In case the result is cached,
 /// read and return from the cache.
-pub async fn forward_body(
+pub async fn forward_body<K, V>(
     tx: Request<hyper::body::Incoming>,
-    con_params: &ConnectionParams,
+    con_params: &ConnectionParams<K, V>,
     cache_args: &CacheArgs,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
-) {
+)
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     // TODO: do content type validation more upstream
     // Check if body has application/json
     //
@@ -232,10 +247,14 @@ pub async fn forward_body(
 /// Measures the time needed for a request, and updates the respective
 /// RPC lself.
 /// In case of a timeout, returns an error.
-pub async fn accept_request(
+pub async fn accept_request<K, V>(
     mut tx: Request<hyper::body::Incoming>,
-    connection_params: ConnectionParams,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    connection_params: ConnectionParams<K, V>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible>
+where
+    K: AsRef<[u8]>,
+    V: Into<InlineArray>,
+{
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
         log_info!("Received WS upgrade request");
