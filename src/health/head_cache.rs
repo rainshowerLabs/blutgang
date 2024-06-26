@@ -35,12 +35,8 @@ pub async fn manage_cache<K, V>(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
-    cache: RequestBus<K, V>,
-) -> Result<(), DbError>
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
-{
+    cache: RequestBus,
+) -> Result<(), DbError> {
     let mut block_number = 0;
     let mut last_finalized = 0;
 
@@ -74,16 +70,12 @@ where
 /// We use the head_cache to store keys of querries we made near the tip
 /// If a reorg happens, we need to remove all querries in the reorg range
 /// from the sled database.
-fn handle_reorg<K, V>(
+fn handle_reorg(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     block_number: u64,
     new_block: u64,
-    cache: RequestBus<K, V>,
-) -> Result<(), DbError>
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
-{
+    cache: RequestBus,
+) -> Result<(), DbError> {
     // sled batch
     let mut batch = Batch::default();
 

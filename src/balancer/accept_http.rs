@@ -85,32 +85,24 @@ use std::{
 /// `ConnectionParams` contains the necessary data needed for blutgang
 /// to fulfil an incoming request.
 #[derive(Debug, Clone)]
-pub struct ConnectionParams<K, V>
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
-{
+pub struct ConnectionParams {
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     channels: RequestChannels,
     named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sub_data: Arc<SubscriptionData>,
-    cache: RequestBus<K, V>,
+    cache: RequestBus<>,
     config: Arc<RwLock<Settings>>,
 }
 
-impl<K, V> ConnectionParams<K, V>
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
-{
+impl ConnectionParams {
     pub fn new(
         rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
         channels: RequestChannels,
         named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
         head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: &RequestBus<K, V>,
+        cache: &RequestBus,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
@@ -189,19 +181,15 @@ macro_rules! accept {
 
 /// Pick RPC and send request to it. In case the result is cached,
 /// read and return from the cache.
-pub async fn forward_body<K, V>(
+pub async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    con_params: &ConnectionParams<K, V>,
+    con_params: &ConnectionParams,
     cache_args: &CacheArgs,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
-)
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
-{
+) {
     // TODO: do content type validation more upstream
     // Check if body has application/json
     //
@@ -249,7 +237,7 @@ where
 /// In case of a timeout, returns an error.
 pub async fn accept_request<K, V>(
     mut tx: Request<hyper::body::Incoming>,
-    connection_params: ConnectionParams<K, V>,
+    connection_params: ConnectionParams,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible>
 where
     K: AsRef<[u8]>,

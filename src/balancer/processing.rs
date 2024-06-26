@@ -1,3 +1,4 @@
+use sled::InlineArray;
 use crate::{
     database::types::{
         RequestBus,
@@ -36,17 +37,17 @@ use serde_json::Value;
 use simd_json::to_vec;
 
 #[derive(Clone)]
-pub struct CacheArgs<K, V>{
+pub struct CacheArgs {
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    pub cache: RequestBus<K, V>,
+    pub cache: RequestBus,
 }
 
 impl CacheArgs {
     #[allow(dead_code)]
     pub fn default() -> Self {
-        let (tx, _) = mpsc::unbounded_channel();
+        let (tx, _rx) = mpsc::unbounded_channel::<DbRequest>();
         CacheArgs {
             finalized_rx: watch::channel(0).1,
             named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
@@ -65,7 +66,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
+pub fn cache_querry<K, V> (rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -86,7 +87,7 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
             rx_value["id"] = Value::Null;
 
             let (tx, _) = oneshot::channel();
-            let req = DbRequest::new(RequestKind::Write(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice()), tx);
+            let req = DbRequest::new(RequestKind::Write(tx_hash.as_bytes().to_vec(), to_vec(&rx_value).unwrap().as_slice().into()), tx);
             cache_args
                 .cache
                 .send(req);
