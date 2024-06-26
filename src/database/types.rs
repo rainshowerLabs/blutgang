@@ -14,8 +14,7 @@ pub type RequestReceiver = oneshot::Receiver<Option<InlineArray>>;
 
 /// Specifies if we are reading or writing to the DB.
 #[derive(Debug)]
-pub enum RequestKind
-{
+pub enum RequestKind {
     Read(Vec<u8>),
     Write(Vec<u8>, InlineArray),
     Batch(sled::Batch),
@@ -23,15 +22,13 @@ pub enum RequestKind
 
 /// Contains data to be sent to the DB thread for processing.
 #[derive(Debug)]
-pub struct DbRequest
-{
+pub struct DbRequest {
     pub request: RequestKind,
     pub sender: RequestSender,
 }
 
-impl DbRequest
-{
+impl DbRequest {
     pub fn new(request: RequestKind, sender: RequestSender) -> Self {
-        DbRequest { request: request.clone(), sender }
+        DbRequest { request, sender }
     }
 }

@@ -91,7 +91,7 @@ pub struct ConnectionParams {
     named_numbers: Arc<RwLock<NamedBlocknumbers>>,
     head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sub_data: Arc<SubscriptionData>,
-    cache: RequestBus<>,
+    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
 }
 

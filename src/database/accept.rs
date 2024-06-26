@@ -1,14 +1,12 @@
 use crate::{
-        database::types::{
+    database::types::{
         DbRequest,
         RequestKind,
     },
     log_err,
 };
 
-use sled::{
-    Db,
-};
+use sled::Db;
 
 use tokio::sync::mpsc;
 
@@ -19,9 +17,7 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
             let result = match incoming.request {
                 RequestKind::Read(k) => cache.get(k),
                 RequestKind::Write(k, v) => cache.insert(k, v),
-                RequestKind::Batch(b) => {
-                    cache.apply_batch(b).map(|_| None)
-                }
+                RequestKind::Batch(b) => cache.apply_batch(b).map(|_| None),
             };
 
             let rax = result.unwrap_or(None);

@@ -1,10 +1,4 @@
-use sled::InlineArray;
 use crate::{
-    database::types::{
-        RequestBus,
-        DbRequest,
-        RequestKind,
-    },
     balancer::{
         format::get_block_number_from_request,
         selection::cache_rules::{
@@ -12,9 +6,15 @@ use crate::{
             cache_result,
         },
     },
+    database::types::{
+        DbRequest,
+        RequestBus,
+        RequestKind,
+    },
     health::safe_block::NamedBlocknumbers,
     Rpc,
 };
+use sled::InlineArray;
 
 use std::{
     collections::BTreeMap,
@@ -27,9 +27,9 @@ use std::{
 };
 
 use tokio::sync::{
-    watch,
     mpsc,
     oneshot,
+    watch,
 };
 
 use blake3::Hash;
@@ -66,7 +66,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry<K, V> (rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
+pub fn cache_querry<K, V>(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -87,10 +87,14 @@ pub fn cache_querry<K, V> (rx: &mut str, method: Value, tx_hash: Hash, cache_arg
             rx_value["id"] = Value::Null;
 
             let (tx, _) = oneshot::channel();
-            let req = DbRequest::new(RequestKind::Write(tx_hash.as_bytes().to_vec(), to_vec(&rx_value).unwrap().as_slice().into()), tx);
-            cache_args
-                .cache
-                .send(req);
+            let req = DbRequest::new(
+                RequestKind::Write(
+                    tx_hash.as_bytes().to_vec(),
+                    to_vec(&rx_value).unwrap().as_slice().into(),
+                ),
+                tx,
+            );
+            cache_args.cache.send(req);
         }
     }
 }
