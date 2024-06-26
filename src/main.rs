@@ -8,7 +8,7 @@ mod websocket;
 
 use crate::{
     admin::{
-        listener::listen_for_admin_requests,
+        // listener::listen_for_admin_requests,
         liveready::{
             liveness_update_sink,
             LiveReadyUpdate,
