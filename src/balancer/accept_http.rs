@@ -183,8 +183,8 @@ macro_rules! accept {
 /// read and return from the cache.
 pub async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    con_params: &ConnectionParams,
-    cache_args: &CacheArgs,
+    con_params: ConnectionParams,
+    cache_args: CacheArgs,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
@@ -235,14 +235,18 @@ pub async fn forward_body(
 /// Measures the time needed for a request, and updates the respective
 /// RPC lself.
 /// In case of a timeout, returns an error.
-pub async fn accept_request<K, V>(
+pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     connection_params: ConnectionParams,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible>
-where
-    K: AsRef<[u8]>,
-    V: Into<InlineArray>,
 {
+    let cache_args = CacheArgs {
+        finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
+        named_numbers: connection_params.named_numbers.clone(),
+        cache: connection_params.cache.clone(),
+        head_cache: connection_params.head_cache.clone(),
+    };
+
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
         log_info!("Received WS upgrade request");
@@ -265,13 +269,6 @@ where
                         .to_string(),
                 )));
             }
-        };
-
-        let cache_args = CacheArgs {
-            finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
-            named_numbers: connection_params.named_numbers.clone(),
-            cache: connection_params.cache,
-            head_cache: connection_params.head_cache.clone(),
         };
 
         // Spawn a task to handle the websocket connection.
@@ -314,11 +311,8 @@ where
     let time = Instant::now();
     (response, rpc_position) = forward_body(
         tx,
-        &connection_params.rpc_list_rwlock,
-        &connection_params.channels.finalized_rx,
-        &connection_params.named_numbers,
-        &connection_params.head_cache,
-        connection_params.cache,
+        connection_params,
+        cache_args,
         params,
     )
     .await;
