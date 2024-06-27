@@ -1,4 +1,5 @@
 use crate::{
+    database::types::RequestBus,
     admin::liveready::{
         accept_health_request,
         accept_readiness_request,
@@ -36,8 +37,6 @@ use std::{
     },
     time::Instant,
 };
-
-use sled::Db;
 
 use crate::{
     admin::methods::execute_method,
@@ -99,7 +98,7 @@ async fn forward_body(
     mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     // Get the id of the request and set it to 0 for caching
@@ -129,7 +128,7 @@ pub async fn accept_admin_request(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
     liveness_request_tx: LiveReadyRequestSnd,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
@@ -183,6 +182,10 @@ pub async fn accept_admin_request(
 
 #[cfg(test)]
 mod tests {
+    use sled::Config;
+    use sled::Db;
+    use tokio::sync::mpsc;
+    use crate::database_processing;
     use super::*;
     use jsonwebtoken::DecodingKey;
 
@@ -195,10 +198,13 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> Db {
-        let db = sled::Config::new().temporary(true);
+    fn create_test_cache() -> RequestBus {
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
 
-        db.open().unwrap()
+        db_tx
     }
 
     #[tokio::test]

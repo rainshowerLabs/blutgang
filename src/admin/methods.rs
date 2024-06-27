@@ -1,4 +1,5 @@
 use crate::{
+    database::types::RequestBus,
     admin::error::AdminError,
     Rpc,
     Settings,
@@ -18,15 +19,13 @@ use serde_json::{
     Value::Null,
 };
 
-use sled::Db;
-
 /// Extract the method, call the appropriate function and return the response
 pub async fn execute_method(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     config: Arc<RwLock<Settings>>,
-    cache: Db,
+    cache: RequestBus,
 ) -> Result<Value, AdminError> {
     let method = tx["method"].as_str();
     println!("Method: {:?}", method.unwrap_or("None"));
@@ -104,9 +103,9 @@ pub async fn execute_method(
 /// Quit Blutgang upon receiving this method
 /// We're returning a Null and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
-async fn admin_blutgang_quit(cache: Db) -> Result<Value, AdminError> {
+async fn admin_blutgang_quit(cache: RequestBus) -> Result<Value, AdminError> {
     // We're doing something not-good so flush everything to disk
-    let _ = cache.flush_async().await;
+    // let _ = cache.flush_async().await;
     // Drop cache so we get the print profile on drop thing before we quit
     // We have to get the raw pointer
     // TODO: This still doesnt work!
@@ -118,9 +117,9 @@ async fn admin_blutgang_quit(cache: Db) -> Result<Value, AdminError> {
 }
 
 /// Flushes sled cache to disk
-async fn admin_flush_cache(cache: Db) -> Result<Value, AdminError> {
+async fn admin_flush_cache(cache: RequestBus) -> Result<Value, AdminError> {
     let time = Instant::now();
-    let _ = cache.flush_async().await;
+    // let _ = cache.flush_async().await;
     let time = time.elapsed();
 
     let rx = json!({
@@ -389,6 +388,10 @@ fn admin_blutgang_set_ttl(
 
 #[cfg(test)]
 mod tests {
+    use sled::Config;
+    use sled::Db;
+    use tokio::sync::mpsc;
+    use crate::database_processing;
     use super::*;
     use jsonwebtoken::DecodingKey;
 
@@ -423,10 +426,13 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> Db {
-        let db = sled::Config::new().temporary(true);
+    fn create_test_cache() -> RequestBus {
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
 
-        db.open().unwrap()
+        db_tx
     }
 
     #[tokio::test]

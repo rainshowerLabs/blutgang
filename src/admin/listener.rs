@@ -9,6 +9,7 @@ use std::{
 use sled::Db;
 
 use crate::{
+    database::types::RequestBus,
     admin::{
         accept::accept_admin_request,
         liveready::{
@@ -68,7 +69,7 @@ macro_rules! accept_admin {
 async fn admin_api_server(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
     address: SocketAddr,
     liveness_request_tx: LiveReadyRequestSnd,
@@ -112,7 +113,7 @@ async fn admin_api_server(
 pub async fn listen_for_admin_requests(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
     liveness_receiver: LiveReadyUpdateRecv,
 ) -> Result<(), Box<dyn std::error::Error>> {
