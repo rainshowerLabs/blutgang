@@ -476,8 +476,8 @@ impl Settings {
         let sled_config = Config::default()
             .path(db_path)
             .cache_capacity_bytes(cache_capacity.try_into().unwrap())
-            .zstd_compression_level(compression.try_into().unwrap())
-            .flush_every_ms(Some((flush_every_ms as u64).try_into().unwrap()));
+            .zstd_compression_level(compression.into())
+            .flush_every_ms(Some(flush_every_ms.try_into().unwrap()));
 
         let health_check = matches.get_occurrences::<String>("health_check").is_some();
         let header_check = matches.get_occurrences::<String>("header_check").is_some();

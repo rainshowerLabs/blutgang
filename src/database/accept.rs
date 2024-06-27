@@ -40,7 +40,7 @@ macro_rules! db_get {
         $channel:expr,
         $data:expr
     ) => {{
-        use crate::database::types::{
+        use $crate::database::types::{
             DbRequest,
             RequestKind,
         };
