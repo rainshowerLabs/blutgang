@@ -62,7 +62,6 @@ use hyper_tungstenite::{
     upgrade,
 };
 
-
 use tokio::time::timeout;
 
 use std::{
@@ -188,8 +187,8 @@ macro_rules! get_response {
         $ttl:expr,
         $max_retries:expr
     ) => {
-        match db_get!($cache_args.cache, $tx_hash) {
-            Ok(Some(rax)) => {
+        match db_get!($cache_args.cache, $tx_hash.as_bytes().to_vec()) {
+            Ok(Some(mut rax)) => {
                 $rpc_position = None;
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(rax.make_mut()).unwrap();
@@ -342,7 +341,7 @@ pub async fn forward_body(
     let mut tx = replace_block_tags(&mut tx, &cache_args.named_numbers);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
-    let (rax, position) = get_response!(
+    let rax = get_response!(
         tx,
         cache_args,
         tx_hash,
@@ -367,7 +366,7 @@ pub async fn forward_body(
         .body(body)
         .unwrap();
 
-    (Ok(res), position)
+    (Ok(res), rpc_position)
 }
 
 /// Forward the request to *a* RPC picked by the algo set by the user.

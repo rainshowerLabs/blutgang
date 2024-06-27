@@ -63,14 +63,15 @@ macro_rules! db_get {
 macro_rules! db_insert {
     (
         $channel:expr,
-        $data:expr
+        $k:expr,
+        $v:expr
     ) => {{
         let (tx, rx) = oneshot::channel();
-        let req = DbRequest::new(RequestKind::Write($data), tx);
+        let req = DbRequest::new(RequestKind::Write($k, $v), tx);
 
         let _ = $channel.send(req);
 
-        rx.await
+        rx
     }};
 }
 
