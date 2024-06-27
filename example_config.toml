@@ -53,7 +53,7 @@ cache_capacity = 1000000000
 # and increases CPU and latency by around 10% for db writes and 2% for reads
 compression = 5
 # Frequency of flushes in ms
-flush_every_ms = 240
+flush_every_ms = 5000
 
 # Add separate RPCs as TOML tables
 # DO NOT name an rpc `blutgang`, `admin`, or `sled`
