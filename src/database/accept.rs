@@ -22,7 +22,7 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
 
             let rax = result.unwrap_or(None);
 
-            if let Err(_) = incoming.sender.send(rax) {
+            if incoming.sender.send(rax).is_err() {
                 log_err!("Db failed to send response back!");
             }
         }

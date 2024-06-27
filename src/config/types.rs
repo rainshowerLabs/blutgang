@@ -251,7 +251,7 @@ impl Settings {
         // Create sled config
         let sled_config = Config::new()
             .path(db_path)
-            .cache_capacity_bytes(cache_capacity.try_into().unwrap())
+            .cache_capacity_bytes(cache_capacity)
             .zstd_compression_level(compression.try_into().unwrap())
             .flush_every_ms(Some((flush_every_ms as u64).try_into().unwrap()));
 
