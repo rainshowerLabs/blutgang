@@ -20,11 +20,13 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
                 RequestKind::Batch(b) => cache.apply_batch(b).map(|_| None),
             };
 
-            let rax = result.unwrap_or(None);
-
-            if incoming.sender.send(rax).is_err() {
-                log_err!("Db failed to send response back!");
+            if result.is_err() {
+                log_err!("Db failed to send response back: {:?}", result);
+                let _ = incoming.sender.send(None);
+                continue;
             }
+
+            let _ = incoming.sender.send(result.unwrap());
         }
     }
 }

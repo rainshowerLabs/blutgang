@@ -10,7 +10,7 @@ use tokio::sync::{
 /// for sending back a response.
 pub type RequestBus = mpsc::UnboundedSender<DbRequest>;
 pub type RequestSender = oneshot::Sender<Option<InlineArray>>;
-pub type RequestReceiver = oneshot::Receiver<Option<InlineArray>>;
+// pub type RequestReceiver = oneshot::Receiver<Option<InlineArray>>;
 
 /// Specifies if we are reading or writing to the DB.
 #[derive(Debug)]
