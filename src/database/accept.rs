@@ -29,7 +29,7 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
     }
 }
 
-/// Macro to abstract getting the data from the Db
+/// Macro to abstract getting the data from the DB.
 #[macro_export]
 macro_rules! db_get {
     (
@@ -46,4 +46,41 @@ macro_rules! db_get {
         }
     };
 }
+
+/// Macro to abstract inserting data into the DB.
+#[macro_export]
+macro_rules! db_insert {
+    (
+        $channel:expr,
+        $data:expr
+    ) => {
+            {
+            let (tx, rx) = oneshot::channel();
+            let req = DbRequest::new(RequestKind::Write($data), tx);
+
+            let _ = $channel.send(req);
+
+            rx.await
+        }
+    };
+}
+
+/// Macro to abstract writing batch data to the DB.
+#[macro_export]
+macro_rules! db_batch {
+    (
+        $channel:expr,
+        $data:expr
+    ) => {
+            {
+            let (tx, rx) = oneshot::channel();
+            let req = DbRequest::new(RequestKind::Batch($data), tx);
+
+            let _ = $channel.send(req);
+
+            rx.await
+        }
+    };
+}
+
 
