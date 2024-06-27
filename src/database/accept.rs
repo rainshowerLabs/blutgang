@@ -30,57 +30,61 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
 }
 
 /// Macro to abstract getting the data from the DB.
+///
+/// Returns `Option<InlineArray>`, where the result is `None` if
+/// there was an error or data isn't present, or `Some` if the operation
+/// completed successfully.
 #[macro_export]
 macro_rules! db_get {
     (
         $channel:expr,
         $data:expr
-    ) => {
-            {
-            let (tx, rx) = oneshot::channel();
-            let req = DbRequest::new(RequestKind::Read($data), tx);
+    ) => {{
+        let (tx, rx) = oneshot::channel();
+        let req = DbRequest::new(RequestKind::Read($data), tx);
 
-            let _ = $channel.send(req);
+        let _ = $channel.send(req);
 
-            rx.await
-        }
-    };
+        rx.await
+    }};
 }
 
 /// Macro to abstract inserting data into the DB.
+///
+/// Returns `Option<InlineArray>`, where the result is `None` if
+/// there was an error or data isn't present, or `Some` if the operation
+/// completed successfully.
 #[macro_export]
 macro_rules! db_insert {
     (
         $channel:expr,
         $data:expr
-    ) => {
-            {
-            let (tx, rx) = oneshot::channel();
-            let req = DbRequest::new(RequestKind::Write($data), tx);
+    ) => {{
+        let (tx, rx) = oneshot::channel();
+        let req = DbRequest::new(RequestKind::Write($data), tx);
 
-            let _ = $channel.send(req);
+        let _ = $channel.send(req);
 
-            rx.await
-        }
-    };
+        rx.await
+    }};
 }
 
 /// Macro to abstract writing batch data to the DB.
+///
+/// Returns `Option<InlineArray>`, where the result is `None` if
+/// there was an error or data isn't present, or `Some` if the operation
+/// completed successfully.
 #[macro_export]
 macro_rules! db_batch {
     (
         $channel:expr,
         $data:expr
-    ) => {
-            {
-            let (tx, rx) = oneshot::channel();
-            let req = DbRequest::new(RequestKind::Batch($data), tx);
+    ) => {{
+        let (tx, rx) = oneshot::channel();
+        let req = DbRequest::new(RequestKind::Batch($data), tx);
 
-            let _ = $channel.send(req);
+        let _ = $channel.send(req);
 
-            rx.await
-        }
-    };
+        rx.await
+    }};
 }
-
-

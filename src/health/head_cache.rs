@@ -21,9 +21,7 @@ use std::{
     },
 };
 
-use sled::{
-    Batch,
-};
+use sled::Batch;
 use tokio_stream::{
     wrappers::WatchStream,
     StreamExt,
@@ -125,14 +123,14 @@ fn remove_stale(
 
 #[cfg(test)]
 mod tests {
-    use crate::db_get;
-    use tokio::sync::mpsc;
-    use crate::database_processing;
     use super::*;
+    use crate::database_processing;
+    use crate::db_get;
     use sled::{
         Config,
         Db,
     };
+    use tokio::sync::mpsc;
 
     // #[tokio::test]
     // async fn test_manage_cache() {

@@ -238,8 +238,7 @@ pub async fn forward_body(
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     connection_params: ConnectionParams,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible>
-{
+) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
     let cache_args = CacheArgs {
         finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
         named_numbers: connection_params.named_numbers.clone(),
@@ -309,13 +308,7 @@ pub async fn accept_request(
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(
-        tx,
-        connection_params,
-        cache_args,
-        params,
-    )
-    .await;
+    (response, rpc_position) = forward_body(tx, connection_params, cache_args, params).await;
 
     response
 }

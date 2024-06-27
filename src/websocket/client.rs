@@ -1,9 +1,4 @@
 use crate::{
-    db_get,
-    database::types::{
-        DbRequest,
-        RequestKind,
-    },
     balancer::{
         format::replace_block_tags,
         processing::{
@@ -13,6 +8,11 @@ use crate::{
         },
         selection::select::pick,
     },
+    database::types::{
+        DbRequest,
+        RequestKind,
+    },
+    db_get,
     log_err,
     log_info,
     rpc::types::Rpc,
@@ -47,7 +47,8 @@ use simd_json::{
 
 use tokio::sync::{
     broadcast,
-    mpsc, oneshot,
+    mpsc,
+    oneshot,
 };
 use tokio_tungstenite::{
     connect_async,
