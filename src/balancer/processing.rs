@@ -44,14 +44,27 @@ pub struct CacheArgs {
 }
 
 impl CacheArgs {
-    #[allow(dead_code)]
+    #[cfg(test)]
+    /// **Note:** This should only be used for testing!
     pub fn default() -> Self {
-        let (tx, _rx) = mpsc::unbounded_channel::<DbRequest>();
+        use crate::database_processing;
+
+        use sled::{
+            Config,
+            Db,
+        };
+
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
+
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
+
         CacheArgs {
             finalized_rx: watch::channel(0).1,
             named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
             head_cache: Arc::new(RwLock::new(BTreeMap::new())),
-            cache: tx,
+            cache: db_tx,
         }
     }
 }
@@ -132,7 +145,6 @@ mod tests {
         assert!(!can_cache("eth_subscribe", r#"{"result": "0x1"}"#));
     }
 
-    // TODO: this :(
     #[tokio::test]
     async fn test_cache_querry() {
         let cache_args = CacheArgs::default();

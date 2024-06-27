@@ -272,6 +272,7 @@ pub async fn subscribe_to_new_heads(
     }
 }
 
+// TODO: this :(
 // #[cfg(test)]
 // mod tests {
 //     use super::*;
