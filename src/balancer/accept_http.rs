@@ -6,7 +6,6 @@ use crate::{
         },
         processing::{
             cache_querry,
-            update_rpc_latency,
             CacheArgs,
         },
         selection::select::pick,

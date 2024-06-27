@@ -27,7 +27,6 @@ use std::{
 };
 
 use tokio::sync::{
-    mpsc,
     oneshot,
     watch,
 };

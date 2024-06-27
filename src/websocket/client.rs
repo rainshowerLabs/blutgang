@@ -8,10 +8,6 @@ use crate::{
         },
         selection::select::pick,
     },
-    database::types::{
-        DbRequest,
-        RequestKind,
-    },
     db_get,
     log_err,
     log_info,
@@ -48,7 +44,6 @@ use simd_json::{
 use tokio::sync::{
     broadcast,
     mpsc,
-    oneshot,
 };
 use tokio_tungstenite::{
     connect_async,
