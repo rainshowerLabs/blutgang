@@ -5,6 +5,7 @@ use crate::{
             replace_block_tags,
         },
         processing::{
+            update_rpc_latency,
             cache_querry,
             CacheArgs,
         },
@@ -289,7 +290,7 @@ macro_rules! fetch_from_rpc {
 /// read and return from the cache.
 pub async fn forward_body(
     tx: Request<hyper::body::Incoming>,
-    con_params: ConnectionParams,
+    con_params: &ConnectionParams,
     cache_args: CacheArgs,
     params: RequestParams,
 ) -> (
@@ -445,7 +446,19 @@ pub async fn accept_request(
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, connection_params, cache_args, params).await;
+    (response, rpc_position) = forward_body(tx, &connection_params, cache_args, params).await;
+
+    let time = time.elapsed();
+    log_info!("Request time: {:?}", time);
+
+    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // we forwarded our request to, or is None if the result was cached.
+    //
+    // Here, we update the latency of the RPC that was used to process the request
+    // if `rpc_position` is Some.
+    if let Some(rpc_position) = rpc_position {
+        update_rpc_latency(&connection_params.rpc_list, rpc_position, time);
+    }
 
     response
 }

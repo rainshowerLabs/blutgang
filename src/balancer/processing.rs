@@ -53,6 +53,8 @@ impl CacheArgs {
             Config,
             Db,
         };
+        
+        use tokio::sync::mpsc;
 
         let cache = Config::tmp().unwrap();
         let cache = Db::open_with_config(&cache).unwrap();

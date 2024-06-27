@@ -242,29 +242,11 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing compression toggle!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse compression as bool!");
-        let print_profile = sled_table
-            .get("print_profile")
-            .expect("\x1b[31mErr:\x1b[0m Missing print profile toggle!")
-            .as_bool()
-            .expect("\x1b[31mErr:\x1b[0m Could not parse print_profile as bool!");
         let flush_every_ms = sled_table
             .get("flush_every_ms")
             .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse flush_every_ms as int!");
-
-        // Parse sled mode
-        let sled_mode_str = sled_table
-            .get("mode")
-            .expect("\x1b[31mErr:\x1b[0m Missing sled_mode!")
-            .as_str()
-            .expect("\x1b[31mErr:\x1b[0m Could not parse sled_mode as str!");
-        // TODO: Replace with fanout!
-        // let mut sled_mode = sled::Mode::HighThroughput;
-
-        // if sled_mode_str == "LowSpace" {
-        //     sled_mode = sled::Mode::LowSpace;
-        // }
 
         // Create sled config
         let sled_config = Config::new()
@@ -479,8 +461,6 @@ impl Settings {
         let cache_capacity = cache_capacity
             .parse::<u64>()
             .expect("Invalid cache_capacity");
-
-        let print_profile = matches.get_occurrences::<String>("print_profile").is_some();
 
         let flush_every_ms = matches
             .get_one::<String>("flush_every_ms")

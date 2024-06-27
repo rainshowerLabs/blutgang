@@ -47,16 +47,11 @@ key = ""
 [sled]
 # Path to db
 db_path = "./blutgang-cache"
-# sled mode. Can be HighThroughput/LowSpace
-mode = "HighThroughput"
 # Cache size in bytes.
 cache_capacity = 1000000000
-# Use zstd compression. Reduces size 60-70%,
-# and increases CPU and latency by around 10% for db writes and 2% for reads.
-# If storage constrained, it's fine to have it be on.
-compression = false
-# Print DB profile when dropped. Doesn't do anything for now.
-print_profile = false
+# Select zstd compression level. Reduces size 60-70%,
+# and increases CPU and latency by around 10% for db writes and 2% for reads
+compression = 5
 # Frequency of flushes in ms
 flush_every_ms = 240
 
