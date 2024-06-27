@@ -134,8 +134,8 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
     use crate::db_get;
+    use serde_json::json;
 
     use super::*;
 
@@ -154,7 +154,9 @@ mod tests {
 
         cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
 
-        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()).unwrap().unwrap();
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec())
+            .unwrap()
+            .unwrap();
         let cached_str = std::str::from_utf8(&cached_value).unwrap();
         assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
     }
