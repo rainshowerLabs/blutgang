@@ -6,7 +6,6 @@ use std::{
     },
 };
 
-use sled::Db;
 
 use crate::{
     database::types::RequestBus,
