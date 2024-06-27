@@ -121,6 +121,9 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+    use crate::db_get;
+
     use super::*;
 
     #[test]
@@ -130,19 +133,19 @@ mod tests {
     }
 
     // TODO: this :(
-    // #[tokio::test]
-    // async fn test_cache_querry() {
-    //     let cache_args = CacheArgs::default();
-    //     let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
-    //     let method = json!({"method": "eth_getBlockByNumber", "params": ["latest", false]});
-    //     let tx_hash = blake3::hash(method.to_string().as_bytes());
+    #[tokio::test]
+    async fn test_cache_querry() {
+        let cache_args = CacheArgs::default();
+        let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
+        let method = json!({"method": "eth_getBlockByNumber", "params": ["latest", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-    //     cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
+        cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
 
-    //     let cached_value = cache_args.cache.get(tx_hash.as_bytes()).unwrap().unwrap();
-    //     let cached_str = std::str::from_utf8(&cached_value).unwrap();
-    //     assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
-    // }
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()).unwrap().unwrap();
+        let cached_str = std::str::from_utf8(&cached_value).unwrap();
+        assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
+    }
 
     #[tokio::test]
     async fn test_update_rpc_latency() {
