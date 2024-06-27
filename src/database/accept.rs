@@ -40,7 +40,12 @@ macro_rules! db_get {
         $channel:expr,
         $data:expr
     ) => {{
-        let (tx, rx) = oneshot::channel();
+        use crate::database::types::{
+            DbRequest,
+            RequestKind,
+        };
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let req = DbRequest::new(RequestKind::Read($data), tx);
 
         let _ = $channel.send(req);

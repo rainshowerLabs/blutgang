@@ -13,6 +13,7 @@ use crate::{
     },
     cache_error,
     database::types::RequestBus,
+    db_get,
     log_err,
     log_info,
     log_wrn,
@@ -183,22 +184,19 @@ macro_rules! accept {
 macro_rules! get_response {
     (
         $tx:expr,
-        $cache:expr,
+        $cache_args:expr,
         $tx_hash:expr,
         $rpc_position:expr,
         $id:expr,
-        $rpc_list_rwlock:expr,
-        $finalized_rx:expr,
-        $named_numbers:expr,
-        $head_cache:expr,
+        $con_params:expr,
         $ttl:expr,
         $max_retries:expr
     ) => {
-        match $cache.get($tx_hash.as_bytes()) {
-            Ok(Some(mut rax)) => {
+        match db_get!($cache_args.cache, $tx_hash) {
+            Ok(Some(rax)) => {
                 $rpc_position = None;
                 // Reconstruct ID
-                let mut cached: Value = simd_json::serde::from_slice(&mut rax).unwrap();
+                let mut cached: Value = simd_json::serde::from_slice(rax.make_mut()).unwrap();
 
                 cached["id"] = $id.into();
                 cached.to_string()
@@ -206,14 +204,11 @@ macro_rules! get_response {
             Ok(None) => {
                 fetch_from_rpc!(
                     $tx,
-                    $id,
-                    $rpc_list_rwlock,
-                    $rpc_position,
-                    $cache,
+                    $cache_args,
                     $tx_hash,
-                    $finalized_rx,
-                    $named_numbers,
-                    $head_cache,
+                    $rpc_position,
+                    $id,
+                    $con_params,
                     $ttl,
                     $max_retries
                 )
@@ -231,14 +226,11 @@ macro_rules! get_response {
 macro_rules! fetch_from_rpc {
     (
         $tx:expr,
-        $id:expr,
-        $rpc_list_rwlock:expr,
-        $rpc_position:expr,
-        $cache:expr,
+        $cache_args:expr,
         $tx_hash:expr,
-        $finalized_rx:expr,
-        $named_numbers:expr,
-        $head_cache:expr,
+        $rpc_position:expr,
+        $id:expr,
+        $con_params:expr,
         $ttl:expr,
         $max_retries:expr
     ) => {{
@@ -252,7 +244,7 @@ macro_rules! fetch_from_rpc {
             // Get the next Rpc in line.
             let mut rpc;
             {
-                let mut rpc_list = $rpc_list_rwlock.write().unwrap();
+                let mut rpc_list = $con_params.rpc_list.write().unwrap();
                 (rpc, $rpc_position) = pick(&mut rpc_list);
             }
             log_info!("Forwarding to: {}", rpc.name);
@@ -287,19 +279,12 @@ macro_rules! fetch_from_rpc {
             }
         }
 
-        let cache_args = CacheArgs {
-            finalized_rx: $finalized_rx,
-            named_numbers: $named_numbers,
-            cache: $cache,
-            head_cache: $head_cache,
-        };
-
         // Don't cache responses that contain errors or missing trie nodes
         cache_querry(
             &mut rx,
             $tx,
             $tx_hash,
-            &cache_args,
+            &$cache_args,
         );
 
         rx
@@ -334,12 +319,43 @@ pub async fn forward_body(
     }
 
     // Convert incoming body to serde value
-    let tx = incoming_to_value(tx).await.unwrap();
+    let mut tx = incoming_to_value(tx).await.unwrap();
+
+    // Get the id of the request and set it to 0 for caching
+    //
+    // We're doing this ID gymnastics because we're hashing the
+    // whole request and we don't want the ID as it's arbitrary
+    // and does not impact the request result.
+    let id = tx["id"].take().as_u64().unwrap_or(0);
+
+    // Hash the request with either blake3 or xxhash depending on the enabled feature
+    let tx_hash;
+    #[cfg(not(feature = "xxhash"))]
+    {
+        tx_hash = hash(tx.to_string().as_bytes());
+    }
+    #[cfg(feature = "xxhash")]
+    {
+        tx_hash = xxh3_64(tx.to_string().as_bytes());
+    }
+
+    // RPC used to get the response, we use it to update the latency for it later.
+    let mut rpc_position;
+
+    // Rewrite named block parameters if possible
+    let mut tx = replace_block_tags(&mut tx, &cache_args.named_numbers);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
-    let (rax, position) = get_response(tx, con_params, cache_args, params)
-        .await
-        .unwrap();
+    let (rax, position) = get_response!(
+        tx,
+        cache_args,
+        tx_hash,
+        rpc_position,
+        id,
+        con_params,
+        params.ttl,
+        params.max_retries
+    );
 
     // Convert rx to bytes and but it in a Buf
     let body = hyper::body::Bytes::from(rax);
