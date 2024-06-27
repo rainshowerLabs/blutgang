@@ -14,7 +14,6 @@ use crate::{
     health::safe_block::NamedBlocknumbers,
     Rpc,
 };
-use sled::InlineArray;
 
 use std::{
     collections::BTreeMap,
@@ -66,7 +65,7 @@ pub fn can_cache(method: &str, result: &str) -> bool {
 }
 
 /// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry<K, V>(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
+pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {

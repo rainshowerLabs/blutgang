@@ -256,6 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let heads_sub_data = sub_data.clone();
 
             let cache_args = CacheArgs {
+                cache: db_tx.clone(),
                 finalized_rx: finalized_rx.clone(),
                 named_numbers: named_blocknumbers.clone(),
                 head_cache: head_cache.clone(),

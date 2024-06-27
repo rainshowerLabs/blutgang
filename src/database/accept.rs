@@ -28,3 +28,22 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
         }
     }
 }
+
+/// Macro to abstract getting the data from the Db
+#[macro_export]
+macro_rules! db_get {
+    (
+        $channel:expr,
+        $data:expr
+    ) => {
+            {
+            let (tx, rx) = oneshot::channel();
+            let req = DbRequest::new(RequestKind::Read($data), tx);
+
+            let _ = $channel.send(req);
+
+            rx.await
+        }
+    };
+}
+

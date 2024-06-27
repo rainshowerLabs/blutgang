@@ -1,4 +1,9 @@
 use crate::{
+    db_get,
+    database::types::{
+        DbRequest,
+        RequestKind,
+    },
     balancer::{
         format::replace_block_tags,
         processing::{
@@ -42,7 +47,7 @@ use simd_json::{
 
 use tokio::sync::{
     broadcast,
-    mpsc,
+    mpsc, oneshot,
 };
 use tokio_tungstenite::{
     connect_async,
@@ -294,8 +299,8 @@ pub async fn execute_ws_call(
         }
     };
 
-    if let Ok(Some(mut rax)) = cache_args.cache.get(tx_hash.as_bytes()) {
-        let mut cached: Value = from_slice(&mut rax).unwrap();
+    if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()) {
+        let mut cached: Value = from_slice(rax.make_mut()).unwrap();
         cached["id"] = id;
         return Ok(cached.to_string());
     }

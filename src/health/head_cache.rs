@@ -23,7 +23,6 @@ use std::{
 
 use sled::{
     Batch,
-    InlineArray,
 };
 use tokio_stream::{
     wrappers::WatchStream,
@@ -31,7 +30,7 @@ use tokio_stream::{
 };
 
 /// Check if we need to do a reorg or if a new block has finalized.
-pub async fn manage_cache<K, V>(
+pub async fn manage_cache(
     head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
@@ -126,8 +125,14 @@ fn remove_stale(
 
 #[cfg(test)]
 mod tests {
+    use crate::db_get;
+    use tokio::sync::mpsc;
+    use crate::database_processing;
     use super::*;
-    use sled::Config;
+    use sled::{
+        Config,
+        Db,
+    };
 
     // #[tokio::test]
     // async fn test_manage_cache() {
@@ -154,11 +159,12 @@ mod tests {
     //     assert!(result.is_ok());
     // }
 
-    #[test]
-    fn test_handle_reorg() {
+    #[tokio::test]
+    async fn test_handle_reorg() {
         // Create test data and resources
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
-        let cache = Config::new().temporary(true).open().unwrap();
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
 
         let _ = cache.insert("key1", "value1");
         let _ = cache.insert("key2", "value2");
@@ -172,8 +178,11 @@ mod tests {
             head_cache_guard.insert(3, vec!["key3".to_string()]);
         }
 
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
+
         // Call handle_reorg
-        let result = handle_reorg(&head_cache, 2, 3, cache.clone());
+        let result = handle_reorg(&head_cache, 2, 3, db_tx.clone());
 
         // Verify the result and check if the data is removed from the cache
         assert!(result.is_ok());
@@ -183,11 +192,11 @@ mod tests {
         assert!(!head_cache_guard.contains_key(&3));
 
         // Check if the data is removed from the cache
-        let key1 = cache.get("key1").unwrap();
+        let key1 = db_get!(db_tx.clone(), "key1".into()).unwrap();
         assert!(key1.is_some());
-        let key2 = cache.get("key2").unwrap();
+        let key2 = db_get!(db_tx.clone(), "key2".into()).unwrap();
         assert!(key2.is_none());
-        let key3 = cache.get("key3").unwrap();
+        let key3 = db_get!(db_tx.clone(), "key3".into()).unwrap();
         assert!(key3.is_none());
     }
 
