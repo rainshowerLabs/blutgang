@@ -85,6 +85,6 @@ macro_rules! db_batch {
 
         let _ = $channel.send(req);
 
-        rx.await
+        rx
     }};
 }

@@ -7,6 +7,7 @@ use crate::{
             RequestKind,
         },
     },
+    db_batch,
     log_info,
     log_wrn,
 };
@@ -89,10 +90,7 @@ fn handle_reorg(
     }
 
     // Send the batch to the cache
-    let (tx, _) = oneshot::channel();
-    let req = DbRequest::new(RequestKind::Batch(batch), tx);
-
-    cache.send(req);
+    let _ = db_batch!(cache, batch);
 
     Ok(())
 }
