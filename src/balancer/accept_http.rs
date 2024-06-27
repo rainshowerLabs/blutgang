@@ -62,10 +62,6 @@ use hyper_tungstenite::{
     upgrade,
 };
 
-use sled::{
-    Db,
-    InlineArray,
-};
 
 use tokio::time::timeout;
 
