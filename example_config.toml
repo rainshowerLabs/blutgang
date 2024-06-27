@@ -51,7 +51,7 @@ db_path = "./blutgang-cache"
 cache_capacity = 1000000000
 # Select zstd compression level. Reduces size 60-70%,
 # and increases CPU and latency by around 10% for db writes and 2% for reads
-compression = 5
+compression = 1
 # Frequency of flushes in ms
 flush_every_ms = 5000
 
