@@ -2,8 +2,7 @@
 /.venv
 /blutgang-cache*
 /benchmarks.txt
-/config.toml
+/*.toml
 /.DS_Store
-/config.toml
 /.env
 /default.sled
