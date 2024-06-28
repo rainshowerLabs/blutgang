@@ -1,4 +1,5 @@
 use crate::{
+    db_flush,
     admin::error::AdminError,
     database::types::RequestBus,
     Rpc,
@@ -105,13 +106,8 @@ pub async fn execute_method(
 #[allow(unreachable_code)]
 async fn admin_blutgang_quit(cache: RequestBus) -> Result<Value, AdminError> {
     // We're doing something not-good so flush everything to disk
-    // let _ = cache.flush_async().await;
-    // Drop cache so we get the print profile on drop thing before we quit
-    // We have to get the raw pointer
-    // TODO: This still doesnt work!
-    // unsafe {
-    //     ptr::drop_in_place(Arc::into_raw(cache) as *mut Db);
-    // }
+    let _ = db_flush!(cache);
+
     std::process::exit(0);
     Ok(Value::Null)
 }
@@ -119,7 +115,7 @@ async fn admin_blutgang_quit(cache: RequestBus) -> Result<Value, AdminError> {
 /// Flushes sled cache to disk
 async fn admin_flush_cache(cache: RequestBus) -> Result<Value, AdminError> {
     let time = Instant::now();
-    // let _ = cache.flush_async().await;
+    let _ = db_flush!(cache);
     let time = time.elapsed();
 
     let rx = json!({

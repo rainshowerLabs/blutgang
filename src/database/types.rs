@@ -18,6 +18,7 @@ pub enum RequestKind {
     Read(Vec<u8>),
     Write(Vec<u8>, InlineArray),
     Batch(sled::Batch),
+    Flush(),
 }
 
 /// Contains data to be sent to the DB thread for processing.

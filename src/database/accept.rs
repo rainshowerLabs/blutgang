@@ -18,6 +18,11 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
                 RequestKind::Read(k) => cache.get(k),
                 RequestKind::Write(k, v) => cache.insert(k, v),
                 RequestKind::Batch(b) => cache.apply_batch(b).map(|_| None),
+                RequestKind::Flush() => {
+                    // TODO: return proper stats!
+                    let _ = cache.flush().unwrap();
+                    Ok(None)
+                },
             };
 
             if result.is_err() {
@@ -96,3 +101,30 @@ macro_rules! db_batch {
         rx
     }};
 }
+
+/// Macro for flushing the DB
+///
+/// Returns `Option<InlineArray>`, where the result is `None` if
+/// there was an error or data isn't present, or `Some` if the operation
+/// completed successfully.
+#[macro_export]
+macro_rules! db_flush {
+    (
+        $channel:expr
+    ) => {{
+        use $crate::database::types::{
+            DbRequest,
+            RequestKind,
+        };
+
+        use tokio::sync::oneshot;
+
+        let (tx, rx) = oneshot::channel();
+        let req = DbRequest::new(RequestKind::Flush(), tx);
+
+        let _ = $channel.send(req);
+
+        rx
+    }};
+}
+
