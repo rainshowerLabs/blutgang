@@ -5,8 +5,8 @@ use crate::{
             replace_block_tags,
         },
         processing::{
-            update_rpc_latency,
             cache_querry,
+            update_rpc_latency,
             CacheArgs,
         },
         selection::select::pick,

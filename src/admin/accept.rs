@@ -1,10 +1,10 @@
 use crate::{
-    database::types::RequestBus,
     admin::liveready::{
         accept_health_request,
         accept_readiness_request,
         LiveReadyRequestSnd,
     },
+    database::types::RequestBus,
     log_info,
 };
 use http_body_util::Full;
@@ -182,12 +182,12 @@ pub async fn accept_admin_request(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::database_processing;
+    use jsonwebtoken::DecodingKey;
     use sled::Config;
     use sled::Db;
     use tokio::sync::mpsc;
-    use crate::database_processing;
-    use super::*;
-    use jsonwebtoken::DecodingKey;
 
     // Helper function to create a test Settings config
     fn create_test_settings() -> Arc<RwLock<Settings>> {

@@ -6,9 +6,7 @@ use std::{
     },
 };
 
-
 use crate::{
-    database::types::RequestBus,
     admin::{
         accept::accept_admin_request,
         liveready::{
@@ -17,6 +15,7 @@ use crate::{
             LiveReadyUpdateRecv,
         },
     },
+    database::types::RequestBus,
     log_info,
     Rpc,
     Settings,

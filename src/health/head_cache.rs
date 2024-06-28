@@ -90,7 +90,9 @@ fn handle_reorg(
     }
 
     // Send the batch to the cache
-    let _ = db_batch!(cache, batch);
+    // Dropping unawaited future we don't need.
+
+    drop(db_batch!(cache, batch));
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 use crate::{
-    database::types::RequestBus,
     admin::error::AdminError,
+    database::types::RequestBus,
     Rpc,
     Settings,
 };
@@ -388,12 +388,12 @@ fn admin_blutgang_set_ttl(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::database_processing;
+    use jsonwebtoken::DecodingKey;
     use sled::Config;
     use sled::Db;
     use tokio::sync::mpsc;
-    use crate::database_processing;
-    use super::*;
-    use jsonwebtoken::DecodingKey;
 
     // Helper function to create a test RPC list
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
