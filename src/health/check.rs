@@ -297,8 +297,6 @@ fn escape_poverty(
         to_send = LiveReadyUpdate::Health(HealthState::Healthy);
     } else if !is_pov_empty && !is_rpc_empty {
         to_send = LiveReadyUpdate::Health(HealthState::MissingRpcs);
-    } else if is_rpc_empty {
-        to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
     } else {
         to_send = LiveReadyUpdate::Health(HealthState::Unhealthy);
     }
