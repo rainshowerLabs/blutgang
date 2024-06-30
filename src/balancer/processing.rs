@@ -148,7 +148,7 @@ mod tests {
     async fn test_cache_querry() {
         let cache_args = CacheArgs::default();
         let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
-        let method = json!({"method": "eth_getBlockByNumber", "params": ["latest", false]});
+        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
         cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
