@@ -61,6 +61,8 @@
             clang
             gdb
             valgrind
+            cargo-llvm-cov
+            llvm_18
             python311Packages.requests
             python311Packages.websocket-client
             (rust-bin.nightly.latest.default.override {
@@ -72,7 +74,11 @@
             export CARGO_BUILD_RUSTC_WRAPPER=$(which sccache)
             export RUSTC_WRAPPER=$(which sccache)
             export OLD_PS1="$PS1" # Preserve the original PS1
-            export PS1="nix-shell:blutgang $PS1" # Customize this line as needed
+            export PS1="nix-shell:blutgang $PS1"
+
+            # For generating code coverage reports using `cargo-llvm-cov`
+            export LLVM_COV=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-cov
+            export LLVM_PROFDATA=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-profdata
 
             # Set NIX_LD and NIX_LD_LIBRARY_PATH for rust-analyzer
             # export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.glibc pkgs.gcc-unwrapped.lib ]}"
