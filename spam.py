@@ -2,6 +2,7 @@ import multiprocessing as mp
 import requests
 import json
 import random
+import time
 
 def get_block_number(hex_num):
     random_id = random.randint(1, 1000000)
@@ -17,9 +18,7 @@ def get_block_number(hex_num):
         block_number = int(result["result"]["number"], 16)
     except Exception as e:
         return e
-    # block_number = result
 
-    # throw if id doesnt match
     if result["id"] != random_id:
         raise ValueError("Invalid response id: %s" % result["id"])
 
@@ -28,15 +27,22 @@ def get_block_number(hex_num):
 def my_func(x):
     for i in range(x): 
         block_number = get_block_number(hex(i+17975056))
-        # print(f"Block Number: {block_number}")
 
 def main():
     pool = mp.Pool(mp.cpu_count())
-    i = 0
-    while i < 10:
+    total_requests = 0
+    start_time = time.time()
+    
+    while True:
         pool.map(my_func, range(0, 1000))
-        print("done: ", i)
-        i += 1
+        total_requests += 1000 * mp.cpu_count()
+        
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= 10:
+            requests_per_second = total_requests / elapsed_time
+            print(f"Requests per second: {requests_per_second}")
+            total_requests = 0
+            start_time = time.time()
 
 if __name__ == "__main__":
     main()
