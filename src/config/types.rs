@@ -247,12 +247,12 @@ impl Settings {
             .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
             .as_integer()
             .expect("\x1b[31mErr:\x1b[0m Could not parse flush_every_ms as int!");
-        let fan_out = sled_table
-            .get("fan_out")
-            .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
-            .as_integer()
-            .expect("\x1b[31mErr:\x1b[0m Could not parse flush_every_ms as int!")
-            as usize;
+        // let fan_out = sled_table
+        //     .get("fan_out")
+        //     .expect("\x1b[31mErr:\x1b[0m Missing flush_every_ms!")
+        //     .as_integer()
+        //     .expect("\x1b[31mErr:\x1b[0m Could not parse flush_every_ms as int!")
+        //     as usize;
 
         // Create sled config
         let sled_config = Config::new()

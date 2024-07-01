@@ -8,6 +8,7 @@ use crate::{
     log_wrn,
     FANOUT,
 };
+
 use sled::Db;
 
 /// Sets up the cache with various basic data about our current blutgang instance.
