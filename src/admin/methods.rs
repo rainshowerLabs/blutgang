@@ -1,7 +1,7 @@
 use crate::{
-    db_flush,
     admin::error::AdminError,
     database::types::RequestBus,
+    db_flush,
     Rpc,
     Settings,
 };

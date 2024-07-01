@@ -22,7 +22,7 @@ pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, ca
                     // TODO: return proper stats!
                     let _ = cache.flush().unwrap();
                     Ok(None)
-                },
+                }
             };
 
             if result.is_err() {
@@ -127,4 +127,3 @@ macro_rules! db_flush {
         rx
     }};
 }
-
