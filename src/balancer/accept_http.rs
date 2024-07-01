@@ -12,7 +12,6 @@ use crate::{
         selection::select::pick,
     },
     cache_error,
-    database::types::RequestBus,
     db_get,
     log_err,
     log_info,
@@ -29,7 +28,6 @@ use crate::{
             SubscriptionData,
         },
     },
-    NamedBlocknumbers,
     Settings,
     WsconnMessage,
 };
@@ -65,7 +63,6 @@ use hyper_tungstenite::{
 use tokio::time::timeout;
 
 use std::{
-    collections::BTreeMap,
     convert::Infallible,
     println,
     sync::{
@@ -84,10 +81,7 @@ use std::{
 pub struct ConnectionParams {
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     channels: RequestChannels,
-    named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-    head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
     sub_data: Arc<SubscriptionData>,
-    cache: RequestBus,
     config: Arc<RwLock<Settings>>,
 }
 
@@ -95,19 +89,13 @@ impl ConnectionParams {
     pub fn new(
         rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
         channels: RequestChannels,
-        named_numbers: &Arc<RwLock<NamedBlocknumbers>>,
-        head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
         sub_data: &Arc<SubscriptionData>,
-        cache: &RequestBus,
         config: &Arc<RwLock<Settings>>,
     ) -> Self {
         ConnectionParams {
             rpc_list: rpc_list_rwlock.clone(),
             channels,
-            named_numbers: named_numbers.clone(),
-            head_cache: head_cache.clone(),
             sub_data: sub_data.clone(),
-            cache: cache.clone(),
             config: config.clone(),
         }
     }
@@ -155,6 +143,7 @@ impl Clone for RequestChannels {
 macro_rules! accept {
     (
         $io:expr,
+        $cache_args:expr,
         $connection_params:expr
     ) => {
         // Bind the incoming connection to our service
@@ -163,7 +152,7 @@ macro_rules! accept {
             .serve_connection(
                 $io,
                 service_fn(|req| {
-                    let response = accept_request(req, $connection_params);
+                    let response = accept_request(req, $cache_args.clone(), $connection_params.clone());
                     response
                 }),
             )
@@ -376,14 +365,8 @@ pub async fn forward_body(
 pub async fn accept_request(
     mut tx: Request<hyper::body::Incoming>,
     connection_params: ConnectionParams,
+    cache_args: CacheArgs,
 ) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
-    let cache_args = CacheArgs {
-        finalized_rx: connection_params.channels.finalized_rx.as_ref().clone(),
-        named_numbers: connection_params.named_numbers.clone(),
-        cache: connection_params.cache.clone(),
-        head_cache: connection_params.head_cache.clone(),
-    };
-
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
         log_info!("Received WS upgrade request");

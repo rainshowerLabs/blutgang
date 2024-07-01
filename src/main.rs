@@ -297,19 +297,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             outgoing_rx.resubscribe(),
         );
 
+        let cache_args = CacheArgs {
+            finalized_rx: channels.finalized_rx.as_ref().clone(),
+            named_numbers: named_blocknumbers.clone(),
+            cache: db_tx.clone(),
+            head_cache: head_cache.clone(),
+        };
+
         let connection_params = ConnectionParams::new(
             &rpc_list_rwlock,
             channels,
-            &named_blocknumbers,
-            &head_cache,
             &sub_data,
-            &db_tx,
             &config,
         );
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
-            accept!(io, connection_params.clone());
+            accept!(io, connection_params.clone(), cache_args.clone());
         });
     }
 }
