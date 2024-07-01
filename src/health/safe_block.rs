@@ -71,7 +71,18 @@ pub async fn get_safe_block(
     named_numbers_rwlock: &Arc<RwLock<NamedBlocknumbers>>,
     ttl: u64,
 ) -> Result<u64, RpcError> {
-    let len = rpc_list.read().unwrap().len();
+    let len;
+    let rpc_list_clone;
+    {
+        let rpc_list_guard = rpc_list.read().unwrap_or_else(|e| {
+            // Handle the case where the RwLock is poisoned
+            e.into_inner()
+        });
+
+        len = rpc_list_guard.len();
+        rpc_list_clone = rpc_list_guard.clone();
+    }
+
     let mut safe = 0;
 
     // If len == 0 return 0
@@ -87,7 +98,7 @@ pub async fn get_safe_block(
 
     // Iterate over all RPCs
     for i in 0..len {
-        let rpc_clone = rpc_list.read().unwrap()[i].clone();
+        let rpc_clone = rpc_list_clone[i].clone();
         let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC

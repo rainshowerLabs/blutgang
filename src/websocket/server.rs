@@ -123,7 +123,7 @@ pub async fn serve_websocket(
                     Err(_) => continue,
                 };
 
-                tx.send(RequestResult::Call(rax)).unwrap();
+                tx.send(RequestResult::Call(rax)).unwrap_or(());
             }
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {

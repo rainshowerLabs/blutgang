@@ -136,8 +136,17 @@ async fn head_check(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     ttl: u128,
 ) -> Result<Vec<HeadResult>, HealthError> {
-    let len = rpc_list.read().unwrap().len();
-    let mut heads = Vec::<HeadResult>::new();
+    let len;
+    let rpc_list_clone;
+    {
+        let rpc_list_guard = rpc_list.read().unwrap_or_else(|e| {
+            // Handle the case where the RwLock is poisoned
+            e.into_inner()
+        });
+
+        len = rpc_list_guard.len();
+        rpc_list_clone = rpc_list_guard.clone();
+    }    let mut heads = Vec::<HeadResult>::new();
 
     // If len == 0 return empty Vec
     if len == 0 {
@@ -152,7 +161,7 @@ async fn head_check(
 
     // Iterate over all RPCs
     for i in 0..len {
-        let rpc_clone = rpc_list.read().unwrap()[i].clone();
+        let rpc_clone = rpc_list_clone[i].clone();
         let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC
@@ -264,8 +273,14 @@ fn escape_poverty(
     agreed_head: u64,
 ) -> Result<crate::LiveReadyUpdate, HealthError> {
     // Check if any nodes made it 🗣️🔥🔥🔥
-    let mut poverty_list_guard = poverty_list.write().unwrap();
-    let mut rpc_list_guard = rpc_list.write().unwrap();
+    let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
+        // Handle the case where the RwLock is poisoned
+        e.into_inner()
+    });
+    let mut poverty_list_guard = poverty_list.write().unwrap_or_else(|e| {
+        // Handle the case where the RwLock is poisoned
+        e.into_inner()
+    });
 
     for head_result in poverty_heads {
         if head_result.reported_head >= agreed_head && !head_result.is_syncing {

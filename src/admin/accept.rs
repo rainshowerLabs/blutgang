@@ -138,7 +138,16 @@ pub async fn accept_admin_request(
         return accept_health_request(liveness_request_tx).await;
     }
 
-    let mut tx = incoming_to_value(tx).await.unwrap();
+    let mut tx = match incoming_to_value(tx).await {
+        Ok(res) => res,
+        Err(err) => {
+            println!("\x1b[31mAdmin request malformed:\x1b[0m {}", err);
+            return Ok(hyper::Response::builder()
+                .status(401)
+                .body(Full::new(Bytes::from("Invalid admin request format")))
+                .unwrap());
+        }
+    };
 
     // If we have JWT enabled check that tx is valid
     if config.read().unwrap().admin.jwt {

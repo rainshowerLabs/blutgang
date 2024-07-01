@@ -229,8 +229,12 @@ macro_rules! fetch_from_rpc {
             // Get the next Rpc in line.
             let mut rpc;
             {
-                let mut rpc_list = $con_params.rpc_list.write().unwrap();
-                (rpc, $rpc_position) = pick(&mut rpc_list);
+                let mut rpc_list_guard = $con_params.rpc_list.write().unwrap_or_else(|e| {
+                    // Handle the case where the RwLock is poisoned
+                    e.into_inner()
+                });
+
+                (rpc, $rpc_position) = pick(&mut rpc_list_guard);
             }
             log_info!("Forwarding to: {}", rpc.name);
 
