@@ -304,12 +304,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             head_cache: head_cache.clone(),
         };
 
-        let connection_params = ConnectionParams::new(
-            &rpc_list_rwlock,
-            channels,
-            &sub_data,
-            &config,
-        );
+        let connection_params =
+            ConnectionParams::new(&rpc_list_rwlock, channels, &sub_data, &config);
 
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {

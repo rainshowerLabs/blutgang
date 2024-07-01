@@ -152,7 +152,8 @@ macro_rules! accept {
             .serve_connection(
                 $io,
                 service_fn(|req| {
-                    let response = accept_request(req, $cache_args.clone(), $connection_params.clone());
+                    let response =
+                        accept_request(req, $cache_args.clone(), $connection_params.clone());
                     response
                 }),
             )

@@ -11,6 +11,7 @@ use crate::{
     db_get,
     log_err,
     log_info,
+    log_wrn,
     rpc::types::Rpc,
     websocket::{
         error::WsError,
@@ -192,9 +193,17 @@ pub async fn ws_conn(
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
     index: usize,
 ) {
-    let (ws_stream, _) = connect_async(&rpc.ws_url.unwrap())
-        .await
-        .expect("Failed to connect to WS");
+    let ws_stream = match connect_async(&rpc.ws_url.unwrap()).await {
+        Ok((ws_stream, _)) => ws_stream,
+        Err(_) => {
+            log_wrn!(
+                "Node {} dropped their connection in the middle of WS init!",
+                rpc.name
+            );
+            return;
+        }
+    };
+
     let (mut ws_sender, mut ws_receiver) = ws_stream.split();
 
     // Thread for sending messages
