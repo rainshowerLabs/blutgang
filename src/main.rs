@@ -26,6 +26,7 @@ use crate::{
     config::{
         cache_setup::setup_data,
         cli_args::create_match,
+        system::FANOUT,
         types::Settings,
     },
     database::accept::database_processing,
@@ -60,6 +61,8 @@ use std::{
         RwLock,
     },
 };
+
+use sled::Db;
 
 use tokio::{
     net::TcpListener,
@@ -103,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
 
     // Create/Open sled DB
-    let cache = config
+    let cache: Db<{ FANOUT }> = config
         .read()
         .unwrap()
         .sled_config

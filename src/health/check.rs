@@ -146,7 +146,8 @@ async fn head_check(
 
         len = rpc_list_guard.len();
         rpc_list_clone = rpc_list_guard.clone();
-    }    let mut heads = Vec::<HeadResult>::new();
+    }
+    let mut heads = Vec::<HeadResult>::new();
 
     // If len == 0 return empty Vec
     if len == 0 {

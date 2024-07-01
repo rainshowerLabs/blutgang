@@ -6,11 +6,12 @@ use crate::{
     log_err,
     log_info,
     log_wrn,
+    FANOUT,
 };
 use sled::Db;
 
 /// Sets up the cache with various basic data about our current blutgang instance.
-pub fn setup_data(cache: &Db, do_clear: bool) {
+pub fn setup_data(cache: &Db<{ FANOUT }>, do_clear: bool) {
     // Clear database if specified
     if do_clear {
         cache.clear().unwrap();

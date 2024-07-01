@@ -4,6 +4,7 @@ use crate::{
         RequestKind,
     },
     log_err,
+    FANOUT,
 };
 
 use sled::Db;
@@ -11,7 +12,10 @@ use sled::Db;
 use tokio::sync::mpsc;
 
 /// Processes incoming requests from clients and returns responses
-pub async fn database_processing(mut rax: mpsc::UnboundedReceiver<DbRequest>, cache: Db) {
+pub async fn database_processing(
+    mut rax: mpsc::UnboundedReceiver<DbRequest>,
+    cache: Db<{ FANOUT }>,
+) {
     loop {
         while let Some(incoming) = rax.recv().await {
             let result = match incoming.request {
