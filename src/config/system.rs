@@ -9,7 +9,7 @@ pub const MAGIC: u32 = 0xb153;
 /// to lower LEAF_FANOUT to between 16 to 256, depending on your efficiency requirements.
 /// A lower value will also cause contention to be reduced for frequently accessed data.
 /// This value cannot be changed after creating the database.
-pub const FANOUT: usize = 512;
+pub const FANOUT: usize = 256;
 
 // Version consts, dont impact functionality
 pub const VERSION_STR: &str = "Blutgang 0.4.0 Arianrhod";
