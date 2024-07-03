@@ -63,6 +63,8 @@
             valgrind
             cargo-llvm-cov
             llvm_18
+            cargo-flamegraph
+            linuxPackages_latest.perf
             python311Packages.requests
             python311Packages.websocket-client
             (rust-bin.nightly.latest.default.override {
