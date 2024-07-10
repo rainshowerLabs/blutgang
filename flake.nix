@@ -8,7 +8,7 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachSystem [ "aarch64-linux" "x86_64-linux" ] (system:
+    flake-utils.lib.eachSystem [ "aarch64-linux" "aarch64-darwin" "x86_64-linux" ] (system:
       let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs {
@@ -54,22 +54,24 @@
 
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
-            gcc
             pkg-config
             openssl
-            systemd
             clang
-            gdb
-            valgrind
-            cargo-llvm-cov
-            llvm_18
             cargo-flamegraph
-            linuxPackages_latest.perf
             python311Packages.requests
             python311Packages.websocket-client
+            python3
             (rust-bin.nightly.latest.default.override {
               extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
             })
+          ] ++ lib.optional pkgs.stdenv.isLinux [
+            pkgs.cargo-llvm-cov
+            pkgs.llvm_18
+            pkgs.valgrind
+            pkgs.gdb
+            pkgs.gcc
+            pkgs.systemd
+            pkgs.linuxPackages_latest.perf
           ];
 
           shellHook = ''
