@@ -181,7 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(feature = "prometheusd"))]
     {
         use crate::admin::metrics::metrics_update_sink;
-        tokio::task::spawn(metrics_update_sink(metrics_rx));
+        tokio::task::spawn(metrics_update_sink(metrics_update_rx));
     }
 
     // Spawn a thread for the admin namespace if enabled

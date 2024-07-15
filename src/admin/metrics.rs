@@ -13,6 +13,8 @@ use measured::text::TextEncoder;
 use prometheus::{
     histogram_opts,
     opts,
+    register_counter,
+    register_gauge,
     register_histogram,
     register_histogram_vec,
     Error,
@@ -110,13 +112,23 @@ const VERSION_LABEL: [(&str, &str); 1] = [("version", env!("CARGO_PKG_VERSION"))
 
 #[derive(Clone, Debug)]
 pub struct RpcMetrics {
+    pub registry: Arc<RwLock<StorageRegistry>>,
+    pub historical_blocks: prometheus::Gauge,
+    pub port: prometheus::Gauge,
+    pub latest_block: prometheus::Gauge,
     pub duration: prometheus::HistogramVec,
+    pub requests: prometheus::Counter,
 }
 impl RpcMetrics {
     pub fn new(label: &'static str) -> Self {
         let opts = histogram_opts!(label, "RPC request latency");
         Self {
+            registry: Arc::new(RwLock::new(StorageRegistry::default())),
             duration: register_histogram_vec!(opts, &["url", label],).unwrap(),
+            historical_blocks: register_gauge!("historical_blocks", "historical_blocks").unwrap(),
+            port: register_gauge!("port", "port").unwrap(),
+            latest_block: register_gauge!("latest_block", "latest_block").unwrap(),
+            requests: register_counter!("requests", "requests").unwrap(),
         }
     }
     pub fn requests_complete(&self, url: &str, method: &str, status: &str, dt: Duration) {
