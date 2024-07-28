@@ -72,6 +72,8 @@
             pkgs.gcc
             pkgs.systemd
             pkgs.linuxPackages_latest.perf
+          ] ++ lib.optionals stdenv.isDarwin [
+            darwin.apple_sdk.frameworks.SystemConfiguration
           ];
 
           shellHook = ''

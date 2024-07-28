@@ -13,7 +13,7 @@ categories = ["command-line-utilities"]
 
 [dependencies]
 clap = "4.3.0"
-hyper = { version = "1.0.1", features = ["full"] }
+hyper = { version = "1.4.1", features = ["server", "http1"] }
 http-body-util = "0.1.0-rc.3"
 reqwest = { version = "0.11.18", features = ["blocking", "json"] }
 serde = { version = "1.0.163", features = ["derive"] }
