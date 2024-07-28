@@ -108,7 +108,7 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
             } else {
                 return;
             }
-            
+
             // Dropping unawaited future we don't need.
             drop(db_insert!(
                 cache_args.cache,
@@ -153,6 +153,14 @@ mod tests {
         assert!(!can_cache("eth_subscribe", r#"{"result": "0x1"}"#));
     }
 
+    #[test]
+    fn test_dont_cache_infura_err() {
+        assert!(can_cache(
+            r#"{"method": "eth_getBlockByNumber", "params": ["0x10", false]}"#,
+            r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#
+        ));
+    }
+
     #[tokio::test]
     async fn test_cache_querry() {
         let cache_args = CacheArgs::default();
@@ -167,6 +175,19 @@ mod tests {
             .unwrap();
         let cached_str = std::str::from_utf8(&cached_value).unwrap();
         assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
+    }
+
+    #[tokio::test]
+    async fn test_cache_infura_error_querry() {
+        let cache_args = CacheArgs::default();
+        let mut rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#.to_string();
+        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
+
+        cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
+
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()).unwrap();
+        assert_eq!(cached_value, None);
     }
 
     #[tokio::test]
