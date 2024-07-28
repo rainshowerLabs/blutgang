@@ -95,11 +95,20 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
                 head_cache.entry(num).or_default().push(tx_hash.to_string());
             }
 
-            // Replace the id with Value::Null and insert the request
+            // Replace the id with Value::Null and insert the request.
+            //
+            // In some cases the response might not contain an ID like in
+            // https://github.com/rainshowerLabs/blutgang/issues/88.
+            // In this case we just skip inserting it into the DB as its an error.
+            //
             // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
-            rx_value["id"] = Value::Null;
-
+            if let Some(id) = rx_value.get_mut("id") {
+                *id = Value::Null;
+            } else {
+                return;
+            }
+            
             // Dropping unawaited future we don't need.
             drop(db_insert!(
                 cache_args.cache,
