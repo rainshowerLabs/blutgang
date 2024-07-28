@@ -83,10 +83,6 @@
             # For generating code coverage reports using `cargo-llvm-cov`
             export LLVM_COV=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-cov
             export LLVM_PROFDATA=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-profdata
-
-            # Set NIX_LD and NIX_LD_LIBRARY_PATH for rust-analyzer
-            # export NIX_LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.glibc pkgs.gcc-unwrapped.lib ]}"
-            # export NIX_LD="${pkgs.stdenv.cc}/nix-support/dynamic-linker"
           '';
 
           # reset ps1
