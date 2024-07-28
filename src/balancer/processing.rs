@@ -73,7 +73,7 @@ impl CacheArgs {
 
 // TODO: we should find a way to check values directly and not convert Value to str
 pub fn can_cache(method: &str, result: &str) -> bool {
-    if cache_method(method) && cache_result(result) {
+    if (cache_method(method)) && (cache_result(result)) {
         return true;
     }
     false
@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_dont_cache_infura_err() {
-        assert!(can_cache(
+        assert!(!can_cache(
             r#"{"method": "eth_getBlockByNumber", "params": ["0x10", false]}"#,
             r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#
         ));
