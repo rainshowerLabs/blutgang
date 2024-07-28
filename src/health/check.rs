@@ -249,7 +249,7 @@ fn make_poverty(
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
             log_wrn!(
-                "{} is falling behind! Removing froma active RPC pool.",
+                "{} is falling behind! Removing from active RPC pool.",
                 rpc_list_guard[head.rpc_list_index].name
             );
 
