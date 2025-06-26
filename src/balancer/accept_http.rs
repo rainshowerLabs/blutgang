@@ -339,6 +339,12 @@ async fn forward_body(
     // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
+    // RPC used to get the response, we use it to update the latency for it later.
+    let mut rpc_position;
+
+    // Rewrite named block parameters if possible
+    let mut tx = replace_block_tags(&mut tx, named_numbers);
+
     // Hash the request with either blake3 or xxhash depending on the enabled feature
     let tx_hash;
     #[cfg(not(feature = "xxhash"))]
@@ -349,12 +355,6 @@ async fn forward_body(
     {
         tx_hash = xxh3_64(tx.to_string().as_bytes());
     }
-
-    // RPC used to get the response, we use it to update the latency for it later.
-    let mut rpc_position;
-
-    // Rewrite named block parameters if possible
-    let mut tx = replace_block_tags(&mut tx, named_numbers);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(

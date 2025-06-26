@@ -317,7 +317,7 @@ pub async fn execute_ws_call(
     );
 
     let id = call["id"].take();
-    let tx_hash = {
+    let mut tx_hash = {
         #[cfg(not(feature = "xxhash"))]
         {
             hash(call.to_string().as_bytes())
@@ -381,6 +381,18 @@ pub async fn execute_ws_call(
     } else {
         // Replace block tags if applicable
         call = replace_block_tags(&mut call, &cache_args.named_numbers);
+
+        // Hash again after replacing block tags to get the right cache key
+        tx_hash = {
+            #[cfg(not(feature = "xxhash"))]
+            {
+                hash(call.to_string().as_bytes())
+            }
+            #[cfg(feature = "xxhash")]
+            {
+                xxh3_64(call.to_string().as_bytes())
+            }
+        };
     }
 
     call["id"] = user_id.into();
