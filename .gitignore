@@ -7,3 +7,7 @@
 /config.toml
 /.env
 /default.sled
+
+# AI stuff
+*CLAUDE*
+*claude*
