@@ -6,3 +6,7 @@
 /.DS_Store
 /.env
 /default.sled
+
+# AI stuff
+*CLAUDE*
+*claude*
