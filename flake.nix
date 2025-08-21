@@ -76,6 +76,9 @@
             darwin.apple_sdk.frameworks.SystemConfiguration
           ];
 
+          # `jemalloc-sys` build step fails during debug builds due to nix gcc hardening
+          hardeningDisable = ["fortify"];
+
           shellHook = ''
             export CARGO_BUILD_RUSTC_WRAPPER=$(which sccache)
             export RUSTC_WRAPPER=$(which sccache)
