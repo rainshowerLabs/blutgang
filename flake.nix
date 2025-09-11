@@ -3,98 +3,307 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+
     flake-utils.url = "github:numtide/flake-utils";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+
+    crane.url = "github:ipetkov/crane";
+
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    advisory-db = {
+      url = "github:rustsec/advisory-db";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachSystem [ "aarch64-linux" "aarch64-darwin" "x86_64-linux" ] (system:
-      let
-        overlays = [ rust-overlay.overlays.default ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
-        cargoMeta = builtins.fromTOML (builtins.readFile ./Cargo.toml);
-      in
-      {
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = cargoMeta.package.name;
-          version = cargoMeta.package.version;
-          src = ./.;
-          cargoLock = {
-            lockFile = ./Cargo.lock;
+  outputs = { self, ... }@inputs:
+    inputs.flake-utils.lib.eachDefaultSystem
+      (system:
+        let
+          inherit (pkgs) fenix;
+          inherit (pkgs.lib) optionalAttrs optional sources;
+          inherit (pkgs.lib.fileset) unions fileFilter toSource;
+
+          pkgs = import inputs.nixpkgs {
+            inherit system;
+            overlays = [ inputs.fenix.overlays.default ];
           };
-          buildInputs = with pkgs; [ gcc pkg-config openssl systemd ];
-          nativeBuildInputs = with pkgs; [
-            gcc
-            pkg-config
-            openssl
-            systemd
-            (rust-bin.stable.latest.default.override {
-              extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
-            })
-          ];
-          # This is the only way im aware of to have
-          # different build profiles with `buildRustPackage` (:
-          preBuild = ''
-            # Backup the original Cargo.toml
-            cp Cargo.toml Cargo.toml.backup
-            # Add the desired profile settings to Cargo.toml
-            echo '[profile.release]' >> Cargo.toml
-            echo 'lto = "fat"' >> Cargo.toml
-            echo 'codegen-units = 1' >> Cargo.toml
-            echo 'incremental = false' >> Cargo.toml
-          '';
-          postBuild = ''
-            # Restore the original Cargo.toml
-            mv Cargo.toml.backup Cargo.toml
-          '';
-          cargoBuildFlags = [ "" ];
-        };
 
-        devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            pkg-config
-            openssl
-            clang
-            cargo-flamegraph
-            python311Packages.requests
-            python311Packages.websocket-client
-            python3
-            (rust-bin.nightly.latest.default.override {
-              extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
-            })
-          ] ++ lib.optional pkgs.stdenv.isLinux [
-            pkgs.cargo-llvm-cov
-            pkgs.llvm_18
-            pkgs.valgrind
-            pkgs.gdb
-            pkgs.gcc
-            pkgs.systemd
-            pkgs.linuxPackages_latest.perf
-          ] ++ lib.optionals stdenv.isDarwin [
-            darwin.apple_sdk.frameworks.SystemConfiguration
-          ];
+          craneLib = (inputs.crane.mkLib pkgs).overrideToolchain fenix.stable.toolchain;
+          craneLibNightly = craneLib.overrideToolchain (fenix.fromToolchainFile {
+            file = ./.rust-toolchain.toml;
+            sha256 = "sha256-5fekoWL33RFwtNPbtEHYUB4UrqSjmGWQ4ju6enZexVM=";
+          });
+          craneLibLlvm = craneLib.overrideToolchain
+            (fenix.complete.withComponents [
+              "cargo"
+              "llvm-tools"
+              "rustc"
+            ]);
 
-          # `jemalloc-sys` build step fails during debug builds due to nix gcc hardening
-          hardeningDisable = ["fortify"];
+          src =
+            let
+              root = ./.;
+              fileset = unions [
+                (craneLib.fileset.commonCargoSources root)
+                (fileFilter (file: file.hasExt "md") root)
+                ./LICENSE
+              ];
+            in
+            toSource {
+              inherit root fileset;
+            };
 
-          shellHook = ''
-            export CARGO_BUILD_RUSTC_WRAPPER=$(which sccache)
-            export RUSTC_WRAPPER=$(which sccache)
-            export OLD_PS1="$PS1" # Preserve the original PS1
-            export PS1="nix-shell:blutgang $PS1"
+          buildArgs = {
+            inherit src;
+            strictDeps = true;
+
+            nativeBuildInputs = with pkgs; [
+              pkg-config
+              rustPlatform.bindgenHook
+              llvmPackages.bintools
+              libclang.lib
+            ];
+            buildInputs = with pkgs; [
+              openssl.dev
+              rocksdb
+            ];
+
+            # Used by build.rs in the rocksdb-sys crate. If we don't set these, it would
+            # try to build RocksDB from source.
+            ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+            # https://github.com/nix-community/fenix/issues/206
+            # Tells rust which linker to use, in this case bintools, containing lld.
+            # The problem doesn't seem to exist on MacOS.
+            env = optionalAttrs (system == "x86_64-linux") {
+              RUSTFLAGS = "-C link-self-contained=-linker";
+            };
+          };
+
+          # Build *just* the cargo dependencies, so we can reuse
+          # all of that work (e.g. via cachix) when running in CI
+          cargoArtifacts = craneLib.buildDepsOnly buildArgs;
+
+          mkBlutgang = { features ? [ ] }: craneLib.buildPackage (buildArgs // {
+            inherit cargoArtifacts;
+
+            # Only patchelf for the actual package
+            nativeBuildInputs = with pkgs; buildArgs.nativeBuildInputs
+            ++ optional stdenv.isLinux [
+              autoPatchelfHook
+            ];
+            doCheck = false;
+
+            CARGO_PROFILE = "maxperf";
+          } // optionalAttrs (builtins.length features > 0) {
+            cargoExtraArgs = "--locked --features ${builtins.concatStringsSep " " features}";
+          });
+
+          blutgang = mkBlutgang { };
+          blutgang-systemd = mkBlutgang { features = [ "journald" ]; };
+
+          mkGuestPlatform = system: builtins.replaceStrings [ "darwin" ] [ "linux" ] system;
+          dockerImage =
+            let
+              inherit (pkgs) blutgang;
+              pkgs = import inputs.nixpkgs {
+                system = mkGuestPlatform system;
+                overlays = [
+                  self.inputs.fenix.overlays.default
+                  self.overlays.craneLib
+                  self.overlays.blutgang
+                ];
+              };
+            in
+            pkgs.dockerTools.buildLayeredImage {
+              name = blutgang.pname;
+              tag = blutgang.version;
+              contents = with pkgs; [
+                pkg-config
+                openssl
+                blutgang
+              ];
+              config = {
+                Workdir = "/app";
+                Entrypoint = [ "${blutgang}/bin/blutgang" ];
+              };
+            };
+        in
+        {
+          checks = {
+            inherit blutgang;
+
+            cargo-clippy = craneLib.cargoClippy (buildArgs // {
+              inherit cargoArtifacts;
+              cargoClippyExtraArgs = "--all-targets -- --deny warnings";
+            });
+
+            cargo-doc = craneLib.cargoDoc (buildArgs // {
+              inherit cargoArtifacts;
+            });
+
+            cargo-fmt = craneLibNightly.cargoFmt {
+              inherit src;
+            };
+
+            taplo-fmt = craneLib.taploFmt {
+              src = sources.sourceFilesBySuffices src [ ".toml" ];
+            };
+
+            cargo-audit = craneLib.cargoAudit {
+              inherit src;
+              inherit (inputs) advisory-db;
+            };
+
+            cargo-deny = craneLib.cargoDeny {
+              inherit src;
+            };
+
+            cargo-nextest = craneLib.cargoNextest (buildArgs // {
+              inherit cargoArtifacts;
+              partitions = 1;
+              partitionType = "count";
+              cargoNextestPartitionsExtraArgs = "--no-tests=warn";
+            });
+
+            # For checking metrics. On MacOS, requires nix-darwin linux-builder.
+            #
+            # `nix run .#checks.<system>.metrics-vm`
+            metrics-vm = (inputs.nixpkgs.lib.nixosSystem {
+              system = null;
+              modules = [
+                {
+                  networking.hostName = "blutgang-metrics";
+                  virtualisation.host.pkgs = pkgs;
+                  nixpkgs = {
+                    hostPlatform = mkGuestPlatform pkgs.stdenv.hostPlatform.system;
+                    overlays = [
+                      self.inputs.fenix.overlays.default
+                      self.overlays.craneLib
+                      self.overlays.blutgang
+                    ];
+                  };
+                  environment.sessionVariables = {
+                    RUST_LOG = "debug";
+                  };
+                  services.blutgang = {
+                    enable = true;
+                    settings.rpc = [{
+                      url = "https://eth.merkle.io";
+                      max_consecutive = 150;
+                      max_per_second = 200;
+                    }];
+                  };
+                }
+                ./nixos/modules/metrics
+                ./nixos/modules/virtualisation.nix
+                ./nixos/modules/users.nix
+                self.nixosModules.default
+              ];
+            }).config.system.build.vm;
+          } // optionalAttrs (!pkgs.stdenv.isDarwin) {
+            llvm-coverage = craneLibLlvm.cargoLlvmCov (buildArgs // {
+              inherit cargoArtifacts;
+            });
+
+            # For debugging, this can be ran interactively:
+            #
+            # `nix run .#checks.<arch>-linux.nixos-module.driverInteractive`
+            nixos-module = pkgs.nixosTest {
+              name = "nixos-module";
+              nodes.machine = { pkgs, ... }: {
+                imports = [ self.nixosModules.default ];
+
+                environment.sessionVariables = {
+                  RUST_LOG = "debug";
+                };
+
+                services.blutgang = {
+                  enable = true;
+                  settings.rpc = [{
+                    url = "https://eth.merkle.io";
+                    max_consecutive = 150;
+                    max_per_second = 200;
+                  }];
+                };
+              };
+              testScript = ''
+                machine.start()
+                machine.wait_for_unit("blutgang.service")
+                machine.succeed("systemctl is-active blutgang.service | grep active")
+                machine.fail("journalctl -u blutgang.service | grep -iE 'err(or)?'")
+              '';
+            };
+          };
+
+          packages = {
+            inherit
+              blutgang
+              blutgang-systemd
+              dockerImage
+              ;
+            default = blutgang;
+          };
+
+          devShells.default = craneLibNightly.devShell {
+            checks = self.checks.${system}; # Inherit dev-tools from checks
+
+            buildInputs = with pkgs; [
+              cargo-flamegraph
+              (python3.withPackages (pypkgs: with pypkgs; [
+                requests
+                websocket-client
+              ]))
+              nixpkgs-fmt
+            ] ++ optional stdenv.isLinux [
+              nil
+              cargo-llvm-cov
+              llvm_18
+              valgrind
+              gdb
+            ];
+
+            # Used by build.rs in the rocksdb-sys crate. If we don't set these, it would
+            # try to build RocksDB from source.
+            ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+
+            # sccache stuff
+            CARGO_BUILD_RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
+            RUSTC_WRAPPER = "${pkgs.sccache}/bin/sccache";
+
+            # https://github.com/nix-community/fenix/issues/206
+            # Tells rust which linker to use, in this case bintools, containing lld.
+            # The problem doesn't seem to exist on MacOS.
+            env = optionalAttrs (system == "x86_64-linux") {
+              RUSTFLAGS = "-C link-self-contained=-linker";
+            };
 
             # For generating code coverage reports using `cargo-llvm-cov`
-            export LLVM_COV=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-cov
-            export LLVM_PROFDATA=/nix/store/smh2gh3sjmj51hrp3vrb6n3lsqda4w3l-llvm-18.1.7/bin/llvm-profdata
-          '';
+            LLVM_COV = "${pkgs.llvm_18}/bin/llvm-cov";
+            LLVM_PROFDATA = "${pkgs.llvm_18}/bin/llvm-profdata";
 
-          # reset ps1
-          shellExitHook = ''
-            export PS1="$OLD_PS1"
-          '';
+            # `jemalloc-sys` build step fails during debug builds due to nix gcc hardening
+            hardeningDisable = [ "fortify" ];
+          };
+
+          formatter = pkgs.nixpkgs-fmt;
+        }) // {
+      overlays = {
+        blutgang = import ./nixos/overlays;
+        craneLib = final: prev: {
+          craneLib = (self.inputs.crane.mkLib prev).overrideToolchain prev.fenix.stable.toolchain;
         };
-      }
-    );
+      };
+
+      nixosModules.default = { pkgs, config, lib, ... }: {
+        imports = [ ./nixos/modules ];
+
+        config.services.blutgang = {
+          package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.blutgang-systemd;
+        };
+      };
+    };
 }

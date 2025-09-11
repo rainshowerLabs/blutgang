@@ -12,34 +12,66 @@ keywords = ["cli", "ethereum", "load-balancing", "websocket", "http"]
 categories = ["command-line-utilities"]
 
 [dependencies]
-clap = "4.3.0"
-hyper = { version = "1.4.1", features = ["server", "http1"] }
-http-body-util = "0.1.0-rc.3"
-reqwest = { version = "0.11.18", features = ["blocking", "json"] }
-serde = { version = "1.0.163", features = ["derive"] }
-serde_json = "1.0.96"
-sled = { version = "1.0.0-alpha.124" }
-tokio = { version = "1.28.1", features = ["sync", "net", "rt-multi-thread", "macros"] }
-url = "2.4.0"
 blake3 = "1.4.1"
-tikv-jemallocator = "0.6.0"
-toml = "0.7.6"
+chrono = "0.4.28"
+clap = { version = "4.5", features = ["derive", "env"] }
+codespan-reporting = "0.12"
+futures = "0.3.29"
+futures-util = "0.3.29"
+http-body-util = "0.1.0-rc.3"
+hyper = { version = "1.4.1", features = ["server", "http1"] }
+hyper-tungstenite = "0.12.0"
+hyper-util-blutgang = { version = "0.2.0", features = ["tokio"] }
+jsonwebtoken = "9.1.0"
 memchr = "2.5.0"
 rand = { version = "0.8.5" }
-chrono = "0.4.28"
-tokio-stream = {version = "0.1.14", features = ["sync"]}
-hyper-util-blutgang = { version = "0.2.0", features = ["tokio"] }
+reqwest = { version = "0.11.18", features = ["blocking", "json"] }
+rocksdb = { version = "0.24", default-features = false, features = [
+  # LZ4 seems to be the best trade-off for compression size vs speed,
+  # but these other compression algos are also supported. Multiple can
+  # be enabled simulatneously, but limiting here to avoid compile times.
+  #
+  "bzip2",
+  "lz4",
+  "snappy",
+  "zlib",
+  "zstd",
+  #
+  # Runtime is fine in most cases, static for building for musl target.
+  # These can't be enabled at the same time.
+  "bindgen-runtime",
+  # "bindgen-static",
+], optional = true }
+rust-tracing = { git = "https://github.com/phylaxsystems/rust-tracing.git", branch = "main", features = [
+  "journald",
+] }
+serde = { version = "1.0.163", features = ["derive"] }
+serde_json = "1.0.96"
 simd-json = { version = "0.12.0", features = ["serde_impl"] }
-xxhash-rust = { version = "0.8.7", features = ["xxh3", "const_xxh3"], optional = true }
+sled = { version = "1.0.0-alpha.124", optional = true }
+thiserror = "2"
+tikv-jemallocator = "0.6.0"
+tokio = { version = "1.28.1", features = [
+  "sync",
+  "net",
+  "rt-multi-thread",
+  "macros",
+] }
+tokio-stream = { version = "0.1.14", features = ["sync"] }
+tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
+toml = "0.8"
+tracing = "0.1"
+tungstenite = "0.20.1"
+url = "2.4.0"
+xxhash-rust = { version = "0.8.7", features = [
+  "xxh3",
+  "const_xxh3",
+], optional = true }
 zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
 zerocopy-derive = "0.7.28"
-jsonwebtoken = "9.1.0"
-hyper-tungstenite = "0.12.0"
-futures = "0.3.29"
-tungstenite = "0.20.1"
-tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
-futures-util = "0.3.29"
-systemd = { version = "0.10.0", optional = true }
+
+[dev-dependencies]
+serial_test = "3.2"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users
@@ -51,13 +83,13 @@ incremental = false
 
 # Optional Blutgang features
 [features]
-journald = ["systemd"]
-default = ["selection-weighed-round-robin"]
-xxhash = ["xxhash-rust"] # 4x faster hashing but potentially less secure
-no-cache = [] # enable this to disable caching
-debug-verbose = [] # Verbose terminal debug output
-selection-weighed-round-robin = [] # default algo
-selection-random = [] # optional random algo
-old-weighted-round-robin = [] # old algo, does not account for max per second
-systemd = ["dep:systemd"]
+journald = []
+default = ["selection-weighed-round-robin", "rocksdb", "sled"]
+sled = ["dep:sled"]
+rocksdb = ["dep:rocksdb"]
+xxhash = ["xxhash-rust"]                                       # 4x faster hashing but potentially less secure
+no-cache = []                                                  # enable this to disable caching
+selection-weighed-round-robin = []                             # default algo
+selection-random = []                                          # optional random algo
+old-weighted-round-robin = []                                  # old algo, does not account for max per second
 # add your own below

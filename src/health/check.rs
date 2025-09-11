@@ -11,8 +11,6 @@ use crate::{
             NamedBlocknumbers,
         },
     },
-    log_info,
-    log_wrn,
     websocket::{
         subscription_manager::move_subscriptions,
         types::{
@@ -34,6 +32,7 @@ use std::{
     time::Duration,
 };
 
+use rust_tracing::deps::metrics;
 use tokio::{
     sync::{
         broadcast,
@@ -103,7 +102,7 @@ async fn check(
     supress_rpc_check: bool,
 ) -> Result<(), HealthError> {
     if !supress_rpc_check {
-        print!("\x1b[35mInfo:\x1b[0m Checking RPC health... ");
+        tracing::info!("Checking RPC health... ");
     }
     // Head blocks reported by each RPC, we also use it to mark delinquents
     //
@@ -112,6 +111,7 @@ async fn check(
 
     // Remove RPCs that are falling behind
     let agreed_head = make_poverty(rpc_list, poverty_list, heads)?;
+    metrics::gauge!("rpc_head_height").set(agreed_head as f64);
 
     // Check if any rpc nodes made it out
     // Its ok if we call them twice because some might have been accidentally put here
@@ -125,7 +125,7 @@ async fn check(
     let _ = liveness_tx.send(to_send).await;
 
     if !supress_rpc_check {
-        println!("OK!");
+        tracing::info!("OK!");
     }
 
     Ok(())
@@ -161,8 +161,7 @@ async fn head_check(
     let (tx, mut rx) = mpsc::channel(len);
 
     // Iterate over all RPCs
-    for i in 0..len {
-        let rpc_clone = rpc_list_clone[i].clone();
+    for (rpc_list_index, rpc) in rpc_list_clone.into_iter().enumerate().take(len) {
         let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC
@@ -171,8 +170,8 @@ async fn head_check(
 
             // Check the current block number
             let a = async move {
-                let block_number = rpc_clone.block_number().await.unwrap_or(0);
-                let syncing = rpc_clone.syncing().await.unwrap_or(true);
+                let block_number = rpc.block_number().await.unwrap_or(0);
+                let syncing = rpc.syncing().await.unwrap_or(true);
 
                 let rax = InnerResult {
                     is_syncing: syncing,
@@ -197,7 +196,7 @@ async fn head_check(
             };
 
             let head_result = HeadResult {
-                rpc_list_index: i,
+                rpc_list_index,
                 is_syncing: result.is_syncing,
                 reported_head: result.reported_head,
             };
@@ -248,10 +247,15 @@ fn make_poverty(
         if head.reported_head < highest_head || head.is_syncing {
             // Mark the RPC as erroring
             rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
-            log_wrn!(
-                "{} is falling behind! Removing from active RPC pool.",
-                rpc_list_guard[head.rpc_list_index].name
-            );
+            let rpc_name = &rpc_list_guard[head.rpc_list_index].name;
+            tracing::warn!("{rpc_name} is falling behind! Removing from active RPC pool.");
+            metrics::gauge!(
+                "rpc_health_by_name",
+                "rpc_name" => rpc_name.to_owned(),
+                "reported_head" => head.reported_head.to_string(),
+                "is_syncing" => head.is_syncing.to_string()
+            )
+            .set(0.0);
 
             // Add the RPC to the poverty list
             poverty_list_guard.push(rpc_list_guard[head.rpc_list_index].clone());
@@ -283,27 +287,37 @@ fn escape_poverty(
         e.into_inner()
     });
 
-    for head_result in poverty_heads {
-        if head_result.reported_head >= agreed_head && !head_result.is_syncing {
-            let mut rpc = poverty_list_guard[head_result.rpc_list_index].clone();
+    for head in poverty_heads {
+        if head.reported_head >= agreed_head && !head.is_syncing {
+            let mut rpc = poverty_list_guard[head.rpc_list_index].clone();
             rpc.status.is_erroring = false;
-            log_info!(
-                "{} is following the head again! Added to active RPC pool.",
-                rpc.name
-            );
+            let rpc_name = &rpc.name;
+            tracing::info!("{rpc_name} is following the head again! Added to active RPC pool.");
+            metrics::gauge!(
+                "rpc_health_by_name",
+                "rpc_name" => rpc_name.to_owned(),
+                "reported_head" => head.reported_head.to_string(),
+                "is_syncing" => head.is_syncing.to_string()
+            )
+            .set(1.0);
 
             // Move the RPC from the poverty list to the rpc list
             rpc_list_guard.push(rpc);
 
             // Remove the RPC from the poverty list
-            poverty_list_guard[head_result.rpc_list_index]
-                .status
-                .is_erroring = false;
+            poverty_list_guard[head.rpc_list_index].status.is_erroring = false;
         }
     }
 
     // Only retain erroring RPCs
     poverty_list_guard.retain(|rpc| rpc.status.is_erroring);
+    let healthy = rpc_list_guard.len() as f64;
+    let unhealthy = poverty_list_guard.len() as f64;
+    let total = healthy + unhealthy;
+    metrics::gauge!("rpc_total").set(total);
+    metrics::gauge!("rpc_healthy_total").set(healthy);
+    metrics::gauge!("rpc_unhealthy_total").set(unhealthy);
+    metrics::gauge!("rpc_health_ratio").set(healthy / total);
 
     //todo: i dont like this but its whatever
     let to_send;

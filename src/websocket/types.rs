@@ -9,11 +9,8 @@ use std::{
     },
 };
 
-use crate::{
-    log_info,
-    log_wrn,
-    websocket::error::WsError,
-};
+use crate::websocket::error::WsError;
+use rust_tracing::deps::metrics;
 use serde_json::Value;
 use tokio::sync::mpsc;
 
@@ -91,7 +88,9 @@ impl SubscriptionData {
     pub fn add_user(&self, user_id: u32, user_data: UserData) {
         let mut users = self.users.write().unwrap_or_else(|e| e.into_inner());
 
-        users.insert(user_id, user_data);
+        if users.insert(user_id, user_data).is_none() {
+            metrics::gauge!("ws_users_total").increment(1);
+        }
     }
 
     pub fn remove_user(&self, user_id: u32) {
@@ -101,9 +100,11 @@ impl SubscriptionData {
         let mut users = self.users.write().unwrap_or_else(|e| e.into_inner());
 
         if users.remove(&user_id).is_some() {
+            metrics::gauge!("ws_users_total").decrement(1);
             let mut subscriptions = self.subscriptions.write().unwrap();
             for user_subscriptions in subscriptions.values_mut() {
                 user_subscriptions.remove(&user_id);
+                metrics::gauge!("ws_user_subs_total").decrement(1);
             }
         }
     }
@@ -118,6 +119,17 @@ impl SubscriptionData {
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
 
+        // Detect duplicates before inserting
+        {
+            let incoming_subscriptions = self
+                .incoming_subscriptions
+                .read()
+                .unwrap_or_else(|e| e.into_inner());
+            if incoming_subscriptions.contains_key(&subscription) {
+                metrics::counter!("ws_duplicate_node_subs", "subscription_id" => subscription_id.clone(), "node_id" => node_id.to_string()).increment(1);
+            }
+        }
+
         self.raw_register(&subscription, subscription_id, node_id);
     }
 
@@ -127,17 +139,19 @@ impl SubscriptionData {
             .write()
             .unwrap_or_else(|e| e.into_inner());
 
-        log_info!(
-            "Register_subscription inserting: {}",
-            subscription.to_owned()
-        );
-        incoming_subscriptions.insert(
-            subscription.to_owned(),
-            NodeSubInfo {
-                node_id,
-                subscription_id,
-            },
-        );
+        tracing::info!(subscription, "Register_subscription inserting");
+        if incoming_subscriptions
+            .insert(
+                subscription.to_owned(),
+                NodeSubInfo {
+                    node_id,
+                    subscription_id,
+                },
+            )
+            .is_none()
+        {
+            metrics::gauge!("ws_node_subs_total").increment(1);
+        }
     }
 
     pub fn unregister_subscription(&self, subscription_request: String) {
@@ -146,7 +160,12 @@ impl SubscriptionData {
             .write()
             .unwrap_or_else(|e| e.into_inner());
 
-        incoming_subscriptions.remove(&subscription_request);
+        if incoming_subscriptions
+            .remove(&subscription_request)
+            .is_some()
+        {
+            metrics::gauge!("ws_node_subs_total").decrement(1);
+        }
     }
 
     // Subscribe user to existing subscription and return the subscription id
@@ -161,7 +180,7 @@ impl SubscriptionData {
 
         // TODO: pepega
         let subscription = format!("{}", subscription["params"]);
-        log_info!("Subscribe_user finding: {}", subscription);
+        tracing::info!(subscription, "Subscribe_user finding");
 
         self.raw_subscribe(user_id, &subscription)
     }
@@ -178,10 +197,13 @@ impl SubscriptionData {
         };
 
         let mut subscriptions = self.subscriptions.write().unwrap();
-        subscriptions
+        if subscriptions
             .entry(node_sub_info.clone())
             .or_default()
-            .insert(user_id);
+            .insert(user_id)
+        {
+            metrics::gauge!("ws_user_subs_total").increment(1);
+        }
 
         Ok(node_sub_info.subscription_id.clone())
     }
@@ -197,6 +219,7 @@ impl SubscriptionData {
         for (node_sub_info, subscribers) in subscriptions.iter_mut() {
             if node_sub_info.subscription_id == subscription_id && subscribers.contains(&user_id) {
                 subscribers.remove(&user_id);
+                metrics::gauge!("ws_user_subs_total").decrement(1);
             }
         }
     }
@@ -212,6 +235,7 @@ impl SubscriptionData {
         for (_, subscribers) in subscriptions.iter_mut() {
             if subscribers.contains(&user_id) {
                 subscribers.remove(&user_id);
+                metrics::gauge!("ws_user_subs_total").decrement(1);
             }
         }
     }
@@ -361,24 +385,19 @@ impl SubscriptionData {
         if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
             if subscribers.is_empty() {
                 self.unregister_subscription(subscription_id.to_string());
-                println!(
-                    "No more users to send subscription to. Unsubscribing from ID: {}",
-                    subscription_id
+                tracing::info!(
+                    subscription_id,
+                    "No more users to send subscription to: Unsubscribing from ID",
                 );
                 return Ok(true);
             }
             for &user_id in subscribers {
                 if let Some(user) = users.get(&user_id) {
-                    #[cfg(feature = "debug-verbose")]
-                    println!(
-                        "Sending user_id {:?} subscription: {:?}",
-                        user_id,
-                        message.clone()
-                    );
+                    tracing::debug!("Sending user_id {:?} subscription: {:?}", user_id, message);
                     match user.send(message.clone()) {
                         Ok(_) => {}
                         Err(_) => {
-                            log_wrn!(
+                            tracing::warn!(
                                 "user_id {} unsubscribed without closing channel! Removing.",
                                 user_id
                             );

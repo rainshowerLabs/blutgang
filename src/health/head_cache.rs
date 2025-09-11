@@ -1,18 +1,12 @@
-use crate::{
-    database::{
-        error::DbError,
-        types::{
-            DbRequest,
-            RequestBus,
-            RequestKind,
-        },
+use crate::database::{
+    accept::db_batch,
+    error::DbError,
+    types::{
+        Batch,
+        GenericBytes,
+        RequestBus,
     },
-    db_batch,
-    log_info,
-    log_wrn,
 };
-
-use tokio::sync::oneshot;
 
 use std::{
     collections::BTreeMap,
@@ -22,19 +16,22 @@ use std::{
     },
 };
 
-use sled::Batch;
 use tokio_stream::{
     wrappers::WatchStream,
     StreamExt,
 };
 
 /// Check if we need to do a reorg or if a new block has finalized.
-pub async fn manage_cache(
-    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+pub async fn manage_cache<K, V>(
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<K>>>>,
     blocknum_rx: tokio::sync::watch::Receiver<u64>,
     finalized_rx: Arc<tokio::sync::watch::Receiver<u64>>,
-    cache: RequestBus,
-) -> Result<(), DbError> {
+    cache: RequestBus<K, V>,
+) -> Result<(), DbError>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     let mut block_number = 0;
     let mut last_finalized = 0;
 
@@ -48,14 +45,14 @@ pub async fn manage_cache(
         // that means that the chain has experienced a reorg and that we should
         // remove everything from the last block to the `new_block`
         if new_block <= block_number {
-            log_wrn!("Reorg detected!\nRemoving stale entries from the cache.");
-            handle_reorg(head_cache, block_number, new_block, cache.clone())?;
+            tracing::warn!("Reorg detected! Removing stale entries from the cache.");
+            handle_reorg(head_cache, block_number, new_block, cache.clone()).await?;
         }
 
         // Check if finalized_stream has changed
         if last_finalized != *finalized_rx.borrow() {
             last_finalized = *finalized_rx.borrow();
-            log_info!("New finalized block!\nRemoving stale entries from the cache.");
+            tracing::info!("New finalized block! Removing stale entries from the cache.");
             // Remove stale entries from the head_cache
             remove_stale(head_cache, last_finalized)?;
         }
@@ -66,33 +63,37 @@ pub async fn manage_cache(
 }
 
 /// We use the head_cache to store keys of querries we made near the tip
-/// If a reorg happens, we need to remove all querries in the reorg range
+/// If a reorg happens, we need to remove all queries in the reorg range
 /// from the sled database.
-fn handle_reorg(
-    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+async fn handle_reorg<K, V>(
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<K>>>>,
     block_number: u64,
     new_block: u64,
-    cache: RequestBus,
-) -> Result<(), DbError> {
-    // sled batch
-    let mut batch = Batch::default();
+    cache: RequestBus<K, V>,
+) -> Result<(), DbError>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
+    let range = block_number..=new_block;
+    let mut batch = Batch::with_capacity(range.clone().count());
 
     // Go over the head cache and get all the keys from block_number to new_block
-    let mut head_cache_guard = head_cache.write().unwrap();
-    for i in block_number..new_block + 1 {
-        if let Some(keys) = head_cache_guard.get(&i) {
-            for key in keys {
-                batch.remove(key.as_bytes());
+    {
+        let mut head_cache_guard = head_cache.write().unwrap();
+        for i in range {
+            if let Some(keys) = head_cache_guard.get(&i).cloned() {
+                for key in keys {
+                    batch.delete(key);
+                }
+                // Remove the entry from the head_cache
+                head_cache_guard.remove(&i);
             }
-            // Remove the entry from the head_cache
-            head_cache_guard.remove(&i);
         }
     }
 
     // Send the batch to the cache
-    // Dropping unawaited future we don't need.
-
-    drop(db_batch!(cache, batch));
+    drop(db_batch(&cache, batch).await);
 
     Ok(())
 }
@@ -101,8 +102,8 @@ fn handle_reorg(
 ///
 /// Once a new block finalizes, we can be sure that certain TXs wont
 /// reorg, so theyre safe to be permanantly in the cache.
-fn remove_stale(
-    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+fn remove_stale<K: GenericBytes>(
+    head_cache: &Arc<RwLock<BTreeMap<u64, Vec<K>>>>,
     block_number: u64,
 ) -> Result<(), DbError> {
     // Get the lowest block_number from the BTreeMap
@@ -124,6 +125,7 @@ fn remove_stale(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::types::DbRequest;
     use crate::database_processing;
     use crate::db_get;
     use sled::{
@@ -133,6 +135,7 @@ mod tests {
     use tokio::sync::mpsc;
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_handle_reorg() {
         // Create test data and resources
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
@@ -146,31 +149,46 @@ mod tests {
         // Add some data to the head_cache
         {
             let mut head_cache_guard = head_cache.write().unwrap();
-            head_cache_guard.insert(1, vec!["key1".to_string()]);
-            head_cache_guard.insert(2, vec!["key2".to_string()]);
-            head_cache_guard.insert(3, vec!["key3".to_string()]);
+            head_cache_guard.insert(1, vec!["key1".as_bytes()]);
+            head_cache_guard.insert(2, vec!["key2".as_bytes()]);
+            head_cache_guard.insert(3, vec!["key3".as_bytes()]);
         }
 
-        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        let (db_tx, db_rx) = mpsc::unbounded_channel::<DbRequest<&[u8], &[u8]>>();
         tokio::task::spawn(database_processing(db_rx, cache));
 
         // Call handle_reorg
-        let result = handle_reorg(&head_cache, 2, 3, db_tx.clone());
+        let result = handle_reorg(&head_cache, 2, 3, db_tx.clone()).await;
 
         // Verify the result and check if the data is removed from the cache
-        assert!(result.is_ok());
-        let head_cache_guard = head_cache.read().unwrap();
-        assert!(head_cache_guard.contains_key(&1));
-        assert!(!head_cache_guard.contains_key(&2));
-        assert!(!head_cache_guard.contains_key(&3));
+        assert!(result.is_ok(), "handle_reorg failed");
+        let head_cache_guard = head_cache.read().expect("failed to read head cache");
+        assert!(
+            head_cache_guard.contains_key(&1),
+            "head cache does not contain key1"
+        );
+        assert!(
+            !head_cache_guard.contains_key(&2),
+            "head cache should not contain key2"
+        );
+        assert!(
+            !head_cache_guard.contains_key(&3),
+            "head cache should not contain key3"
+        );
 
         // Check if the data is removed from the cache
-        let key1 = db_get!(db_tx.clone(), "key1".into()).unwrap();
-        assert!(key1.is_some());
-        let key2 = db_get!(db_tx.clone(), "key2".into()).unwrap();
-        assert!(key2.is_none());
-        let key3 = db_get!(db_tx.clone(), "key3".into()).unwrap();
-        assert!(key3.is_none());
+        let key1 = db_get!(db_tx.clone(), "key1".as_bytes()).unwrap();
+        assert!(key1.is_some(), "failed to get key1 from db");
+        let key2 = db_get!(db_tx.clone(), "key2".as_bytes()).unwrap();
+        assert!(
+            key2.is_none(),
+            "successfully got key2 from db which should have failed"
+        );
+        let key3 = db_get!(db_tx.clone(), "key3".as_bytes()).unwrap();
+        assert!(
+            key3.is_none(),
+            "successfully got key3 from db which should have failed"
+        );
     }
 
     #[test]
@@ -181,8 +199,8 @@ mod tests {
         // Add some data to the head_cache
         {
             let mut head_cache_guard = head_cache.write().unwrap();
-            head_cache_guard.insert(1, vec!["key1".to_string()]);
-            head_cache_guard.insert(2, vec!["key2".to_string()]);
+            head_cache_guard.insert(1, vec!["key1".as_bytes()]);
+            head_cache_guard.insert(2, vec!["key2".as_bytes()]);
         }
 
         // Call remove_stale
