@@ -141,7 +141,10 @@ pub fn replace_block_tags(
     // Check if the block number is a named tag
     let nn = has_named_number(&block_number);
     if nn != NamedNumber::Null {
-        let rwlock_guard = named_blocknumbers.read().unwrap();
+        let rwlock_guard = named_blocknumbers.read().unwrap_or_else(|e| {
+            // Handle the case where the RwLock is poisoned
+            e.into_inner()
+        });
 
         // Replace the named block tag with its corresponding hex value
         match nn {

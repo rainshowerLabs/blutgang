@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 mod admin;
 mod balancer;
 mod config;
@@ -79,7 +81,7 @@ use hyper::{
 };
 use hyper_util_blutgang::rt::TokioIo;
 
-// jemalloc offers faster mallocs when dealing with lots of threads which is what we're doing
+/// `jemalloc` offers faster mallocs when dealing with lots of threads which is what we're doing
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 

@@ -71,13 +71,24 @@ pub async fn ws_conn_manager(
     // Initialize WebSocket connections
     update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
 
+    // Buffer for WS subscriptions when all nodes are ded
+    let mut ws_buffer: Vec<Value> = Vec::new();
+
     while let Some(message) = incoming_rx.recv().await {
         match message {
             WsconnMessage::Message(incoming, specified_index) => {
-                handle_incoming_message(&ws_handles, &rpc_list, incoming, specified_index).await;
+                handle_incoming_message(
+                    &ws_handles,
+                    &rpc_list,
+                    incoming,
+                    specified_index,
+                    &mut ws_buffer,
+                )
+                .await;
             }
             WsconnMessage::Reconnect() => {
                 update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
+                unload_buffer(&rpc_list, &ws_handles, &mut ws_buffer).await;
             }
         }
     }
@@ -99,6 +110,19 @@ async fn update_ws_connections(
     *ws_handle_guard = ws_vec;
 }
 
+/// Dispatches buffered WS subscriptions out to nodes.
+async fn unload_buffer(
+    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
+    ws_buffer: &mut Vec<Value>,
+) {
+    for i in 0..ws_buffer.len() {
+        let incoming = ws_buffer[i].clone();
+        handle_incoming_message(ws_handles, rpc_list, incoming, None, ws_buffer).await;
+    }
+    ws_buffer.clear();
+}
+
 /// Sends an incoming request to a WS connection.
 ///
 /// Indexes can be specified via the `specified_index` param.
@@ -107,19 +131,29 @@ async fn handle_incoming_message(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     incoming: Value,
     specified_index: Option<usize>,
+    ws_buffer: &mut Vec<Value>,
 ) {
     let rpc_position = if let Some(index) = specified_index {
         index
     } else {
         let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
             // Handle the case where the rpc_list RwLock is poisoned
-            log_err!("{}", e);
+            log_err!("handle_incoming_message poison: {}", e);
             e.into_inner()
         });
 
         match pick(&mut rpc_list_guard).1 {
             Some(position) => position,
             None => {
+                // Check if the incoming content is a subscription.
+                //
+                // We do this because we want to send it to a buffer
+                // in case we have no available RPCs.
+                if incoming["method"] == "eth_subscription" || incoming["method"] == "eth_subscribe"
+                {
+                    println!("in none: {:?}", incoming);
+                    ws_buffer.push(incoming);
+                }
                 log_err!("No RPC position available");
                 return;
             }
@@ -471,8 +505,16 @@ mod tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let ws_handles = Arc::new(RwLock::new(vec![Some(tx)]));
         let incoming = json!({"type": "test"});
+        let mut ws_buffer: Vec<Value> = Vec::new();
 
-        handle_incoming_message(&ws_handles, &rpc_list, incoming.clone(), Some(0)).await;
+        handle_incoming_message(
+            &ws_handles,
+            &rpc_list,
+            incoming.clone(),
+            Some(0),
+            &mut ws_buffer,
+        )
+        .await;
 
         // Check if the message was sent through the channel
         let received = rx.recv().await;

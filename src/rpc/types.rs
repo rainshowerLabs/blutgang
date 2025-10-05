@@ -23,8 +23,6 @@ pub struct Status {
     // pub throughput: f64,
 }
 
-unsafe impl Sync for Status {}
-
 #[derive(Debug, Clone)]
 pub struct Rpc {
     pub name: String,           // sanitized name for appearing in logs
@@ -60,8 +58,6 @@ fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
 
     Ok(sanitized.to_string())
 }
-
-unsafe impl Sync for Rpc {}
 
 impl Default for Rpc {
     fn default() -> Self {
