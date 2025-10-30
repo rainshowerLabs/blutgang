@@ -3,9 +3,11 @@
 # Config for blutgang goes here
 [blutgang]
 # Clear the cache DB on startup
-do_clear = false
-# Where to bind blutgang to
-address = "127.0.0.1:3000"
+clear_cache = false
+# Address to bind blutgang to
+address = "127.0.0.1"
+# Port to bind blutgang to
+port = 3000
 # Moving average length for the latency
 ma_length = 100
 # Sort RPCs by latency on startup. Recommended to leave on.
@@ -25,14 +27,22 @@ expected_block_time = 13000
 health_check_ttl = 400
 # Supress the health check running info messages
 supress_rpc_check = false
+# Choose which database backend to use for caching
+db = "sled"
 
 # Note: the admin namespace contains volatile functions and
-# should not be exposed publicly.
-[admin]
+# should not be exposed publicly. Values can be provided directly
+# for testing, but it's recommended to configure an admin file
+# and provide the path.
+[blutgang.admin]
+# Path to a privileged admin config
+path = "./blutgang-admin.toml"
 # Enable the admin namespace
-enabled = false
+enable = false
 # Address for the admin RPC
-address = "127.0.0.1:5715"
+address = "127.0.0.1"
+# Port for the admin RPC
+port = 5715
 # Only allow read-only methods
 # Recommended `true` unless you 100% need write methods
 readonly = true
@@ -43,10 +53,11 @@ jwt = false
 key = ""
 
 # Sled config
-# Sled is the database we use for our cache, for more info check their docs
-[sled]
+# Sled is one of the databases we use for our cache, for more info check their docs
+# https://docs.rs/sled/1.0.0-alpha.124/sled/struct.Config.html
+[blutgang.sled]
 # Path to db
-db_path = "./blutgang-cache"
+path = "./blutgang-cache-sled"
 # Cache size in bytes.
 cache_capacity = 1000000000
 # Select zstd compression level. Reduces size 60-70%,
@@ -55,10 +66,57 @@ compression = 1
 # Frequency of flushes in ms
 flush_every_ms = 12000
 
-# Add separate RPCs as TOML tables
-# DO NOT name an rpc `blutgang`, `admin`, or `sled`
+# RocksDB config
+# RocksDB is one of the databases we use for our cache, for more info check their docs
+# https://github.com/facebook/rocksdb/wiki/RocksDB-Tuning-Guide
+[blutgang.rocksdb]
+# General options
+create_if_missing = true
+create_missing_column_families = false
+error_if_exists = false
+paranoid_checks = true
 
-[merkle]
+# Paths
+db_paths = [{ path = "./db", target_size = 1073741824 }]
+db_log_dir = "./db/logs"
+wal_dir = "./db/wal"
+
+# Performance tuning
+increase_parallelism = 8
+optimize_level_style_compaction = 512
+optimize_universal_style_compaction = 512
+optimize_for_point_lookup = 64
+
+# File limits / concurrency
+max_open_files = 1024
+max_file_opening_threads = 4
+max_background_jobs = 8
+
+# Write buffers
+write_buffer_size = 64
+max_write_buffer_number = 4
+min_write_buffer_number = 2
+target_file_size_base = 64
+max_bytes_for_level_base = 1024
+max_bytes_for_level_multiplier = 10.0
+
+# Level triggers
+level_zero_file_num_compaction_trigger = 4
+level_zero_slowdown_writes_trigger = 20
+level_zero_stop_writes_trigger = 36
+disable_auto_compactions = false
+
+# Sync options
+use_fsync = true
+bytes_per_sync = 1048576
+wal_bytes_per_sync = 1048576
+
+# Compression
+compression_type = "Snappy"
+bottommost_compression_type = "Zstd"
+
+# Add separate RPCs as an array of TOML tables
+[[rpc]]
 url = "https://eth.merkle.io"
 ws_url = "wss://eth.merkle.io"
 # The maximum amount of time we can use this rpc in a row.

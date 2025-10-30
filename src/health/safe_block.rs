@@ -1,9 +1,7 @@
 use crate::{
     balancer::processing::CacheArgs,
     config::system::WS_HEALTH_CHECK_USER_ID,
-    log_err,
-    log_info,
-    log_wrn,
+    database::types::GenericBytes,
     rpc::{
         error::RpcError,
         types::{
@@ -97,13 +95,12 @@ pub async fn get_safe_block(
     let (tx, mut rx) = mpsc::channel(len);
 
     // Iterate over all RPCs
-    for i in 0..len {
-        let rpc_clone = rpc_list_clone[i].clone();
+    for rpc in rpc_list_clone.into_iter().take(len) {
         let tx = tx.clone(); // Clone the sender for this RPC
 
         // Spawn a future for each RPC
         let rpc_future = async move {
-            let a = rpc_clone.get_finalized_block();
+            let a = rpc.get_finalized_block();
             let result = timeout(Duration::from_millis(ttl), a).await;
 
             // Handle timeout as 0
@@ -147,7 +144,7 @@ pub async fn get_safe_block(
 
     finalized_tx.send_if_modified(send_if_changed);
 
-    // println!("Safe block: {}", safe);
+    tracing::debug!("Safe block: {}", safe);
 
     // Return as NamedBlocknumbers
     let mut nn_rwlock = named_numbers_rwlock.write().unwrap();
@@ -157,13 +154,16 @@ pub async fn get_safe_block(
 }
 
 /// Send a message subscribing to newHeads
-async fn send_newheads_sub_message(
+async fn send_newheads_sub_message<K, V>(
     user_id: u32,
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: &broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
-    cache_args: &CacheArgs,
-) {
+    cache_args: &CacheArgs<K, V>,
+) where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     let mut call = format!(
         r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
         user_id
@@ -193,14 +193,17 @@ async fn send_newheads_sub_message(
 }
 
 /// Subscribe to eth_subscribe("newHeads") and write to NamedBlocknumbers
-pub async fn subscribe_to_new_heads(
+pub async fn subscribe_to_new_heads<K, V>(
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<IncomingResponse>,
     blocknum_tx: watch::Sender<u64>,
     sub_data: Arc<SubscriptionData>,
-    cache_args: CacheArgs,
+    cache_args: CacheArgs<K, V>,
     expected_block_time: u64,
-) {
+) where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     // We basically have to create a new system-only user for subscribing to newHeads
 
     // Create channels for message send/receiving
@@ -212,7 +215,7 @@ pub async fn subscribe_to_new_heads(
     let user_id = WS_HEALTH_CHECK_USER_ID;
 
     // Add the user to the sink map
-    log_info!("Adding user {} to sink map", user_id);
+    tracing::info!("Adding user {} to sink map", user_id);
     let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);
 
@@ -232,14 +235,14 @@ pub async fn subscribe_to_new_heads(
                         .as_str()
                         .unwrap()
                         .clone_into(&mut subscription_id);
-                    log_info!("New chain head: {}", a);
+                    tracing::info!(a, "New chain head");
                     let _ = blocknum_tx.send(a);
                     nn_rwlock.latest = a;
                 }
             }
             Ok(None) => {
                 // Handle the case where the channel is closed
-                log_err!("newHeads channel closed.");
+                tracing::error!("newHeads channel closed.");
                 panic!("FATAL: Channel closed in newHeads subscription.");
             }
             Err(_) => {
@@ -247,24 +250,24 @@ pub async fn subscribe_to_new_heads(
                 {
                     let mut nn_rwlock = cache_args.named_numbers.write().unwrap_or_else(|e| {
                         // Handle the case where the named_numbers RwLock is poisoned
-                        log_err!("{}", e);
+                        tracing::error!(?e);
                         e.into_inner()
                     });
                     nn_rwlock.latest = 0;
                     match incoming_tx.send(WsconnMessage::Reconnect()) {
                         Ok(_) => {}
                         Err(_) => {
-                            log_err!("WS incoming channel closed.");
+                            tracing::error!("WS incoming channel closed.");
                             panic!("FATAL: WS module failed trying to reinitialize! Please restart Blutgang!");
                         }
                     }
                     drop(nn_rwlock);
                 }
-                log_wrn!("Timeout in newHeads subscription, possible connection failiure or missed block.");
+                tracing::warn!("Timeout in newHeads subscription, possible connection failiure or missed block.");
                 let node_id = match sub_data.get_node_from_id(&subscription_id) {
                     Some(node_id) => node_id,
                     None => {
-                        log_err!("Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
+                        tracing::error!("Failed to get some failed node subscription IDs! Subscriptions might be silently dropped!");
                         continue;
                     }
                 };
@@ -278,7 +281,7 @@ pub async fn subscribe_to_new_heads(
                 {
                     Ok(_) => {}
                     Err(err) => {
-                        log_err!("{}", err);
+                        tracing::error!(?err);
                     }
                 };
             }

@@ -1,0 +1,17 @@
+[bans]
+multiple-versions = 'allow' # allow multiple versions of the same license
+
+[licenses]
+private = { ignore = true } # ignore workspace crates that won't be published
+allow = [
+  "AGPL-1.0",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "OpenSSL",
+  "Unicode-3.0",
+  "Zlib",
+]

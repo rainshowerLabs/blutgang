@@ -1,5 +1,6 @@
 use crate::rpc::error::RpcError;
 use reqwest::Client;
+use rust_tracing::deps::metrics;
 use url::Url;
 
 use serde_json::{
@@ -25,16 +26,16 @@ pub struct Status {
 
 #[derive(Debug, Clone)]
 pub struct Rpc {
-    pub name: String,           // sanitized name for appearing in logs
-    url: String,                // url of the rpc we're forwarding requests to.
-    client: Client,             // Reqwest client
-    pub ws_url: Option<String>, // url of the websocket we're forwarding requests to.
-    pub status: Status,         // stores stats related to the rpc.
+    pub name: String,             // sanitized name for appearing in logs
+    url: url::Url,                // url of the rpc we're forwarding requests to.
+    client: Client,               // Reqwest client
+    pub ws_url: Option<url::Url>, // url of the websocket we're forwarding requests to.
+    pub status: Status,           // stores stats related to the rpc.
     // For max_consecutive
     pub max_consecutive: u32, // max times we can call an rpc in a row
     pub consecutive: u32,
     // For max_per_second
-    pub last_used: u128,      // last time we sent a querry to this node
+    pub last_used: u128,      // last time we sent a query to this node
     pub min_time_delta: u128, // microseconds
 }
 
@@ -42,15 +43,13 @@ pub struct Rpc {
 ///
 /// For example, if we have a URL: https://eth-mainnet.g.alchemy.com/v2/api-key
 // as input, we output: https://eth-mainnet.g.alchemy.com/
-fn sanitize_url(url: &str) -> Result<String, url::ParseError> {
-    let parsed_url = Url::parse(url)?;
-
+fn sanitize_url(url: &url::Url) -> Result<String, url::ParseError> {
     // Build a new URL with the scheme, host, and port (if any), but without the path or query
     let sanitized = Url::parse(&format!(
         "{}://{}{}",
-        parsed_url.scheme(),
-        parsed_url.host_str().unwrap_or_default(),
-        match parsed_url.port() {
+        url.scheme(),
+        url.host_str().unwrap_or_default(),
+        match url.port() {
             Some(port) => format!(":{}", port),
             None => String::new(),
         }
@@ -63,7 +62,7 @@ impl Default for Rpc {
     fn default() -> Self {
         Self {
             name: "".to_string(),
-            url: "".to_string(),
+            url: "https://eth.merkle.io".parse().unwrap(),
             ws_url: None,
             client: Client::new(),
             status: Status::default(),
@@ -78,14 +77,14 @@ impl Default for Rpc {
 // implement new for rpc
 impl Rpc {
     pub fn new(
-        url: String,
-        ws_url: Option<String>,
+        url: url::Url,
+        ws_url: Option<url::Url>,
         max_consecutive: u32,
         min_time_delta: u128,
         ma_length: f64,
     ) -> Self {
         Self {
-            name: sanitize_url(&url).unwrap_or(url.clone()),
+            name: sanitize_url(&url).unwrap_or(url.to_string()),
             url,
             client: Client::new(),
             ws_url,
@@ -102,33 +101,23 @@ impl Rpc {
 
     /// Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth
     #[cfg(test)]
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> Url {
         self.url.clone()
     }
 
     /// Generic fn to send rpc
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
-        #[cfg(feature = "debug-verbose")]
-        println!("Sending request: {}", tx.clone());
+        tracing::debug!("Sending request: {}", tx.clone());
 
-        let response = match self.client.post(&self.url).json(&tx).send().await {
+        let response = match self.client.post(self.url.clone()).json(&tx).send().await {
             Ok(response) => response,
-            Err(err) => {
-                return Err(crate::rpc::types::RpcError::InvalidResponse(
-                    err.to_string(),
-                ))
-            }
+            Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
         };
 
-        #[cfg(feature = "debug-verbose")]
-        {
-            let a = response.text().await.unwrap();
-            println!("response: {}", a);
-            return Ok(a);
-        }
+        let resp_text = response.text().await;
+        tracing::debug!("response: {:?}", resp_text);
 
-        #[cfg(not(feature = "debug-verbose"))]
-        Ok(response.text().await.unwrap())
+        resp_text.map_err(From::from)
     }
 
     /// Request blocknumber and return its value
@@ -140,7 +129,16 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
+        metrics::gauge!("rpc_requests_active", "method" => "eth_blockNumber").increment(1);
+        metrics::counter!("rpc_requests_total", "method" => "eth_blockNumber").increment(1);
+
+        let req_start = std::time::Instant::now();
         let number = self.send_request(request).await?;
+
+        metrics::histogram!("rpc_response_time_secs", "method" => "eth_blockNumber")
+            .record(req_start.elapsed().as_secs_f64());
+        metrics::gauge!("rpc_requests_active", "method" => "eth_blockNumber").decrement(1);
+
         let return_number = extract_number(&number)?;
 
         Ok(return_number)
@@ -155,7 +153,16 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
+        metrics::gauge!("rpc_requests_active", "method" => "eth_syncing").increment(1);
+        metrics::counter!("rpc_requests_total", "method" => "eth_syncing").increment(1);
+
+        let req_start = std::time::Instant::now();
         let sync = self.send_request(request).await?;
+
+        metrics::histogram!("rpc_response_time_secs", "method" => "eth_syncing")
+            .record(req_start.elapsed().as_secs_f64());
+        metrics::gauge!("rpc_requests_active", "method" => "eth_syncing").decrement(1);
+
         let status = extract_sync(&sync)?;
 
         Ok(status)
@@ -170,8 +177,17 @@ impl Rpc {
             "jsonrpc": "2.0".to_string(),
         });
 
-        let number: Value =
-            unsafe { simd_json::serde::from_str(&mut self.send_request(request).await?)? };
+        metrics::gauge!("rpc_requests_active", "method" => "eth_getBlockByNumber").increment(1);
+        metrics::counter!("rpc_requests_total", "method" => "eth_getBlockByNumber").increment(1);
+
+        let req_start = std::time::Instant::now();
+        let mut resp = self.send_request(request).await?;
+
+        metrics::histogram!("rpc_response_time_secs", "method" => "eth_getBlockByNumber")
+            .record(req_start.elapsed().as_secs_f64());
+        metrics::gauge!("rpc_requests_active", "method" => "eth_getBlockByNumber").decrement(1);
+
+        let number: Value = unsafe { simd_json::serde::from_str(&mut resp)? };
         let number = &number["result"]["number"];
 
         let number = match number.as_str() {

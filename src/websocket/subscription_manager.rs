@@ -3,7 +3,6 @@ use crate::{
         MAGIC,
         WS_SUB_MANAGER_ID,
     },
-    log_err,
     websocket::{
         error::WsError,
         types::{
@@ -49,10 +48,9 @@ pub async fn subscription_dispatcher(
             continue;
         }
 
-        #[cfg(feature = "debug-verbose")]
-        println!(
-            "subscription_dispatcher: received subscription: {}",
-            response.content
+        tracing::debug!(
+            ?response.content,
+            "subscription_dispatcher: received subscription"
         );
 
         // Get the subscription id
@@ -82,7 +80,7 @@ pub async fn subscription_dispatcher(
             // False means tht we do not need to do anything
             Ok(false) => {}
             Err(e) => {
-                log_err!("Fatal error while trying to send subscriptions: {}", e);
+                tracing::error!(?e, "Fatal error while trying to send subscriptions");
             }
         };
     }

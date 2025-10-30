@@ -6,19 +6,19 @@ use crate::{
             cache_result,
         },
     },
-    database::types::{
-        DbRequest,
-        RequestBus,
-        RequestKind,
+    database::{
+        accept::db_insert,
+        types::{
+            GenericBytes,
+            RequestBus,
+        },
     },
-    db_insert,
     health::safe_block::NamedBlocknumbers,
     Rpc,
 };
 
 use std::{
     collections::BTreeMap,
-    println,
     sync::{
         Arc,
         RwLock,
@@ -26,24 +26,25 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{
-    oneshot,
-    watch,
-};
+use tokio::sync::watch;
 
 use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
 
 #[derive(Clone)]
-pub struct CacheArgs {
+pub struct CacheArgs<K, V>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
-    pub cache: RequestBus,
+    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<K>>>>,
+    pub cache: RequestBus<K, V>,
 }
 
-impl CacheArgs {
+impl CacheArgs<[u8; 32], Vec<u8>> {
     #[cfg(test)]
     /// **Note:** This should only be used for testing!
     pub fn default() -> Self {
@@ -71,6 +72,8 @@ impl CacheArgs {
     }
 }
 
+// TODO: @eureka-cpu -- The method can be an enum and impl FromStr to avoid this:
+//
 // TODO: we should find a way to check values directly and not convert Value to str
 pub fn can_cache(method: &str, result: &str) -> bool {
     if (cache_method(method)) && (cache_result(result)) {
@@ -79,8 +82,16 @@ pub fn can_cache(method: &str, result: &str) -> bool {
     false
 }
 
-/// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
+/// Check if we should cache the query, and if so cache it in the DB
+pub async fn cache_query<K, V>(
+    rx: &mut str,
+    method: Value,
+    tx_hash: Hash,
+    cache_args: &CacheArgs<K, V>,
+) where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -92,7 +103,10 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
         if let Some(num) = num {
             if num > *cache_args.finalized_rx.borrow() {
                 let mut head_cache = cache_args.head_cache.write().unwrap();
-                head_cache.entry(num).or_default().push(tx_hash.to_string());
+                head_cache
+                    .entry(num)
+                    .or_default()
+                    .push(tx_hash.as_bytes().to_owned().into());
             }
 
             // Replace the id with Value::Null and insert the request.
@@ -109,12 +123,14 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
                 return;
             }
 
-            // Dropping unawaited future we don't need.
-            drop(db_insert!(
-                cache_args.cache,
-                tx_hash.as_bytes().to_vec(),
-                to_vec(&rx_value).unwrap().as_slice().into()
-            ));
+            drop(
+                db_insert(
+                    &cache_args.cache.clone(),
+                    tx_hash.as_bytes().to_owned().into(),
+                    to_vec(&rx_value).unwrap().into(),
+                )
+                .await,
+            );
         }
     }
 }
@@ -136,7 +152,7 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
         };
         rpc_list_guard[index].update_latency(time.as_nanos() as f64);
         rpc_list_guard[index].last_used = time.as_micros();
-        println!("LA {}", rpc_list_guard[index].status.latency);
+        tracing::info!("LA {}", rpc_list_guard[index].status.latency);
     }
 }
 
@@ -162,15 +178,16 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_querry() {
+    #[serial_test::serial]
+    async fn test_cache_query() {
         let cache_args = CacheArgs::default();
         let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
         let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-        cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
+        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
 
-        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec())
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned())
             .unwrap()
             .unwrap();
         let cached_str = std::str::from_utf8(&cached_value).unwrap();
@@ -178,23 +195,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_infura_error_querry() {
+    #[serial_test::serial]
+    async fn test_cache_infura_error_query() {
         let cache_args = CacheArgs::default();
         let mut rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#.to_string();
         let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-        cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
+        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
 
-        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()).unwrap();
-        assert_eq!(cached_value, None);
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned()).unwrap();
+        assert!(
+            cached_value.is_none(),
+            "got cached value for transaction that should have failed"
+        );
     }
 
     #[tokio::test]
     async fn test_update_rpc_latency() {
         let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".to_string(),
-            Some("ws://test_rpc".to_string()),
+            "http://test_rpc".parse().unwrap(),
+            Some("ws://test_rpc".parse().unwrap()),
             0,
             0,
             1.0,
@@ -209,15 +230,15 @@ mod tests {
     async fn test_update_rpc_latency_with_multiple_rpcs() {
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
-                "http://test_rpc1".to_string(),
-                Some("ws://test_rpc1".to_string()),
+                "http://test_rpc1".parse().unwrap(),
+                Some("ws://test_rpc1".parse().unwrap()),
                 0,
                 0,
                 1.0,
             ),
             Rpc::new(
-                "http://test_rpc2".to_string(),
-                Some("ws://test_rpc2".to_string()),
+                "http://test_rpc2".parse().unwrap(),
+                Some("ws://test_rpc2".parse().unwrap()),
                 0,
                 0,
                 1.0,
@@ -232,8 +253,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_rpc_latency_with_invalid_position() {
         let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".to_string(),
-            Some("ws://test_rpc".to_string()),
+            "http://test_rpc".parse().unwrap(),
+            Some("ws://test_rpc".parse().unwrap()),
             0,
             0,
             1.0,
@@ -259,15 +280,15 @@ mod tests {
     async fn test_update_rpc_latency_edge_cases() {
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
-                "http://test_rpc1".to_string(),
-                Some("ws://test_rpc1".to_string()),
+                "http://test_rpc1".parse().unwrap(),
+                Some("ws://test_rpc1".parse().unwrap()),
                 0,
                 0,
                 1.0,
             ),
             Rpc::new(
-                "http://test_rpc2".to_string(),
-                Some("ws://test_rpc2".to_string()),
+                "http://test_rpc2".parse().unwrap(),
+                Some("ws://test_rpc2".parse().unwrap()),
                 0,
                 0,
                 1.0,

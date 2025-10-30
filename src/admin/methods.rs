@@ -1,6 +1,9 @@
 use crate::{
     admin::error::AdminError,
-    database::types::RequestBus,
+    database::types::{
+        GenericBytes,
+        RequestBus,
+    },
     db_flush,
     Rpc,
     Settings,
@@ -21,15 +24,19 @@ use serde_json::{
 };
 
 /// Extract the method, call the appropriate function and return the response
-pub async fn execute_method(
+pub async fn execute_method<K, V>(
     tx: Value,
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     config: Arc<RwLock<Settings>>,
-    cache: RequestBus,
-) -> Result<Value, AdminError> {
+    cache: RequestBus<K, V>,
+) -> Result<Value, AdminError>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     let method = tx["method"].as_str();
-    println!("Method: {:?}", method.unwrap_or("None"));
+    tracing::debug!("Method: {:?}", method);
 
     // Check if write protection is enabled
     let write_protection_enabled = config.read().unwrap().admin.readonly;
@@ -104,18 +111,26 @@ pub async fn execute_method(
 /// Quit Blutgang upon receiving this method
 /// We're returning a Null and allowing unreachable code so rustc doesnt cry
 #[allow(unreachable_code)]
-async fn admin_blutgang_quit(cache: RequestBus) -> Result<Value, AdminError> {
+async fn admin_blutgang_quit<K, V>(cache: RequestBus<K, V>) -> Result<Value, AdminError>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     // We're doing something not-good so flush everything to disk
-    let _ = db_flush!(cache);
+    drop(db_flush!(cache));
 
     std::process::exit(0);
     Ok(Value::Null)
 }
 
 /// Flushes sled cache to disk
-async fn admin_flush_cache(cache: RequestBus) -> Result<Value, AdminError> {
+async fn admin_flush_cache<K, V>(cache: RequestBus<K, V>) -> Result<Value, AdminError>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     let time = Instant::now();
-    let _ = db_flush!(cache);
+    drop(db_flush!(cache));
     let time = time.elapsed();
 
     let rx = json!({
@@ -237,8 +252,8 @@ fn admin_add_rpc(
     let mut rpc_list = rpc_list.write().map_err(|_| AdminError::Inaccessible)?;
 
     rpc_list.push(Rpc::new(
-        rpc.to_string(),
-        ws_url,
+        rpc.parse().unwrap(),
+        ws_url.map(|ws_url| ws_url.parse().unwrap()),
         max_consecutive,
         delta.into(),
         ma_len,
@@ -394,7 +409,7 @@ mod tests {
     // Helper function to create a test RPC list
     fn create_test_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
-            "http://example.com".to_string(),
+            "http://example.com".parse().unwrap(),
             None,
             5,
             1000,
@@ -405,7 +420,7 @@ mod tests {
     // Helper function to create a test poverty list
     fn create_test_poverty_list() -> Arc<RwLock<Vec<Rpc>>> {
         Arc::new(RwLock::new(vec![Rpc::new(
-            "http://poverty.com".to_string(),
+            "http://poverty.com".parse().unwrap(),
             None,
             2,
             1000,
@@ -422,7 +437,7 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> RequestBus {
+    fn create_test_cache() -> RequestBus<Vec<u8>, Vec<u8>> {
         let cache = Config::tmp().unwrap();
         let cache = Db::open_with_config(&cache).unwrap();
         let (db_tx, db_rx) = mpsc::unbounded_channel();
@@ -432,6 +447,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_rpc_list() {
         // Arrange
         let cache = create_test_cache();
@@ -452,6 +468,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_flush_cache() {
         // Arrange
         let cache = create_test_cache();
@@ -472,6 +489,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_config() {
         // Arrange
         let cache = create_test_cache();
@@ -492,6 +510,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_poverty_list() {
         // Arrange
         let cache = create_test_cache();
@@ -512,6 +531,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_ttl() {
         // Arrange
         let cache = create_test_cache();
@@ -532,6 +552,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_health_check_ttl() {
         // Arrange
         let cache = create_test_cache();
@@ -552,6 +573,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_invalid_method() {
         // Arrange
         let cache = create_test_cache();
@@ -572,6 +594,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_add_to_rpc_list() {
         // Arrange
         let cache = create_test_cache();
@@ -596,6 +619,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_add_to_rpc_list_no_ws() {
         // Arrange
         let cache = create_test_cache();
@@ -620,6 +644,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_remove_from_rpc_list() {
         // Arrange
         let cache = create_test_cache();
@@ -629,7 +654,7 @@ mod tests {
         let rpc_list = create_test_rpc_list();
         // rpc_list has only 1 so add another one to keep the 1st one some company
         rpc_list.write().unwrap().push(Rpc::new(
-            "http://example.com".to_string(),
+            "http://example.com".parse().unwrap(),
             None,
             5,
             1000,
@@ -670,6 +695,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_set_ttl() {
         // Arrange
         let cache = create_test_cache();
@@ -695,6 +721,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_execute_method_blutgang_set_health_check_ttl() {
         // Arrange
         let cache = create_test_cache();
@@ -720,6 +747,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_rw_protection() {
         // Arrange
         let cache = create_test_cache();

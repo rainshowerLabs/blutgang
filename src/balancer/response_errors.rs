@@ -30,9 +30,9 @@ macro_rules! timed_out {
 #[macro_export]
 macro_rules! print_cache_error {
     () => {
-        println!("\x1b[31m!!! Cache error! Check the DB !!!\x1b[0m");
-        println!("To recover, please stop blutgang, delete your cache folder, and start blutgang again.");
-        println!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
+        tracing::error!("!!! Cache error! Check the DB !!!");
+        tracing::error!("To recover, please stop blutgang, delete your cache folder, and start blutgang again.");
+        tracing::error!("If the error perists, please open up an issue: https://github.com/rainshowerLabs/blutgang/issues");
     };
 }
 

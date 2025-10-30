@@ -1,6 +1,6 @@
 use crate::{
     config::error::ConfigError,
-    log_err,
+    rpc::error::RpcError,
     Rpc,
 };
 use std::time::Instant;
@@ -25,15 +25,16 @@ async fn set_starting_latency(
         match rpc.syncing().await {
             Ok(false) => {}
             Ok(true) => {
-                tx.send(StartingLatencyResp::Error(rpc, ConfigError::Syncing()))
-                    .await?;
-                return Err(ConfigError::RpcError("Node syncing to head".to_string()));
+                tx.send(StartingLatencyResp::Error(rpc, ConfigError::Syncing))
+                    .await
+                    .map_err(|err| ConfigError::from(RpcError::from(err)))?;
+                return Err(RpcError::SendError("Node syncing to head".to_string()).into());
             }
             Err(e) => {
-                tx.send(StartingLatencyResp::Error(rpc, e.into())).await?;
-                return Err(ConfigError::RpcError(
-                    "Error awaiting sync status!".to_string(),
-                ));
+                tx.send(StartingLatencyResp::Error(rpc, e.into()))
+                    .await
+                    .map_err(|err| ConfigError::from(RpcError::from(err)))?;
+                return Err(RpcError::SendError("Error awaiting sync status!".to_string()).into());
             }
         };
         let end = Instant::now();
@@ -44,14 +45,16 @@ async fn set_starting_latency(
     let avg_latency = latencies.iter().sum::<f64>() / latencies.len() as f64;
     rpc.update_latency(avg_latency);
 
-    println!("{}: {}ns", rpc.name, rpc.status.latency);
+    tracing::debug!("{}: {}ns", rpc.name, rpc.status.latency);
 
-    tx.send(StartingLatencyResp::Ok(rpc)).await?;
+    tx.send(StartingLatencyResp::Ok(rpc))
+        .await
+        .map_err(|err| ConfigError::from(RpcError::from(err)))?;
 
     Ok(())
 }
 
-/// Do `ma_length`amount eth_blockNumber calls per rpc and then sort them by latency
+/// Do `ma_length` amount `eth_blockNumber` calls per rpc and then sort them by latency
 pub async fn sort_by_latency(
     mut rpc_list: Vec<Rpc>,
     mut poverty_list: Vec<Rpc>,
@@ -59,9 +62,11 @@ pub async fn sort_by_latency(
 ) -> Result<(Vec<Rpc>, Vec<Rpc>), ConfigError> {
     // Return empty vec if we dont supply any RPCs
     if rpc_list.is_empty() {
-        log_err!("No RPCs supplied!");
+        tracing::error!("No RPCs supplied!");
         return Ok((Vec::new(), Vec::new()));
     }
+
+    let mut sorted_rpc_list = Vec::with_capacity(rpc_list.len());
 
     let (tx, mut rx) = mpsc::channel(rpc_list.len());
 
@@ -72,8 +77,6 @@ pub async fn sort_by_latency(
         tokio::spawn(set_starting_latency(rpc, ma_length, tx));
     }
 
-    let mut sorted_rpc_list = Vec::new();
-
     // Drop tx so we don't try to receive nothing
     drop(tx);
 
@@ -82,7 +85,7 @@ pub async fn sort_by_latency(
         let rpc = match rpc {
             StartingLatencyResp::Ok(rax) => rax,
             StartingLatencyResp::Error(mut rax, e) => {
-                log_err!("Adding to poverty list: {}", e);
+                tracing::error!(?e, "Adding to poverty list");
                 rax.status.is_erroring = true;
                 poverty_list.push(rax);
                 continue;

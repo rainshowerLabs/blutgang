@@ -5,17 +5,15 @@ use crate::{
             replace_block_tags,
         },
         processing::{
-            cache_querry,
+            cache_query,
             update_rpc_latency,
             CacheArgs,
         },
         selection::select::pick,
     },
     cache_error,
+    database::types::GenericBytes,
     db_get,
-    log_err,
-    log_info,
-    log_wrn,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
@@ -64,7 +62,6 @@ use tokio::time::timeout;
 
 use std::{
     convert::Infallible,
-    println,
     sync::{
         Arc,
         RwLock,
@@ -77,7 +74,7 @@ use std::{
 
 /// `ConnectionParams` contains the necessary data needed for blutgang
 /// to fulfil an incoming request.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ConnectionParams {
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
     channels: RequestChannels,
@@ -160,7 +157,7 @@ macro_rules! accept {
             .with_upgrades()
             .await
         {
-            log_err!("Error serving connection: {:?}", err);
+            tracing::error!(?err, "Error serving connection");
         }
     };
 }
@@ -177,16 +174,16 @@ macro_rules! get_response {
         $ttl:expr,
         $max_retries:expr
     ) => {
-        match db_get!($cache_args.cache, $tx_hash.as_bytes().to_vec()) {
+        match db_get!($cache_args.cache, $tx_hash.as_bytes().to_owned().into()) {
             Ok(Some(mut rax)) => {
                 $rpc_position = None;
                 // Reconstruct ID
-                let mut cached: Value = simd_json::serde::from_slice(rax.make_mut()).unwrap();
+                let mut cached: Value = simd_json::serde::from_slice(rax.as_mut()).unwrap();
 
                 cached["id"] = $id.into();
                 cached.to_string()
             }
-            Ok(None) => {
+            Ok(_) => {
                 fetch_from_rpc!(
                     $tx,
                     $cache_args,
@@ -236,7 +233,7 @@ macro_rules! fetch_from_rpc {
 
                 (rpc, $rpc_position) = pick(&mut rpc_list_guard);
             }
-            log_info!("Forwarding to: {}", rpc.name);
+            tracing::info!(rpc.name, "Forwarding to");
 
             // Check if we have any RPCs in the list, if not return error
             if $rpc_position == None {
@@ -255,26 +252,21 @@ macro_rules! fetch_from_rpc {
                 Ok(rxa) => {
                     rx = rxa.unwrap();
                     break;
-                },
+                }
                 Err(_) => {
-                    log_wrn!("\x1b[93mWrn:\x1b[0m An RPC request has timed out, picking new RPC and retrying.");
+                    tracing::warn!("An RPC request has timed out, picking new RPC and retrying.");
                     rpc.update_latency($ttl as f64);
                     retries += 1;
-                },
+                }
             };
 
             if retries == $max_retries {
-                return (timed_out!(), $rpc_position,);
+                return (timed_out!(), $rpc_position);
             }
         }
 
         // Don't cache responses that contain errors or missing trie nodes
-        cache_querry(
-            &mut rx,
-            $tx,
-            $tx_hash,
-            &$cache_args,
-        );
+        cache_query(&mut rx, $tx, $tx_hash, &$cache_args);
 
         rx
     }};
@@ -282,15 +274,19 @@ macro_rules! fetch_from_rpc {
 
 /// Pick RPC and send request to it. In case the result is cached,
 /// read and return from the cache.
-pub async fn forward_body(
+pub async fn forward_body<K, V>(
     tx: Request<hyper::body::Incoming>,
     con_params: &ConnectionParams,
-    cache_args: CacheArgs,
+    cache_args: CacheArgs<K, V>,
     params: RequestParams,
 ) -> (
     Result<hyper::Response<Full<Bytes>>, Infallible>,
     Option<usize>,
-) {
+)
+where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     // TODO: do content type validation more upstream
     // Check if body has application/json
     //
@@ -367,14 +363,18 @@ pub async fn forward_body(
 /// Measures the time needed for a request, and updates the respective
 /// RPC lself.
 /// In case of a timeout, returns an error.
-pub async fn accept_request(
+pub async fn accept_request<K, V>(
     mut tx: Request<hyper::body::Incoming>,
     connection_params: ConnectionParams,
-    cache_args: CacheArgs,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+    cache_args: CacheArgs<K, V>,
+) -> Result<hyper::Response<Full<Bytes>>, Infallible>
+where
+    K: GenericBytes + From<[u8; 32]> + 'static,
+    V: GenericBytes + From<Vec<u8>> + 'static,
+{
     // Check if the request is a websocket upgrade request.
     if is_upgrade_request(&tx) {
-        log_info!("Received WS upgrade request");
+        tracing::info!("Received WS upgrade request");
 
         if !connection_params.config.read().unwrap().is_ws {
             return rpc_response!(
@@ -388,7 +388,7 @@ pub async fn accept_request(
         let (response, websocket) = match upgrade(&mut tx, None) {
             Ok((response, websocket)) => (response, websocket),
             Err(e) => {
-                log_err!("Websocket upgrade error: {}", e);
+                tracing::error!(?e, "Websocket upgrade error");
                 return rpc_response!(500, Full::new(Bytes::from(
                     "{code:-32004, message:\"error: Websocket upgrade error! Try again later...\"}"
                         .to_string(),
@@ -403,11 +403,11 @@ pub async fn accept_request(
                 connection_params.channels.incoming_tx,
                 connection_params.channels.outgoing_rx,
                 connection_params.sub_data.clone(),
-                cache_args,
+                cache_args.to_owned(),
             )
             .await
             {
-                log_err!("Websocket connection error: {}", e);
+                tracing::error!(?e, "Websocket connection error");
             }
         });
 
@@ -437,7 +437,7 @@ pub async fn accept_request(
     (response, rpc_position) = forward_body(tx, &connection_params, cache_args, params).await;
 
     let time = time.elapsed();
-    log_info!("Request time: {:?}", time);
+    tracing::info!(?time, "Request time");
 
     // `rpc_position` is an Option<> that either contains the index of the RPC
     // we forwarded our request to, or is None if the result was cached.

@@ -2,16 +2,14 @@ use crate::{
     balancer::{
         format::replace_block_tags,
         processing::{
-            cache_querry,
+            cache_query,
             update_rpc_latency,
             CacheArgs,
         },
         selection::select::pick,
     },
+    database::types::GenericBytes,
     db_get,
-    log_err,
-    log_info,
-    log_wrn,
     rpc::types::Rpc,
     websocket::{
         error::WsError,
@@ -104,7 +102,7 @@ async fn update_ws_connections(
     let ws_vec = create_ws_vec(rpc_list, broadcast_tx, ws_error_tx).await;
     let mut ws_handle_guard = ws_handles.write().unwrap_or_else(|e| {
         // Handle the case where the ws_handles RwLock is poisoned
-        log_err!("{}", e);
+        tracing::error!(?e);
         e.into_inner()
     });
     *ws_handle_guard = ws_vec;
@@ -138,7 +136,7 @@ async fn handle_incoming_message(
     } else {
         let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
             // Handle the case where the rpc_list RwLock is poisoned
-            log_err!("handle_incoming_message poison: {}", e);
+            tracing::error!(?e);
             e.into_inner()
         });
 
@@ -151,10 +149,9 @@ async fn handle_incoming_message(
                 // in case we have no available RPCs.
                 if incoming["method"] == "eth_subscription" || incoming["method"] == "eth_subscribe"
                 {
-                    println!("in none: {:?}", incoming);
                     ws_buffer.push(incoming);
                 }
-                log_err!("No RPC position available");
+                tracing::error!("No RPC position available");
                 return;
             }
         }
@@ -167,10 +164,10 @@ async fn handle_incoming_message(
         .and_then(|handle| handle.as_ref())
     {
         if ws.send(incoming).is_err() {
-            log_err!("ws_conn_manager error: failed to send message");
+            tracing::error!("ws_conn_manager error: failed to send message");
         }
     } else {
-        log_err!("No WS connection at index {}", rpc_position);
+        tracing::error!(rpc_position, "No WS connection at index");
     }
 }
 
@@ -187,7 +184,7 @@ pub async fn create_ws_vec(
         .read()
         .unwrap_or_else(|e| {
             // Handle the case where the rpc_list RwLock is poisoned
-            log_err!("{}", e);
+            tracing::error!(?e);
             e.into_inner()
         })
         .clone();
@@ -230,7 +227,7 @@ pub async fn ws_conn(
     let ws_stream = match connect_async(&rpc.ws_url.unwrap()).await {
         Ok((ws_stream, _)) => ws_stream,
         Err(_) => {
-            log_wrn!(
+            tracing::error!(
                 "Node {} dropped their connection in the middle of WS init!",
                 rpc.name
             );
@@ -244,8 +241,7 @@ pub async fn ws_conn(
     let sender_error_tx = ws_error_tx.clone();
     tokio::spawn(async move {
         while let Some(incoming) = incoming_rx.recv().await {
-            #[cfg(feature = "debug-verbose")]
-            println!("ws_conn[{}], send: {:?}", index, incoming);
+            tracing::debug!("ws_conn[{}], send: {:?}", index, incoming);
 
             if ws_sender
                 .send(Message::Text(incoming.to_string()))
@@ -264,13 +260,12 @@ pub async fn ws_conn(
             match message {
                 Ok(message) => {
                     let time = Instant::now();
-                    #[cfg(feature = "debug-verbose")]
-                    println!("ws_conn[{}], recv: {:?}", index, message);
+                    tracing::debug!("ws_conn[{}], recv: {:?}", index, message);
 
                     let mut ws_message = match message.into_text() {
                         Ok(rax) => rax,
                         Err(e) => {
-                            log_err!("Received malformed message from ws_conn {}", e);
+                            tracing::error!(?e, "Received malformed message from ws_conn");
                             let _ = ws_error_tx.send(WsChannelErr::Closed(index));
                             break;
                         }
@@ -279,10 +274,8 @@ pub async fn ws_conn(
                     let rax = match unsafe { from_str(&mut ws_message) } {
                         Ok(rax) => rax,
                         Err(_e) => {
-                            #[cfg(feature = "debug-verbose")]
                             {
-                                use crate::log_wrn;
-                                log_wrn!("Couldn't deserialize ws_conn response: {}", _e);
+                                tracing::warn!(?_e, "Couldn't deserialize ws_conn response");
                             }
 
                             continue;
@@ -297,7 +290,7 @@ pub async fn ws_conn(
                     let _ = broadcast_tx.send(incoming);
                     let time = time.elapsed();
                     update_rpc_latency(&rpc_list, index, time);
-                    log_info!("WS request time: {:?}", time);
+                    tracing::info!(?time, "WS request time");
                 }
                 Err(_) => {
                     let _ = ws_error_tx.send(WsChannelErr::Closed(index));
@@ -312,18 +305,22 @@ pub async fn ws_conn(
 ///
 /// Contains logic for retreiving from cache, sending to the internal
 /// WS pipeline, retreiving and returning received responses.
-pub async fn execute_ws_call(
+pub async fn execute_ws_call<K, V>(
     mut call: Value,
     user_id: u32,
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     broadcast_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
-    cache_args: &CacheArgs,
-) -> Result<String, WsError> {
-    #[cfg(feature = "debug-verbose")]
-    println!(
+    cache_args: &CacheArgs<K, V>,
+) -> Result<String, WsError>
+where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
+    tracing::debug!(
         "Received incoming WS call from user_id {}: {:?}",
-        user_id, call
+        user_id,
+        call
     );
 
     let id = call["id"].take();
@@ -338,8 +335,8 @@ pub async fn execute_ws_call(
         }
     };
 
-    if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_vec()) {
-        let mut cached: Value = from_slice(rax.make_mut()).unwrap();
+    if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
+        let mut cached: Value = from_slice(rax.as_mut()).unwrap();
         cached["id"] = id;
         return Ok(cached.to_string());
     }
@@ -366,7 +363,7 @@ pub async fn execute_ws_call(
                 ));
             }
         };
-        println!("execute_ws_call: index: {:?}", index);
+        tracing::info!("execute_ws_call: index: {index:?}");
 
         sub_data.unsubscribe_user(user_id, subscription_id);
 
@@ -382,7 +379,7 @@ pub async fn execute_ws_call(
         // if so return the subscription id and add this user to the dispatch
         // if not continue
         if let Ok(rax) = sub_data.subscribe_user(user_id, call.clone()) {
-            println!("has subscription already");
+            tracing::debug!("has subscription already");
             return Ok(format!(
                 "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":\"{}\"}}",
                 id, rax
@@ -398,10 +395,8 @@ pub async fn execute_ws_call(
     let mut response = listen_for_response(user_id, broadcast_rx).await?;
 
     if is_subscription {
-        #[cfg(feature = "debug-verbose")]
-        println!("is subscription!");
-        #[cfg(feature = "debug-verbose")]
-        println!("response content: {:?}", response.content);
+        tracing::debug!("is subscription!");
+        tracing::debug!(?response.content, "response content");
         // add the subscription id and add this user to the dispatch
         let sub_id = match response.content["result"].as_str() {
             Some(sub_id) => sub_id.to_string(),
@@ -413,11 +408,11 @@ pub async fn execute_ws_call(
             }
         };
 
-        println!("\x1b[35mInfo:\x1b[0m sub_id: {}", sub_id);
+        tracing::info!(sub_id, "sub_id");
         sub_data.register_subscription(call.clone(), sub_id.clone(), response.node_id);
         sub_data.subscribe_user(user_id, call)?;
     } else {
-        cache_querry(&mut response.content.to_string(), call, tx_hash, cache_args);
+        cache_query(&mut response.content.to_string(), call, tx_hash, cache_args).await;
     }
 
     response.content["id"] = id;
@@ -446,8 +441,8 @@ mod tests {
     // Helper function to create a mock Rpc object
     fn mock_rpc(url: &str) -> Rpc {
         Rpc::new(
-            format!("http://{}", url),
-            Some(format!("ws://{}", url)),
+            format!("http://{}", url).parse().unwrap(),
+            Some(format!("ws://{}", url).parse().unwrap()),
             10000,
             1,
             10.0,
@@ -457,15 +452,15 @@ mod tests {
     async fn create_mock_rpc_list() -> Arc<RwLock<Vec<Rpc>>> {
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
-                "http://test1".to_string(),
-                Some("ws://test1".to_string()),
+                "http://test1".parse().unwrap(),
+                Some("ws://test1".parse().unwrap()),
                 0,
                 0,
                 0.0,
             ),
             Rpc::new(
-                "http://test2".to_string(),
-                Some("ws://test2".to_string()),
+                "http://test2".parse().unwrap(),
+                Some("ws://test2".parse().unwrap()),
                 0,
                 0,
                 0.0,

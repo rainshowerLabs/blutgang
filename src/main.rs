@@ -27,11 +27,16 @@ use crate::{
     },
     config::{
         cache_setup::setup_data,
-        cli_args::create_match,
         system::FANOUT,
-        types::Settings,
+        types::{
+            CacheSettings,
+            Settings,
+        },
     },
-    database::accept::database_processing,
+    database::{
+        accept::database_processing,
+        types::GenericDatabase,
+    },
     health::{
         check::{
             dropped_listener,
@@ -64,8 +69,6 @@ use std::{
     },
 };
 
-use sled::Db;
-
 use tokio::{
     net::TcpListener,
     sync::{
@@ -85,12 +88,53 @@ use hyper_util_blutgang::rt::TokioIo;
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[tokio::main]
-#[allow(warnings)]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Get all the cli args and set them
-    let config = Arc::new(RwLock::new(Settings::new(create_match()).await));
+fn init_tracing_subscriber() -> Option<rust_tracing::utils::otlp::OtelGuard> {
+    #[cfg(feature = "journald")]
+    {
+        rust_tracing::trace_with_journald()
+    }
 
+    #[cfg(not(feature = "journald"))]
+    {
+        rust_tracing::trace()
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    init_tracing_subscriber();
+
+    // Get all the cli args and set them
+    let mut settings = Settings::new()?;
+    if settings.sort_on_startup {
+        settings = settings.sort_on_startup().await?;
+    }
+    let cache_settings = settings.cache.clone();
+    let config = Arc::new(RwLock::new(settings));
+
+    // Create/Open DB
+    match cache_settings {
+        CacheSettings::Sled(sled) => {
+            let cache = <sled::Db<{ FANOUT }> as GenericDatabase>::open(&sled)
+                .expect("Can't open/create database!");
+            run(cache, config).await
+        }
+        CacheSettings::RocksDB(rocks) => {
+            let cache =
+                <rocksdb::DBWithThreadMode<rocksdb::SingleThreaded> as GenericDatabase>::open(&(
+                    rocks,
+                    std::path::PathBuf::from("./blutgang-cache-rocksdb"),
+                ))
+                .expect("Can't open/create database!");
+            run(cache, config).await
+        }
+    }
+}
+
+async fn run<DB: GenericDatabase + 'static>(
+    cache: DB,
+    config: Arc<RwLock<Settings>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Copy the configuration values we need
     let (addr, do_clear, do_health_check, admin_enabled, is_ws, expected_block_time) = {
         let config_guard = config.read().unwrap();
@@ -107,16 +151,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Make the list a rwlock
     let rpc_list_rwlock = Arc::new(RwLock::new(config.read().unwrap().rpc_list.clone()));
 
-    // Create/Open sled DB
-    let cache: Db<{ FANOUT }> = config
-        .read()
-        .unwrap()
-        .sled_config
-        .open()
-        .expect("Can't open/create database!");
-
     // Cache for storing querries near the tip
-    let head_cache = Arc::new(RwLock::new(BTreeMap::<u64, Vec<String>>::new()));
+    let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
 
     // Insert data about blutgang and our settings into the DB. Clears if specified.
     //
@@ -125,11 +161,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Starts the database task.
     let (db_tx, db_rx) = mpsc::unbounded_channel();
-    tokio::task::spawn(database_processing(db_rx, cache));
+    tokio::task::spawn(database_processing::<[u8; 32], Vec<u8>, DB>(db_rx, cache));
 
     // We create a TcpListener and bind it to 127.0.0.1:3000
     let listener = TcpListener::bind(addr).await?;
-    log_info!("Bound to: {}", addr);
+    tracing::info!(?addr, "Bound to");
 
     let (blocknum_tx, blocknum_rx) = watch::channel(0);
     let (finalized_tx, finalized_rx) = watch::channel(0);
@@ -147,7 +183,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let config_admin = Arc::clone(&config);
         let db_admin = db_tx.clone();
         tokio::task::spawn(async move {
-            log_info!("Admin namespace enabled, accepting admin methods at admin port");
+            tracing::info!("Admin namespace enabled, accepting admin methods at admin port");
             let _ = listen_for_admin_requests(
                 rpc_list_admin,
                 poverty_list_admin,
@@ -209,7 +245,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sub_data = Arc::new(SubscriptionData::new());
     if is_ws {
         let (ws_error_tx, ws_error_rx) = mpsc::unbounded_channel::<WsChannelErr>();
-        let db_tx_clone = db_tx.clone();
 
         let rpc_list_ws = Arc::clone(&rpc_list_rwlock);
         // TODO: make this more ergonomic
@@ -290,7 +325,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, socketaddr) = listener.accept().await?;
-        log_info!("Connection from: {}", socketaddr);
+        tracing::info!(?socketaddr, "Connection from");
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.
