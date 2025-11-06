@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     balancer::processing::CacheArgs,
-    log_info,
+    database::types::GenericBytes,
     websocket::{
         client::execute_ws_call,
         error::WsError,
@@ -36,13 +36,17 @@ use tungstenite::Message;
 ///
 /// Opens a WebSocket connection between Blutgang and a client,
 /// sending their requests to be processed.
-pub async fn serve_websocket(
+pub async fn serve_websocket<K, V>(
     websocket: HyperWebsocket,
     incoming_tx: mpsc::UnboundedSender<WsconnMessage>,
     outgoing_rx: broadcast::Receiver<IncomingResponse>,
     sub_data: Arc<SubscriptionData>,
-    cache_args: CacheArgs,
-) -> Result<(), WsError> {
+    cache_args: CacheArgs<K, V>,
+) -> Result<(), WsError>
+where
+    K: GenericBytes + From<[u8; 32]> + 'static,
+    V: GenericBytes + From<Vec<u8>> + 'static,
+{
     let websocket = websocket.await?;
 
     // Split the Sink so we can do async send/recv
@@ -57,7 +61,7 @@ pub async fn serve_websocket(
     let user_id = random::<u32>();
 
     // Add the user to the sink map
-    log_info!("Adding user {} to sink map", user_id);
+    tracing::info!("Adding user {} to sink map", user_id);
     let user_data = tx.clone();
     sub_data.add_user(user_id, user_data);
 
@@ -90,7 +94,7 @@ pub async fn serve_websocket(
                         Err(e) => {
                             // Remove the user from the sink map
                             sub_data_clone.remove_user(user_id);
-                            println!("\x1b[93mWrn:\x1b[0m Error sending call: {}", e);
+                            tracing::error!(?e, "Error sending call");
                             break;
                         }
                     }
@@ -116,24 +120,24 @@ pub async fn serve_websocket(
     while let Some(message) = websocket_stream.next().await {
         match message {
             Ok(Message::Text(mut msg)) => {
-                log_info!("Received WS text message: {}", msg);
+                tracing::info!(msg, "Received WS text message");
                 // Send message to the channel
                 let rax = match unsafe { from_str(&mut msg) } {
                     Ok(rax) => rax,
                     Err(_) => continue,
                 };
 
-                tx.send(RequestResult::Call(rax)).unwrap();
+                tx.send(RequestResult::Call(rax)).unwrap_or(());
             }
             Ok(Message::Close(msg)) => {
                 if let Some(msg) = &msg {
-                    log_info!(
+                    tracing::info!(
                         "Received close message with code {} and message: {}",
                         msg.code,
                         msg.reason
                     );
                 } else {
-                    println!("Received close message");
+                    tracing::info!("Received close message");
                 }
             }
             Err(e) => {

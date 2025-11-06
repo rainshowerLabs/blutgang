@@ -6,13 +6,19 @@ use crate::{
             cache_result,
         },
     },
+    database::{
+        accept::db_insert,
+        types::{
+            GenericBytes,
+            RequestBus,
+        },
+    },
     health::safe_block::NamedBlocknumbers,
     Rpc,
 };
 
 use std::{
     collections::BTreeMap,
-    println,
     sync::{
         Arc,
         RwLock,
@@ -25,38 +31,67 @@ use tokio::sync::watch;
 use blake3::Hash;
 use serde_json::Value;
 use simd_json::to_vec;
-use sled::Db;
 
 #[derive(Clone)]
-pub struct CacheArgs {
+pub struct CacheArgs<K, V>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     pub finalized_rx: watch::Receiver<u64>,
     pub named_numbers: Arc<RwLock<NamedBlocknumbers>>,
-    pub cache: Db,
-    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<String>>>>,
+    pub head_cache: Arc<RwLock<BTreeMap<u64, Vec<K>>>>,
+    pub cache: RequestBus<K, V>,
 }
 
-impl CacheArgs {
-    #[allow(dead_code)]
+impl CacheArgs<[u8; 32], Vec<u8>> {
+    #[cfg(test)]
+    /// **Note:** This should only be used for testing!
     pub fn default() -> Self {
+        use crate::database_processing;
+
+        use sled::{
+            Config,
+            Db,
+        };
+
+        use tokio::sync::mpsc;
+
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
+
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
+
         CacheArgs {
             finalized_rx: watch::channel(0).1,
             named_numbers: Arc::new(RwLock::new(NamedBlocknumbers::default())),
-            cache: (sled::Config::default().open().unwrap()),
             head_cache: Arc::new(RwLock::new(BTreeMap::new())),
+            cache: db_tx,
         }
     }
 }
 
+// TODO: @eureka-cpu -- The method can be an enum and impl FromStr to avoid this:
+//
 // TODO: we should find a way to check values directly and not convert Value to str
 pub fn can_cache(method: &str, result: &str) -> bool {
-    if cache_method(method) && cache_result(result) {
+    if (cache_method(method)) && (cache_result(result)) {
         return true;
     }
     false
 }
 
-/// Check if we should cache the querry, and if so cache it in the DB
-pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &CacheArgs) {
+/// Check if we should cache the query, and if so cache it in the DB
+pub async fn cache_query<K, V>(
+    rx: &mut str,
+    method: Value,
+    tx_hash: Hash,
+    cache_args: &CacheArgs<K, V>,
+) where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     let tx_string = method.to_string();
 
     if can_cache(&tx_string, rx) {
@@ -68,18 +103,34 @@ pub fn cache_querry(rx: &mut str, method: Value, tx_hash: Hash, cache_args: &Cac
         if let Some(num) = num {
             if num > *cache_args.finalized_rx.borrow() {
                 let mut head_cache = cache_args.head_cache.write().unwrap();
-                head_cache.entry(num).or_default().push(tx_hash.to_string());
+                head_cache
+                    .entry(num)
+                    .or_default()
+                    .push(tx_hash.as_bytes().to_owned().into());
             }
 
-            // Replace the id with Value::Null and insert the request
+            // Replace the id with Value::Null and insert the request.
+            //
+            // In some cases the response might not contain an ID like in
+            // https://github.com/rainshowerLabs/blutgang/issues/88.
+            // In this case we just skip inserting it into the DB as its an error.
+            //
             // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
             let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
-            rx_value["id"] = Value::Null;
+            if let Some(id) = rx_value.get_mut("id") {
+                *id = Value::Null;
+            } else {
+                return;
+            }
 
-            cache_args
-                .cache
-                .insert(tx_hash.as_bytes(), to_vec(&rx_value).unwrap().as_slice())
-                .unwrap();
+            drop(
+                db_insert(
+                    &cache_args.cache.clone(),
+                    tx_hash.as_bytes().to_owned().into(),
+                    to_vec(&rx_value).unwrap().into(),
+                )
+                .await,
+            );
         }
     }
 }
@@ -101,12 +152,15 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
         };
         rpc_list_guard[index].update_latency(time.as_nanos() as f64);
         rpc_list_guard[index].last_used = time.as_micros();
-        println!("LA {}", rpc_list_guard[index].status.latency);
+        tracing::info!("LA {}", rpc_list_guard[index].status.latency);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::db_get;
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -115,26 +169,53 @@ mod tests {
         assert!(!can_cache("eth_subscribe", r#"{"result": "0x1"}"#));
     }
 
-    // TODO: this :(
-    // #[tokio::test]
-    // async fn test_cache_querry() {
-    //     let cache_args = CacheArgs::default();
-    //     let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
-    //     let method = json!({"method": "eth_getBlockByNumber", "params": ["latest", false]});
-    //     let tx_hash = blake3::hash(method.to_string().as_bytes());
+    #[test]
+    fn test_dont_cache_infura_err() {
+        assert!(!can_cache(
+            r#"{"method": "eth_getBlockByNumber", "params": ["0x10", false]}"#,
+            r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#
+        ));
+    }
 
-    //     cache_querry(&mut rx, method.clone(), tx_hash, &cache_args);
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_cache_query() {
+        let cache_args = CacheArgs::default();
+        let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
+        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-    //     let cached_value = cache_args.cache.get(tx_hash.as_bytes()).unwrap().unwrap();
-    //     let cached_str = std::str::from_utf8(&cached_value).unwrap();
-    //     assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
-    // }
+        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
+
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned())
+            .unwrap()
+            .unwrap();
+        let cached_str = std::str::from_utf8(&cached_value).unwrap();
+        assert_eq!(cached_str, r#"{"id":null,"jsonrpc":"2.0","result":"0x1"}"#);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_cache_infura_error_query() {
+        let cache_args = CacheArgs::default();
+        let mut rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#.to_string();
+        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
+
+        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
+
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned()).unwrap();
+        assert!(
+            cached_value.is_none(),
+            "got cached value for transaction that should have failed"
+        );
+    }
 
     #[tokio::test]
     async fn test_update_rpc_latency() {
         let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".to_string(),
-            Some("ws://test_rpc".to_string()),
+            "http://test_rpc".parse().unwrap(),
+            Some("ws://test_rpc".parse().unwrap()),
             0,
             0,
             1.0,
@@ -149,15 +230,15 @@ mod tests {
     async fn test_update_rpc_latency_with_multiple_rpcs() {
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
-                "http://test_rpc1".to_string(),
-                Some("ws://test_rpc1".to_string()),
+                "http://test_rpc1".parse().unwrap(),
+                Some("ws://test_rpc1".parse().unwrap()),
                 0,
                 0,
                 1.0,
             ),
             Rpc::new(
-                "http://test_rpc2".to_string(),
-                Some("ws://test_rpc2".to_string()),
+                "http://test_rpc2".parse().unwrap(),
+                Some("ws://test_rpc2".parse().unwrap()),
                 0,
                 0,
                 1.0,
@@ -172,8 +253,8 @@ mod tests {
     #[tokio::test]
     async fn test_update_rpc_latency_with_invalid_position() {
         let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".to_string(),
-            Some("ws://test_rpc".to_string()),
+            "http://test_rpc".parse().unwrap(),
+            Some("ws://test_rpc".parse().unwrap()),
             0,
             0,
             1.0,
@@ -199,15 +280,15 @@ mod tests {
     async fn test_update_rpc_latency_edge_cases() {
         let rpc_list = Arc::new(RwLock::new(vec![
             Rpc::new(
-                "http://test_rpc1".to_string(),
-                Some("ws://test_rpc1".to_string()),
+                "http://test_rpc1".parse().unwrap(),
+                Some("ws://test_rpc1".parse().unwrap()),
                 0,
                 0,
                 1.0,
             ),
             Rpc::new(
-                "http://test_rpc2".to_string(),
-                Some("ws://test_rpc2".to_string()),
+                "http://test_rpc2".parse().unwrap(),
+                Some("ws://test_rpc2".parse().unwrap()),
                 0,
                 0,
                 1.0,

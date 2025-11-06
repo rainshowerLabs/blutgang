@@ -1,10 +1,11 @@
 /target
+*result
+/.nixos-test-history
+*.qcow2
 /.venv
 /blutgang-cache*
 /benchmarks.txt
-/config.toml
 /.DS_Store
-/config.toml
 /.env
 /default.sled
 

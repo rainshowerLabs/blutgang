@@ -6,8 +6,6 @@ use std::{
     },
 };
 
-use sled::Db;
-
 use crate::{
     admin::{
         accept::accept_admin_request,
@@ -17,7 +15,10 @@ use crate::{
             LiveReadyUpdateRecv,
         },
     },
-    log_info,
+    database::types::{
+        GenericBytes,
+        RequestBus,
+    },
     Rpc,
     Settings,
 };
@@ -60,26 +61,30 @@ macro_rules! accept_admin {
             )
             .await
         {
-            println!("error serving admin connection: {:?}", err);
+            tracing::error!(?err, "error serving admin connection");
         }
     };
 }
 
-async fn admin_api_server(
+async fn admin_api_server<K, V>(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus<K, V>,
     config: Arc<RwLock<Settings>>,
     address: SocketAddr,
     liveness_request_tx: LiveReadyRequestSnd,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    K: GenericBytes + 'static,
+    V: GenericBytes + 'static,
+{
     // Create a listener and bind to it
     let listener = TcpListener::bind(address).await?;
-    log_info!("Bound admin API to: {}", address);
+    tracing::info!("Bound admin API to: {}", address);
 
     loop {
         let (stream, socketaddr) = listener.accept().await?;
-        log_info!("Admin connection from: {}", socketaddr);
+        tracing::info!("Admin connection from: {}", socketaddr);
 
         // Use an adapter to access something implementing `tokio::io` traits as if they implement
         // `hyper::rt` IO traits.
@@ -109,13 +114,17 @@ async fn admin_api_server(
 /// Also used for k8s liveness/readiness probes.
 ///
 /// Similar to what you'd find in main/balancer
-pub async fn listen_for_admin_requests(
+pub async fn listen_for_admin_requests<K, V>(
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus<K, V>,
     config: Arc<RwLock<Settings>>,
     liveness_receiver: LiveReadyUpdateRecv,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    K: GenericBytes + 'static,
+    V: GenericBytes + 'static,
+{
     let address;
     {
         let config_guard = config.read().unwrap();

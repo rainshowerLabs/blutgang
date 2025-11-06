@@ -1,34 +1,25 @@
 //! RPC type errors
-use std::error::Error;
 
-#[derive(Debug)]
-#[allow(dead_code)]
+#[derive(Debug, thiserror::Error)]
 pub enum RpcError {
-    Unresponsive,
-    //InvalidHexFormat,
-    OutOfBounds,
+    #[error("Invalid RPC response: {0}")]
     InvalidResponse(String),
-}
 
-impl std::fmt::Display for RpcError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            RpcError::Unresponsive => write!(f, "RPC is unresponsive"),
-            RpcError::OutOfBounds => {
-                write!(
-                    f,
-                    "Request out of bounds. Most likeley a bad response from the current RPC node."
-                )
-            }
-            RpcError::InvalidResponse(reason) => write!(f, "Invalid RPC response: {}", reason),
-        }
-    }
+    #[error("Failed to send message: {0}")]
+    SendError(String),
+
+    #[error(transparent)]
+    ReqwestError(#[from] reqwest::Error),
 }
 
 impl From<simd_json::Error> for RpcError {
-    fn from(_: simd_json::Error) -> Self {
-        RpcError::InvalidResponse("Error while trying to parse JSON".to_string())
+    fn from(value: simd_json::Error) -> Self {
+        RpcError::InvalidResponse(format!("Error while trying to parse JSON: {value:?}"))
     }
 }
 
-impl Error for RpcError {}
+impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RpcError {
+    fn from(error: tokio::sync::mpsc::error::SendError<T>) -> Self {
+        RpcError::SendError(error.to_string())
+    }
+}

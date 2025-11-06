@@ -4,7 +4,10 @@ use crate::{
         accept_readiness_request,
         LiveReadyRequestSnd,
     },
-    log_info,
+    database::types::{
+        GenericBytes,
+        RequestBus,
+    },
 };
 use http_body_util::Full;
 use hyper::{
@@ -36,8 +39,6 @@ use std::{
     },
     time::Instant,
 };
-
-use sled::Db;
 
 use crate::{
     admin::methods::execute_method,
@@ -95,13 +96,17 @@ macro_rules! get_response {
 }
 
 /// Execute request and construct a HTTP response
-async fn forward_body(
+async fn forward_body<K, V>(
     mut tx: Value,
     rpc_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: &Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus<K, V>,
     config: Arc<RwLock<Settings>>,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+) -> Result<hyper::Response<Full<Bytes>>, Infallible>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -125,21 +130,34 @@ async fn forward_body(
 }
 
 /// Accept admin request, self explanatory
-pub async fn accept_admin_request(
+pub async fn accept_admin_request<K, V>(
     tx: Request<hyper::body::Incoming>,
     rpc_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
     poverty_list_rwlock: Arc<RwLock<Vec<Rpc>>>,
-    cache: Db,
+    cache: RequestBus<K, V>,
     config: Arc<RwLock<Settings>>,
     liveness_request_tx: LiveReadyRequestSnd,
-) -> Result<hyper::Response<Full<Bytes>>, Infallible> {
+) -> Result<hyper::Response<Full<Bytes>>, Infallible>
+where
+    K: GenericBytes,
+    V: GenericBytes,
+{
     if tx.uri().path() == "/ready" {
         return accept_readiness_request(liveness_request_tx).await;
     } else if tx.uri().path() == "/health" {
         return accept_health_request(liveness_request_tx).await;
     }
 
-    let mut tx = incoming_to_value(tx).await.unwrap();
+    let mut tx = match incoming_to_value(tx).await {
+        Ok(res) => res,
+        Err(err) => {
+            tracing::error!(?err, "Admin request malformed");
+            return Ok(hyper::Response::builder()
+                .status(401)
+                .body(Full::new(Bytes::from("Invalid admin request format")))
+                .unwrap());
+        }
+    };
 
     // If we have JWT enabled check that tx is valid
     if config.read().unwrap().admin.jwt {
@@ -153,7 +171,7 @@ pub async fn accept_admin_request(
         ) {
             Ok(token) => token,
             Err(err) => {
-                println!("\x1b[31mJWT Auth error:\x1b[0m {}", err);
+                tracing::error!(?err, "JWT Auth error");
                 return Ok(hyper::Response::builder()
                     .status(401)
                     .body(Full::new(Bytes::from("Unauthorized or invalid token")))
@@ -162,7 +180,7 @@ pub async fn accept_admin_request(
         };
 
         // Reconstruct the TX as a normal json rpc request
-        log_info!("JWT claims: {:?}", token);
+        tracing::info!(?token, "JWT claims");
 
         tx = json!({
             "id": token.claims.id,
@@ -176,7 +194,7 @@ pub async fn accept_admin_request(
     let time = Instant::now();
     let response = forward_body(tx, &rpc_list_rwlock, &poverty_list_rwlock, cache, config).await;
     let time = time.elapsed();
-    log_info!("Request time: {:?}", time);
+    tracing::info!(?time, "Request time");
 
     response
 }
@@ -184,7 +202,11 @@ pub async fn accept_admin_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database_processing;
     use jsonwebtoken::DecodingKey;
+    use sled::Config;
+    use sled::Db;
+    use tokio::sync::mpsc;
 
     // Helper function to create a test Settings config
     fn create_test_settings() -> Arc<RwLock<Settings>> {
@@ -195,13 +217,17 @@ mod tests {
     }
 
     // Helper function to create a test cache
-    fn create_test_cache() -> Db {
-        let db = sled::Config::new().temporary(true);
+    fn create_test_cache() -> RequestBus<Vec<u8>, Vec<u8>> {
+        let cache = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&cache).unwrap();
+        let (db_tx, db_rx) = mpsc::unbounded_channel();
+        tokio::task::spawn(database_processing(db_rx, cache));
 
-        db.open().unwrap()
+        db_tx
     }
 
     #[tokio::test]
+    #[serial_test::serial]
     async fn test_forward_body() {
         let settings = create_test_settings();
         let cache = create_test_cache();

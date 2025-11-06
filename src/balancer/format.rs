@@ -167,8 +167,7 @@ pub fn replace_block_tags(
 
 /// *Converts* a hyper `Incoming` request to a `serde_json::Value`.
 pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Error> {
-    #[cfg(feature = "debug-verbose")]
-    println!("Incoming request: {:?}", tx);
+    tracing::debug!(?tx, "Incoming request");
 
     let tx = tx.collect().await?.to_bytes().clone();
     let mut tx = from_utf8(&tx).unwrap().to_owned();
