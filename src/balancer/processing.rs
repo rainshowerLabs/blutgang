@@ -72,14 +72,12 @@ impl CacheArgs<[u8; 32], Vec<u8>> {
     }
 }
 
-// TODO: @eureka-cpu -- The method can be an enum and impl FromStr to avoid this:
-//
 // TODO: we should find a way to check values directly and not convert Value to str
-pub fn can_cache(method: &str, result: &str) -> bool {
-    if (cache_method(method)) && (cache_result(result)) {
-        return true;
-    }
-    false
+//
+// @makemake -- Here's an intermediate solution to step towards the above todo which
+// uses a loose trait constraint `AsRef<str>` which is implemented for the method types.
+pub fn can_cache<M: AsRef<str>>(method: M, result: &str) -> bool {
+    cache_method(method) && cache_result(result)
 }
 
 /// Check if we should cache the query, and if so cache it in the DB
@@ -92,9 +90,7 @@ pub async fn cache_query<K, V>(
     K: GenericBytes + From<[u8; 32]>,
     V: GenericBytes + From<Vec<u8>>,
 {
-    let tx_string = method.to_string();
-
-    if can_cache(&tx_string, rx) {
+    if can_cache(method.to_string(), rx) {
         // Insert the response hash into the head_cache
         let num = get_block_number_from_request(method, &cache_args.named_numbers);
 
@@ -158,15 +154,21 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize,
 
 #[cfg(test)]
 mod tests {
-    use crate::db_get;
+    use crate::{
+        db_get,
+        rpc::method::EthRpcMethod,
+    };
     use serde_json::json;
 
     use super::*;
 
     #[test]
     fn test_can_cache() {
-        assert!(can_cache("eth_getBlockByNumber", r#"{"result": "0x1"}"#));
-        assert!(!can_cache("eth_subscribe", r#"{"result": "0x1"}"#));
+        assert!(can_cache(
+            EthRpcMethod::GetBlockByNumber,
+            r#"{"result": "0x1"}"#
+        ));
+        assert!(!can_cache(EthRpcMethod::Subscribe, r#"{"result": "0x1"}"#));
     }
 
     #[test]
@@ -182,7 +184,7 @@ mod tests {
     async fn test_cache_query() {
         let cache_args = CacheArgs::default();
         let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
-        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
+        let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
         cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
@@ -199,7 +201,7 @@ mod tests {
     async fn test_cache_infura_error_query() {
         let cache_args = CacheArgs::default();
         let mut rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#.to_string();
-        let method = json!({"method": "eth_getBlockByNumber", "params": ["0x10", false]});
+        let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
         cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;

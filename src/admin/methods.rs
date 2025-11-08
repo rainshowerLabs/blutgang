@@ -10,6 +10,7 @@ use crate::{
 };
 
 use std::{
+    fmt,
     sync::{
         Arc,
         RwLock,
@@ -23,6 +24,142 @@ use serde_json::{
     Value::Null,
 };
 
+#[derive(Debug, thiserror::Error)]
+#[error("failed to convert method to `BlutgangRpcMethod`:\n\ngot: {0:?}\nexpected:\n{1:#?}")]
+pub struct Error<Method>(Method, &'static [&'static str])
+where
+    Method: fmt::Debug;
+impl<Method> Error<Method>
+where
+    Method: fmt::Debug,
+{
+    pub fn new(method: Method) -> Self {
+        Self(method, BlutgangRpcMethod::BLUTGANG_ALL)
+    }
+}
+
+// @makemake -- This could make it easier to port code into a library for interacting with blutgang.
+/// Available internal RPC method for Blutgang.
+#[derive(Debug)]
+pub enum BlutgangRpcMethod {
+    Quit,
+    RpcList,
+    FlushCache,
+    Config,
+    PovertyList,
+    Ttl,
+    HealthCheckTtl,
+    SetTtl,
+    SetHealthCheckTtl,
+    AddToRpcList,
+    AddToPovertyList,
+    RemoveFromRpcList,
+    RemoveFromPovertyList,
+}
+impl BlutgangRpcMethod {
+    const BLUTGANG_QUIT: &str = "blutgang_quit";
+    const BLUTGANG_RPC_LIST: &str = "blutgang_rpc_list";
+    const BLUTGANG_FLUSH_CACHE: &str = "blutgang_flush_cache";
+    const BLUTGANG_CONFIG: &str = "blutgang_config";
+    const BLUTGANG_POVERTY_LIST: &str = "blutgang_poverty_list";
+    const BLUTGANG_TTL: &str = "blutgang_ttl";
+    const BLUTGANG_HEALTH_CHECK_TTL: &str = "blutgang_health_check_ttl";
+    const BLUTGANG_SET_TTL: &str = "blutgang_set_ttl";
+    const BLUTGANG_SET_HEALTH_CHECK_TTL: &str = "blutgang_set_health_check_ttl";
+    const BLUTGANG_ADD_TO_RPC_LIST: &str = "blutgang_add_to_rpc_list";
+    const BLUTGANG_ADD_TO_POVERTY_LIST: &str = "blutgang_add_to_poverty_list";
+    const BLUTGANG_REMOVE_FROM_RPC_LIST: &str = "blutgang_remove_from_rpc_list";
+    const BLUTGANG_REMOVE_FROM_POVERTY_LIST: &str = "blutgang_remove_from_poverty_list";
+
+    const BLUTGANG_ALL: &[&str; 13] = &[
+        Self::BLUTGANG_QUIT,
+        Self::BLUTGANG_RPC_LIST,
+        Self::BLUTGANG_FLUSH_CACHE,
+        Self::BLUTGANG_CONFIG,
+        Self::BLUTGANG_POVERTY_LIST,
+        Self::BLUTGANG_TTL,
+        Self::BLUTGANG_HEALTH_CHECK_TTL,
+        Self::BLUTGANG_SET_TTL,
+        Self::BLUTGANG_SET_HEALTH_CHECK_TTL,
+        Self::BLUTGANG_ADD_TO_RPC_LIST,
+        Self::BLUTGANG_ADD_TO_POVERTY_LIST,
+        Self::BLUTGANG_REMOVE_FROM_RPC_LIST,
+        Self::BLUTGANG_REMOVE_FROM_POVERTY_LIST,
+    ];
+
+    /// Useful for circumventing lifetimes associated with `let` bindings.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Quit => Self::BLUTGANG_QUIT,
+            Self::RpcList => Self::BLUTGANG_RPC_LIST,
+            Self::FlushCache => Self::BLUTGANG_FLUSH_CACHE,
+            Self::Config => Self::BLUTGANG_CONFIG,
+            Self::PovertyList => Self::BLUTGANG_POVERTY_LIST,
+            Self::Ttl => Self::BLUTGANG_TTL,
+            Self::HealthCheckTtl => Self::BLUTGANG_HEALTH_CHECK_TTL,
+            Self::SetTtl => Self::BLUTGANG_SET_TTL,
+            Self::SetHealthCheckTtl => Self::BLUTGANG_SET_HEALTH_CHECK_TTL,
+            Self::AddToRpcList => Self::BLUTGANG_ADD_TO_RPC_LIST,
+            Self::AddToPovertyList => Self::BLUTGANG_ADD_TO_POVERTY_LIST,
+            Self::RemoveFromRpcList => Self::BLUTGANG_REMOVE_FROM_RPC_LIST,
+            Self::RemoveFromPovertyList => Self::BLUTGANG_REMOVE_FROM_POVERTY_LIST,
+        }
+    }
+}
+impl TryFrom<Option<&str>> for BlutgangRpcMethod {
+    type Error = Error<Option<String>>;
+    fn try_from(value: Option<&str>) -> Result<Self, Self::Error> {
+        match value {
+            Some(Self::BLUTGANG_QUIT) => Ok(Self::Quit),
+            Some(Self::BLUTGANG_RPC_LIST) => Ok(Self::RpcList),
+            Some(Self::BLUTGANG_FLUSH_CACHE) => Ok(Self::FlushCache),
+            Some(Self::BLUTGANG_CONFIG) => Ok(Self::Config),
+            Some(Self::BLUTGANG_POVERTY_LIST) => Ok(Self::PovertyList),
+            Some(Self::BLUTGANG_TTL) => Ok(Self::Ttl),
+            Some(Self::BLUTGANG_HEALTH_CHECK_TTL) => Ok(Self::HealthCheckTtl),
+            Some(Self::BLUTGANG_SET_TTL) => Ok(Self::SetTtl),
+            Some(Self::BLUTGANG_SET_HEALTH_CHECK_TTL) => Ok(Self::SetHealthCheckTtl),
+            Some(Self::BLUTGANG_ADD_TO_RPC_LIST) => Ok(Self::AddToRpcList),
+            Some(Self::BLUTGANG_ADD_TO_POVERTY_LIST) => Ok(Self::AddToPovertyList),
+            Some(Self::BLUTGANG_REMOVE_FROM_RPC_LIST) => Ok(Self::RemoveFromRpcList),
+            Some(Self::BLUTGANG_REMOVE_FROM_POVERTY_LIST) => Ok(Self::RemoveFromPovertyList),
+            _ => Err(Error::new(value.map(ToString::to_string))),
+        }
+    }
+}
+impl serde::Serialize for BlutgangRpcMethod {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+impl<'de> serde::Deserialize<'de> for BlutgangRpcMethod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        match s {
+            Self::BLUTGANG_QUIT => Ok(Self::Quit),
+            Self::BLUTGANG_RPC_LIST => Ok(Self::RpcList),
+            Self::BLUTGANG_FLUSH_CACHE => Ok(Self::FlushCache),
+            Self::BLUTGANG_CONFIG => Ok(Self::Config),
+            Self::BLUTGANG_POVERTY_LIST => Ok(Self::PovertyList),
+            Self::BLUTGANG_TTL => Ok(Self::Ttl),
+            Self::BLUTGANG_HEALTH_CHECK_TTL => Ok(Self::HealthCheckTtl),
+            Self::BLUTGANG_SET_TTL => Ok(Self::SetTtl),
+            Self::BLUTGANG_SET_HEALTH_CHECK_TTL => Ok(Self::SetHealthCheckTtl),
+            Self::BLUTGANG_ADD_TO_RPC_LIST => Ok(Self::AddToRpcList),
+            Self::BLUTGANG_ADD_TO_POVERTY_LIST => Ok(Self::AddToPovertyList),
+            Self::BLUTGANG_REMOVE_FROM_RPC_LIST => Ok(Self::RemoveFromRpcList),
+            Self::BLUTGANG_REMOVE_FROM_POVERTY_LIST => Ok(Self::RemoveFromPovertyList),
+            _ => Err(serde::de::Error::unknown_variant(s, Self::BLUTGANG_ALL)),
+        }
+    }
+}
+
 /// Extract the method, call the appropriate function and return the response
 pub async fn execute_method<K, V>(
     tx: Value,
@@ -35,76 +172,75 @@ where
     K: GenericBytes,
     V: GenericBytes,
 {
-    let method = tx["method"].as_str();
+    let method = tx["method"].as_str().try_into();
     tracing::debug!("Method: {:?}", method);
 
     // Check if write protection is enabled
     let write_protection_enabled = config.read().unwrap().admin.readonly;
 
     match method {
-        Some("blutgang_quit") => {
+        Ok(BlutgangRpcMethod::Quit) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_blutgang_quit(cache).await
             }
         }
-        Some("blutgang_rpc_list") => admin_list_rpc(rpc_list),
-        Some("blutgang_flush_cache") => {
+        Ok(BlutgangRpcMethod::RpcList) => admin_list_rpc(rpc_list),
+        Ok(BlutgangRpcMethod::FlushCache) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_flush_cache(cache).await
             }
         }
-        Some("blutgang_config") => admin_config(config),
-        Some("blutgang_poverty_list") => admin_list_rpc(poverty_list),
-        Some("blutgang_ttl") => admin_blutgang_ttl(config),
-        Some("blutgang_health_check_ttl") => admin_blutgang_health_check_ttl(config),
-        Some("blutgang_set_ttl") => {
+        Ok(BlutgangRpcMethod::Config) => admin_config(config),
+        Ok(BlutgangRpcMethod::PovertyList) => admin_list_rpc(poverty_list),
+        Ok(BlutgangRpcMethod::Ttl) => admin_blutgang_ttl(config),
+        Ok(BlutgangRpcMethod::HealthCheckTtl) => admin_blutgang_health_check_ttl(config),
+        Ok(BlutgangRpcMethod::SetTtl) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_blutgang_set_ttl(config, tx["params"].as_array())
             }
         }
-        Some("blutgang_set_health_check_ttl") => {
+        Ok(BlutgangRpcMethod::SetHealthCheckTtl) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_blutgang_set_health_check_ttl(config, tx["params"].as_array())
             }
         }
-        Some("blutgang_add_to_rpc_list") => {
+        Ok(BlutgangRpcMethod::AddToRpcList) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_add_rpc(rpc_list, tx["params"].as_array())
             }
         }
-        Some("blutgang_add_to_poverty_list") => {
+        Ok(BlutgangRpcMethod::AddToPovertyList) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_add_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        Some("blutgang_remove_from_rpc_list") => {
+        Ok(BlutgangRpcMethod::RemoveFromRpcList) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_remove_rpc(rpc_list, tx["params"].as_array())
             }
         }
-        Some("blutgang_remove_from_poverty_list") => {
+        Ok(BlutgangRpcMethod::RemoveFromPovertyList) => {
             if write_protection_enabled {
                 Err(AdminError::WriteProtectionEnabled)
             } else {
                 admin_remove_rpc(poverty_list, tx["params"].as_array())
             }
         }
-        Some(_) => Err(AdminError::InvalidMethod),
-        _ => Ok(().into()),
+        Err(err) => Err(AdminError::InvalidMethod(err)),
     }
 }
 
@@ -451,7 +587,7 @@ mod tests {
     async fn test_execute_method_blutgang_rpc_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_rpc_list" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::RpcList });
 
         // Act
         let result = execute_method(
@@ -472,7 +608,7 @@ mod tests {
     async fn test_execute_method_blutgang_flush_cache() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_flush_cache" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::FlushCache });
 
         // Act
         let result = execute_method(
@@ -493,7 +629,7 @@ mod tests {
     async fn test_execute_method_blutgang_config() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_config" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::Config });
 
         // Act
         let result = execute_method(
@@ -514,7 +650,7 @@ mod tests {
     async fn test_execute_method_blutgang_poverty_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_poverty_list" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::PovertyList });
 
         // Act
         let result = execute_method(
@@ -535,7 +671,7 @@ mod tests {
     async fn test_execute_method_blutgang_ttl() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_ttl" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::Ttl });
 
         // Act
         let result = execute_method(
@@ -556,7 +692,7 @@ mod tests {
     async fn test_execute_method_blutgang_health_check_ttl() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_health_check_ttl" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::HealthCheckTtl });
 
         // Act
         let result = execute_method(
@@ -598,7 +734,7 @@ mod tests {
     async fn test_execute_method_add_to_rpc_list() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", "ws://example.com", 5, 10, 0.5] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::AddToRpcList, "params": ["http://example.com", "ws://example.com", 5, 10, 0.5] });
 
         let rpc_list = create_test_rpc_list();
         let len = rpc_list.read().unwrap().len();
@@ -623,7 +759,7 @@ mod tests {
     async fn test_execute_method_add_to_rpc_list_no_ws() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_add_to_rpc_list", "params": ["http://example.com", Null, 5, 10, 0.5] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::AddToRpcList, "params": ["http://example.com", Null, 5, 10, 0.5] });
 
         let rpc_list = create_test_rpc_list();
         let len = rpc_list.read().unwrap().len();
@@ -649,7 +785,7 @@ mod tests {
         // Arrange
         let cache = create_test_cache();
         // purpusefully OOB
-        let tx = json!({ "id":1,"method": "blutgang_remove_from_rpc_list", "params": [10] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::RemoveFromRpcList, "params": [10] });
 
         let rpc_list = create_test_rpc_list();
         // rpc_list has only 1 so add another one to keep the 1st one some company
@@ -676,7 +812,7 @@ mod tests {
         assert!(result.is_err());
 
         // Arrange
-        let tx = json!({ "id":1,"method": "blutgang_remove_from_rpc_list", "params": [0] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::RemoveFromRpcList, "params": [0] });
 
         // Act
         let binding = create_test_poverty_list();
@@ -699,7 +835,7 @@ mod tests {
     async fn test_execute_method_blutgang_set_ttl() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_set_ttl", "params": [9001] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::SetTtl, "params": [9001] });
 
         let config = create_test_settings_config();
         let ttl = config.read().unwrap().ttl;
@@ -725,7 +861,7 @@ mod tests {
     async fn test_execute_method_blutgang_set_health_check_ttl() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_set_health_check_ttl", "params": [9001] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::SetHealthCheckTtl, "params": [9001] });
 
         let config = create_test_settings_config();
         let health_check_ttl = config.read().unwrap().health_check_ttl;
@@ -751,7 +887,7 @@ mod tests {
     async fn test_rw_protection() {
         // Arrange
         let cache = create_test_cache();
-        let tx = json!({ "id":1,"method": "blutgang_set_health_check_ttl", "params": [9001] });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::SetHealthCheckTtl, "params": [9001] });
 
         let config = create_test_settings_config();
         config.write().unwrap().admin.readonly = true;
@@ -770,7 +906,7 @@ mod tests {
         assert!(result.is_err());
 
         // Also check that we can read
-        let tx = json!({ "id":1,"method": "blutgang_health_check_ttl" });
+        let tx = json!({ "id":1,"method": BlutgangRpcMethod::HealthCheckTtl });
         let result = execute_method(
             tx,
             &create_test_rpc_list(),

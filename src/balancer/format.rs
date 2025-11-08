@@ -1,4 +1,7 @@
-use crate::NamedBlocknumbers;
+use crate::{
+    rpc::method::EthRpcMethod,
+    NamedBlocknumbers,
+};
 use http_body_util::BodyExt;
 use hyper::{
     body::Incoming,
@@ -20,7 +23,7 @@ use std::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum NamedNumber {
+pub enum NamedNumber {
     Latest,
     Earliest,
     Safe,
@@ -28,14 +31,32 @@ enum NamedNumber {
     Pending,
     Null,
 }
+impl AsRef<str> for NamedNumber {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Latest => "latest",
+            Self::Earliest => "earliest",
+            Self::Safe => "safe",
+            Self::Finalized => "finalized",
+            Self::Pending => "pending",
+            Self::Null => "null",
+        }
+    }
+}
 
 /// Returns the corresponding NamedNumber enum value for the named number
 /// Null if n/a.
 fn has_named_number(param: &str) -> NamedNumber {
-    let named_list = ["latest", "earliest", "safe", "finalized", "pending"];
+    let named_list = [
+        NamedNumber::Latest,
+        NamedNumber::Earliest,
+        NamedNumber::Safe,
+        NamedNumber::Finalized,
+        NamedNumber::Pending,
+    ];
 
     for (index, item) in named_list.iter().enumerate() {
-        if memmem::find(param.as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(param.as_bytes(), item.as_ref().as_bytes()).is_some() {
             match index {
                 0 => return NamedNumber::Latest,
                 1 => return NamedNumber::Earliest,
@@ -68,18 +89,8 @@ pub fn get_block_number_from_request(
 
     // The JSON-RPC standard is all over the place so depending on the method, we need to look at
     // different param indexes. Why? Has i ever???
-    let position = match tx["method"].as_str() {
-        Some("eth_getBalance") => 1,
-        Some("eth_getStorageAt") => 2,
-        Some("eth_getTransactionCount") => 1,
-        Some("eth_getBlockTransactionCountByNumber") => 0,
-        Some("eth_getUncleCountByBlockNumber") => 0,
-        Some("eth_getCode") => 1,
-        Some("eth_call") => 1,
-        Some("eth_getBlockByNumber") => 0,
-        Some("eth_getTransactionByBlockNumberAndIndex") => 0,
-        Some("eth_getUncleByBlockNumberAndIndex") => 0,
-        _ => return None,
+    let Some(position) = EthRpcMethod::get_position(tx["method"].as_str()) else {
+        return None;
     };
 
     // Get the corresponding blockbumber from the params
@@ -121,18 +132,8 @@ pub fn replace_block_tags(
     }
 
     // Determine the correct parameter index based on the method
-    let position = match tx["method"].as_str() {
-        Some("eth_getBalance")
-        | Some("eth_getTransactionCount")
-        | Some("eth_getCode")
-        | Some("eth_call") => 1,
-        Some("eth_getStorageAt") => 2,
-        Some("eth_getBlockTransactionCountByNumber")
-        | Some("eth_getUncleCountByBlockNumber")
-        | Some("eth_getBlockByNumber")
-        | Some("eth_getTransactionByBlockNumberAndIndex")
-        | Some("eth_getUncleByBlockNumberAndIndex") => 0,
-        _ => return tx.to_owned(),
+    let Some(position) = EthRpcMethod::get_position(tx["method"].as_str()) else {
+        return tx.to_owned();
     };
 
     // Extract the block number parameter
@@ -191,6 +192,8 @@ pub async fn incoming_to_value(tx: Request<Incoming>) -> Result<Value, hyper::Er
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc::method::EthRpcMethod;
+
     use super::*;
     use serde_json::json;
 
@@ -223,10 +226,10 @@ mod tests {
         let named_blocknumbers = dummy_named_blocknumbers();
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBalance",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBalance,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
         assert_eq!(
@@ -235,10 +238,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBalance",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "adiuasiudagbdiad"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBalance,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "adiuasiudagbdiad"]
         });
 
         assert_eq!(
@@ -247,10 +250,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBalance",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBalance,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
         assert_eq!(
@@ -259,10 +262,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBalance",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBalance,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
         });
 
         assert_eq!(
@@ -271,10 +274,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getStorageAt",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "latest"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetStorageAt,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "latest"]
         });
 
         assert_eq!(
@@ -283,10 +286,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getStorageAt",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "0x1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetStorageAt,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0", "0x1"]
         });
 
         assert_eq!(
@@ -295,10 +298,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getStorageAt",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetStorageAt,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x0"]
         });
 
         assert_eq!(
@@ -307,10 +310,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
         assert_eq!(
@@ -319,10 +322,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "safe"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "safe"]
         });
 
         assert_eq!(
@@ -331,10 +334,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "finalized"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "finalized"]
         });
 
         assert_eq!(
@@ -343,10 +346,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "pending"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "pending"]
         });
 
         assert_eq!(
@@ -355,10 +358,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
         assert_eq!(
@@ -367,10 +370,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getTransactionCount",
-            "params":["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetTransactionCount,
+            "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1"]
         });
 
         assert_eq!(
@@ -379,10 +382,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBlockTransactionCountByNumber",
-            "params":["latest"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBlockTransactionCountByNumber,
+            "params": ["latest"]
         });
 
         assert_eq!(
@@ -391,10 +394,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBlockTransactionCountByNumber",
-            "params":["0x1"]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBlockTransactionCountByNumber,
+            "params": ["0x1"]
         });
 
         assert_eq!(
@@ -403,10 +406,10 @@ mod tests {
         );
 
         let request = json!({
-            "id":1,
-            "jsonrpc":"2.0",
-            "method":"eth_getBlockTransactionCountByNumber",
-            "params":[]
+            "id": 1,
+            "jsonrpc": "2.0",
+            "method": EthRpcMethod::GetBlockTransactionCountByNumber,
+            "params": []
         });
 
         assert_eq!(
@@ -419,12 +422,12 @@ mod tests {
     fn replace_named_block_number_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
         let mut tx = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
         let expected = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0xa"]
         });
 
@@ -435,7 +438,7 @@ mod tests {
     fn keep_hex_block_number_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
         let mut tx = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "0x1"]
         });
 
@@ -446,7 +449,7 @@ mod tests {
     fn handle_invalid_block_number_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
         let mut tx = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "invalid"]
         });
 
@@ -456,7 +459,7 @@ mod tests {
     #[test]
     fn replace_block_number_different_methods_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
-        let methods = vec!["eth_getBalance", "eth_getTransactionCount"];
+        let methods = vec![EthRpcMethod::GetBalance, EthRpcMethod::GetTransactionCount];
 
         for method in methods {
             let mut tx = json!({
@@ -479,11 +482,11 @@ mod tests {
     fn handle_missing_or_empty_params_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
         let mut tx_no_params = json!({
-            "method": "eth_getBalance"
+            "method": EthRpcMethod::GetBalance,
         });
 
         let mut tx_empty_params = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": []
         });
 
@@ -502,12 +505,12 @@ mod tests {
         let named_blocknumbers = dummy_named_blocknumbers();
         named_blocknumbers.write().unwrap().latest = 0;
         let mut tx = json!({
-            "method": "eth_getTransactionCount",
+            "method": EthRpcMethod::GetTransactionCount,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
         let expected = json!({
-            "method": "eth_getTransactionCount",
+            "method": EthRpcMethod::GetTransactionCount,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", "latest"]
         });
 
@@ -518,7 +521,7 @@ mod tests {
     fn handle_non_string_block_number_test() {
         let named_blocknumbers = dummy_named_blocknumbers();
         let mut tx = json!({
-            "method": "eth_getBalance",
+            "method": EthRpcMethod::GetBalance,
             "params": ["0x407d73d8a49eeb85d32cf465507dd71d507100c1", 100]
         });
 

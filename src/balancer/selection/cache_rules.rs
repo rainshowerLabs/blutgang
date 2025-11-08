@@ -1,25 +1,30 @@
 use memchr::memmem;
 
+use crate::{
+    balancer::format::NamedNumber,
+    rpc::method::EthRpcMethod,
+};
+
 // Return true if we are supposed to be caching the input.
 //
 // This loop cannot be unrolled because it wouldn't work against mangled queries that would
 // overall be valid. Too bad!
-pub fn cache_method(rx: &str) -> bool {
+pub fn cache_method<M: AsRef<str>>(rx: M) -> bool {
     // If no-cache feature is on, return false
     #[cfg(feature = "no-cache")]
     return false;
 
     // all of the below cannot be cached properly
     let blacklist = [
-        "latest",
-        "eth_blockNumber",
-        "eth_getTransactionCount",
-        "earliest",
-        "safe",
-        "finalized",
-        "pending",
-        "eth_subscribe",
-        "eth_unsubscribe",
+        NamedNumber::Latest.as_ref(),
+        NamedNumber::Earliest.as_ref(),
+        NamedNumber::Safe.as_ref(),
+        NamedNumber::Finalized.as_ref(),
+        NamedNumber::Pending.as_ref(),
+        EthRpcMethod::BlockNumber.as_ref(),
+        EthRpcMethod::GetTransactionCount.as_ref(),
+        EthRpcMethod::Subscribe.as_ref(),
+        EthRpcMethod::Unsubscribe.as_ref(),
     ];
     // rx should look something like `{"id":1,"jsonrpc":"2.0","method":"eth_call","params":...`
     // Even tho rx should look like the example above, its still a valid request if the method
@@ -28,7 +33,7 @@ pub fn cache_method(rx: &str) -> bool {
     // We could potentially try to find `params` and then move from there but it would end up
     // being slower in most cases.
     for item in blacklist.iter() {
-        if memmem::find(rx.as_bytes(), item.as_bytes()).is_some() {
+        if memmem::find(rx.as_ref().as_bytes(), item.as_bytes()).is_some() {
             return false;
         }
     }

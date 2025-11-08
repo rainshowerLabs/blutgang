@@ -3,6 +3,7 @@ use crate::{
         MAGIC,
         WS_SUB_MANAGER_ID,
     },
+    rpc::method::EthRpcMethod,
     websocket::{
         error::WsError,
         types::{
@@ -44,7 +45,7 @@ pub async fn subscription_dispatcher(
         };
 
         // Check if its a subscription
-        if response.content["method"] != "eth_subscription" {
+        if response.content["method"].ne(&EthRpcMethod::Subscription) {
             continue;
         }
 
@@ -73,7 +74,7 @@ pub async fn subscription_dispatcher(
             // Getting true means that we should unsubscribe from the subscription
             // as thre are no more users needing it.
             Ok(true) => {
-                let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
+                let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID, "method": EthRpcMethod::Unsubscribe, "params": [id]});
                 let message = WsconnMessage::Message(unsub, Some(response.node_id));
                 let _ = incoming_tx.send(message);
             }
@@ -100,7 +101,7 @@ pub async fn move_subscriptions(
 
     // We want to send unsubscribe messages (for postoriety) to node_id
     for id in ids {
-        let unsub = json!({"jsonrpc": "2.0","id": WS_SUB_MANAGER_ID,"method": "eth_unsubscribe","params": [id]});
+        let unsub = json!({"jsonrpc": "2.0", "id": WS_SUB_MANAGER_ID, "method": EthRpcMethod::Unsubscribe, "params": [id]});
         let message = WsconnMessage::Message(unsub, Some(node_id));
         let _ = incoming_tx.send(message);
     }
@@ -111,7 +112,7 @@ pub async fn move_subscriptions(
     let mut id = WS_SUB_MANAGER_ID + MAGIC;
     for params in subs {
         id += 1;
-        let sub = json!({"jsonrpc": "2.0","id": id,"method": "eth_subscribe","params": vec![params.clone()]});
+        let sub = json!({"jsonrpc": "2.0", "id": id, "method": EthRpcMethod::Subscribe, "params": vec![params.clone()]});
         let message = WsconnMessage::Message(sub, None);
 
         pairs.insert(id, params);
@@ -152,6 +153,8 @@ pub async fn move_subscriptions(
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc::method::EthRpcMethod;
+
     use super::*;
     use rand::Rng;
     use serde_json::json;
@@ -169,8 +172,7 @@ mod tests {
         let (user_tx, mut user_rx) = mpsc::unbounded_channel();
         sub_data.add_user(user_id, user_tx);
 
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 1, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0", "id": 1, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         sub_data.register_subscription(
             subscription_request.clone(),
             subscription_id.to_string(),
@@ -184,8 +186,7 @@ mod tests {
             let _ = subscription_dispatcher(rx, incoming_tx, Arc::clone(&sub_data)).await;
         });
 
-        let subscription_content =
-            json!({"method": "eth_subscription", "params": {"subscription": subscription_id}});
+        let subscription_content = json!({"method": EthRpcMethod::Subscription, "params": {"subscription": subscription_id}});
         let incoming_response = IncomingResponse {
             content: subscription_content,
             node_id: 0,
@@ -196,7 +197,7 @@ mod tests {
         if let Some(RequestResult::Subscription(msg)) = user_rx.recv().await {
             assert_eq!(
                 msg,
-                json!({"method": "eth_subscription", "params": {"subscription": subscription_id}})
+                json!({"method": EthRpcMethod::Subscription, "params": {"subscription": subscription_id}})
             );
         } else {
             panic!("User did not receive the expected message.");
@@ -212,8 +213,7 @@ mod tests {
         let user_id = 2;
 
         // Setup for subscriptions
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         sub_data.register_subscription(subscription_request.clone(), "sub789".to_string(), node_id);
         sub_data
             .subscribe_user(user_id, subscription_request)
@@ -223,7 +223,7 @@ mod tests {
         let tx_clone = tx.clone();
         tokio::spawn(async move {
             while let Some(WsconnMessage::Message(message, _)) = incoming_rx.recv().await {
-                if message["method"] == "eth_subscribe" {
+                if message["method"].eq(&EthRpcMethod::Subscribe) {
                     let id = message["id"].as_u64().unwrap() as u32;
                     let random_result = rand::thread_rng().gen::<u64>().to_string();
                     let mock_response = IncomingResponse {

@@ -4,6 +4,7 @@ use crate::{
     database::types::GenericBytes,
     rpc::{
         error::RpcError,
+        method::EthRpcMethod,
         types::{
             hex_to_decimal,
             Rpc,
@@ -165,7 +166,8 @@ async fn send_newheads_sub_message<K, V>(
     V: GenericBytes + From<Vec<u8>>,
 {
     let mut call = format!(
-        r#"{{"jsonrpc":"2.0","method":"eth_subscribe","params":["newHeads"],"id":"{}"}}"#,
+        r#"{{"jsonrpc":"2.0","method":"{}","params":["newHeads"],"id":"{}"}}"#,
+        EthRpcMethod::Subscribe,
         user_id
     );
     let call: Value = unsafe { simd_json::from_str(&mut call).unwrap() };
