@@ -10,7 +10,10 @@ use crate::{
     },
     database::types::GenericBytes,
     db_get,
-    rpc::types::Rpc,
+    rpc::{
+        method::EthRpcMethod,
+        types::Rpc,
+    },
     websocket::{
         error::WsError,
         types::{
@@ -147,8 +150,8 @@ async fn handle_incoming_message(
                 //
                 // We do this because we want to send it to a buffer
                 // in case we have no available RPCs.
-                if incoming["method"] == "eth_subscription" || incoming["method"] == "eth_subscribe"
-                {
+                let method = &incoming["method"];
+                if method.eq(&EthRpcMethod::Subscription) || method.eq(&EthRpcMethod::Subscribe) {
                     ws_buffer.push(incoming);
                 }
                 tracing::error!("No RPC position available");
@@ -342,7 +345,7 @@ where
     }
 
     // Remove and unsubscribe user is "eth_unsubscribe"
-    if call["method"] == "eth_unsubscribe" {
+    if call["method"].eq(&EthRpcMethod::Unsubscribe) {
         // subscription_id is ["params"][0]
         let subscription_id = match call["params"][0].as_str() {
             Some(subscription_id) => subscription_id.to_string(),
@@ -373,7 +376,7 @@ where
         ));
     }
 
-    let is_subscription = call["method"] == "eth_subscribe";
+    let is_subscription = call["method"].eq(&EthRpcMethod::Subscribe);
     if is_subscription {
         // Check if we're already subscribed to this
         // if so return the subscription id and add this user to the dispatch
@@ -434,6 +437,8 @@ async fn listen_for_response(
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc::method::EthRpcMethod;
+
     use super::*;
     use serde_json::json;
     use std::time::Duration;
@@ -547,7 +552,7 @@ mod tests {
         let call = json!({
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "eth_subscribe",
+            "method": EthRpcMethod::Subscribe,
             "params": ["newHeads"]
         });
 
@@ -589,7 +594,7 @@ mod tests {
         let call = json!({
             "jsonrpc": "2.0",
             "id": 1,
-            "method": "eth_blockNumber"
+            "method": EthRpcMethod::BlockNumber,
         });
 
         // Simulate a response

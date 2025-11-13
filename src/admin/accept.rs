@@ -202,6 +202,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::admin::methods::BlutgangRpcMethod;
     use crate::database_processing;
     use jsonwebtoken::DecodingKey;
     use sled::Config;
@@ -238,7 +239,7 @@ mod tests {
         let tx = json!({
             "id": 1,
             "jsonrpc": "2.0",
-            "method": "blutgang_ttl",
+            "method": BlutgangRpcMethod::Ttl,
             "params": [],
         });
 

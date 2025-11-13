@@ -414,6 +414,8 @@ impl SubscriptionData {
 
 #[cfg(test)]
 mod tests {
+    use crate::rpc::method::EthRpcMethod;
+
     use super::*;
     use serde_json::json;
 
@@ -454,8 +456,7 @@ mod tests {
         // Setup test data
         let node_id = 42;
         let subscription_id = "sub123".to_string();
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
 
         // Register a subscription
         subscription_data.register_subscription(
@@ -482,8 +483,7 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_and_unsubscribe_user() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
@@ -518,8 +518,7 @@ mod tests {
     #[tokio::test]
     async fn test_unsubscribe_user_from_all() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 
@@ -554,8 +553,7 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_subscribers() {
         let (subscription_data, user_id, mut rx) = setup_user_and_subscription_data();
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         let subscription_id = "300".to_string();
         let node_id = 1;
         let message =
@@ -836,8 +834,7 @@ mod tests {
     #[tokio::test]
     async fn test_dispatch_to_empty_subscription_list() {
         let subscription_data = SubscriptionData::new();
-        let empty_subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let empty_subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         let empty_subscription_id = "500".to_string();
         let empty_node_id = 10000;
         let message = RequestResult::Subscription(serde_json::Value::String(
@@ -859,8 +856,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_users_for_subscription() {
         let (subscription_data, user_id, _) = setup_user_and_subscription_data();
-        let subscription_request =
-            json!({"jsonrpc":"2.0","id": 2, "method": "eth_subscribe", "params": ["newHeads"]});
+        let subscription_request = json!({"jsonrpc":"2.0","id": 2, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
         let subscription_id = "200".to_string();
         let node_id = 1;
 

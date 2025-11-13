@@ -1,4 +1,7 @@
-use crate::rpc::error::RpcError;
+use crate::rpc::{
+    error::RpcError,
+    method::EthRpcMethod,
+};
 use reqwest::Client;
 use rust_tracing::deps::metrics;
 use url::Url;
@@ -122,22 +125,23 @@ impl Rpc {
 
     /// Request blocknumber and return its value
     pub async fn block_number(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        let method = EthRpcMethod::BlockNumber;
         let request = json!({
-            "method": "eth_blockNumber".to_string(),
+            "method": method,
             "params": serde_json::Value::Null,
             "id": 1,
             "jsonrpc": "2.0".to_string(),
         });
 
-        metrics::gauge!("rpc_requests_active", "method" => "eth_blockNumber").increment(1);
-        metrics::counter!("rpc_requests_total", "method" => "eth_blockNumber").increment(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).increment(1);
+        metrics::counter!("rpc_requests_total", "method" => method.as_str()).increment(1);
 
         let req_start = std::time::Instant::now();
         let number = self.send_request(request).await?;
 
-        metrics::histogram!("rpc_response_time_secs", "method" => "eth_blockNumber")
+        metrics::histogram!("rpc_response_time_secs", "method" => method.as_str())
             .record(req_start.elapsed().as_secs_f64());
-        metrics::gauge!("rpc_requests_active", "method" => "eth_blockNumber").decrement(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).decrement(1);
 
         let return_number = extract_number(&number)?;
 
@@ -146,22 +150,23 @@ impl Rpc {
 
     /// Returns the sync status. False if we're synced and following the head.
     pub async fn syncing(&self) -> Result<bool, crate::rpc::types::RpcError> {
+        let method = EthRpcMethod::Syncing;
         let request = json!({
-            "method": "eth_syncing".to_string(),
+            "method": method,
             "params": serde_json::Value::Null,
             "id": 1,
             "jsonrpc": "2.0".to_string(),
         });
 
-        metrics::gauge!("rpc_requests_active", "method" => "eth_syncing").increment(1);
-        metrics::counter!("rpc_requests_total", "method" => "eth_syncing").increment(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).increment(1);
+        metrics::counter!("rpc_requests_total", "method" => method.as_str()).increment(1);
 
         let req_start = std::time::Instant::now();
         let sync = self.send_request(request).await?;
 
-        metrics::histogram!("rpc_response_time_secs", "method" => "eth_syncing")
+        metrics::histogram!("rpc_response_time_secs", "method" => method.as_str())
             .record(req_start.elapsed().as_secs_f64());
-        metrics::gauge!("rpc_requests_active", "method" => "eth_syncing").decrement(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).decrement(1);
 
         let status = extract_sync(&sync)?;
 
@@ -170,22 +175,23 @@ impl Rpc {
 
     /// Get the latest finalized block
     pub async fn get_finalized_block(&self) -> Result<u64, crate::rpc::types::RpcError> {
+        let method = EthRpcMethod::GetBlockByNumber;
         let request = json!({
-            "method": "eth_getBlockByNumber".to_string(),
+            "method": method,
             "params": ["finalized", false],
             "id": 1,
             "jsonrpc": "2.0".to_string(),
         });
 
-        metrics::gauge!("rpc_requests_active", "method" => "eth_getBlockByNumber").increment(1);
-        metrics::counter!("rpc_requests_total", "method" => "eth_getBlockByNumber").increment(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).increment(1);
+        metrics::counter!("rpc_requests_total", "method" => method.as_str()).increment(1);
 
         let req_start = std::time::Instant::now();
         let mut resp = self.send_request(request).await?;
 
-        metrics::histogram!("rpc_response_time_secs", "method" => "eth_getBlockByNumber")
+        metrics::histogram!("rpc_response_time_secs", "method" => method.as_str())
             .record(req_start.elapsed().as_secs_f64());
-        metrics::gauge!("rpc_requests_active", "method" => "eth_getBlockByNumber").decrement(1);
+        metrics::gauge!("rpc_requests_active", "method" => method.as_str()).decrement(1);
 
         let number: Value = unsafe { simd_json::serde::from_str(&mut resp)? };
         let number = &number["result"]["number"];
