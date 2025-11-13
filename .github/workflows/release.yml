@@ -1,0 +1,113 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_suffix: x86_64-unknown-linux-gnu
+            linker: ''
+            cxx: ''
+          - name: linux-aarch64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            asset_suffix: aarch64-unknown-linux-gnu
+            linker: aarch64-linux-gnu-gcc
+            cxx: aarch64-linux-gnu-g++
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            asset_suffix: aarch64-apple-darwin
+            linker: ''
+            cxx: ''
+
+    env:
+      CARGO_TERM_COLOR: always
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Install cross-compilation toolchain
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu pkg-config
+
+      - name: Build release binary
+        env:
+          CC_aarch64_unknown_linux_gnu: ${{ matrix.linker }}
+          CXX_aarch64_unknown_linux_gnu: ${{ matrix.cxx }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Set archive name
+        run: echo "ARCHIVE=blutgang-${GITHUB_REF_NAME}-${{ matrix.asset_suffix }}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Package binary
+        shell: bash
+        run: |
+          bin_path="target/${{ matrix.target }}/release/blutgang"
+          chmod +x "$bin_path"
+          mkdir -p release
+          cp "$bin_path" release/
+          tar -C release -czf "$ARCHIVE" blutgang
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: "$ARCHIVE"
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag is on master
+        run: |
+          git fetch origin master
+          if ! git branch --contains "${GITHUB_SHA}" remotes/origin/master; then
+            echo "::error::Tag ${GITHUB_REF_NAME} is not pointing to a commit on master"
+            exit 1
+          fi
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Blutgang ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
