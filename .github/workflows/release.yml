@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build:
@@ -18,58 +19,35 @@ jobs:
         include:
           - name: linux-x86_64
             os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-            asset_suffix: x86_64-unknown-linux-gnu
-            linker: ''
-            cxx: ''
+            system: x86_64-linux
           - name: linux-aarch64
             os: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
-            asset_suffix: aarch64-unknown-linux-gnu
-            linker: aarch64-linux-gnu-gcc
-            cxx: aarch64-linux-gnu-g++
+            system: aarch64-linux
           - name: macos-arm64
             os: macos-latest
-            target: aarch64-apple-darwin
-            asset_suffix: aarch64-apple-darwin
-            linker: ''
-            cxx: ''
-
-    env:
-      CARGO_TERM_COLOR: always
+            system: aarch64-darwin
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Install Rust target
-        run: rustup target add ${{ matrix.target }}
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Install cross-compilation toolchain
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build with Nix
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu pkg-config
-
-      - name: Build release binary
-        env:
-          CC_aarch64_unknown_linux_gnu: ${{ matrix.linker }}
-          CXX_aarch64_unknown_linux_gnu: ${{ matrix.cxx }}
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.linker }}
-        run: cargo build --release --target ${{ matrix.target }}
+          nix build .#blutgang --system ${{ matrix.system }}
 
       - name: Set archive name
-        run: echo "ARCHIVE=blutgang-${GITHUB_REF_NAME}-${{ matrix.asset_suffix }}.tar.gz" >> "$GITHUB_ENV"
+        run: echo "ARCHIVE=blutgang-${GITHUB_REF_NAME}-${{ matrix.system }}.tar.gz" >> "$GITHUB_ENV"
 
       - name: Package binary
-        shell: bash
         run: |
-          bin_path="target/${{ matrix.target }}/release/blutgang"
-          chmod +x "$bin_path"
           mkdir -p release
-          cp "$bin_path" release/
+          cp result/bin/blutgang release/
           tar -C release -czf "$ARCHIVE" blutgang
 
       - name: Upload artifact
@@ -78,9 +56,56 @@ jobs:
           name: ${{ matrix.name }}
           path: "$ARCHIVE"
 
+  docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        system:
+          - x86_64-linux
+          - aarch64-linux
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build Docker image
+        run: |
+          nix build .#docker --system ${{ matrix.system }}
+          docker load < result
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          ARCH=$(echo "${{ matrix.system }}" | cut -d'-' -f1)
+          echo "repo_owner=${REPO_OWNER}" >> $GITHUB_OUTPUT
+          echo "arch=${ARCH}" >> $GITHUB_OUTPUT
+
+      - name: Tag and push image
+        run: |
+          IMAGE_NAME="ghcr.io/${{ steps.meta.outputs.repo_owner }}/blutgang"
+          TAG="${{ github.ref_name }}-${{ steps.meta.outputs.arch }}"
+
+          docker tag blutgang:* ${IMAGE_NAME}:${TAG}
+          docker push ${IMAGE_NAME}:${TAG}
+
   create-release:
     name: Create GitHub Release
-    needs: build
+    needs: [build, docker]
     runs-on: ubuntu-latest
 
     steps:

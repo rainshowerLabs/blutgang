@@ -8,7 +8,7 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachSystem [ "aarch64-linux" "x86_64-linux" ] (system:
+    flake-utils.lib.eachSystem [ "aarch64-linux" "x86_64-linux" "aarch64-darwin" ] (system:
       let
         overlays = [ rust-overlay.overlays.default ];
         pkgs = import nixpkgs {
@@ -17,39 +17,55 @@
         cargoMeta = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       in
       {
-        packages.default = pkgs.rustPlatform.buildRustPackage {
-          pname = cargoMeta.package.name;
-          version = cargoMeta.package.version;
-          src = ./.;
-          cargoLock = {
-            lockFile = ./Cargo.lock;
+        packages = rec {
+          blutgang = pkgs.rustPlatform.buildRustPackage {
+            pname = cargoMeta.package.name;
+            version = cargoMeta.package.version;
+            src = ./.;
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+            };
+            buildInputs = with pkgs; [ gcc pkg-config openssl systemd ];
+            nativeBuildInputs = with pkgs; [
+              gcc
+              pkg-config
+              openssl
+              systemd
+              (rust-bin.stable.latest.default.override {
+                extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
+              })
+            ];
+            # This is the only way im aware of to have
+            # different build profiles with `buildRustPackage` (:
+            preBuild = ''
+              # Backup the original Cargo.toml
+              cp Cargo.toml Cargo.toml.backup
+              # Add the desired profile settings to Cargo.toml
+              echo '[profile.release]' >> Cargo.toml
+              echo 'lto = "fat"' >> Cargo.toml
+              echo 'codegen-units = 1' >> Cargo.toml
+              echo 'incremental = false' >> Cargo.toml
+            '';
+            postBuild = ''
+              # Restore the original Cargo.toml
+              mv Cargo.toml.backup Cargo.toml
+            '';
+            cargoBuildFlags = [ "" ];
           };
-          buildInputs = with pkgs; [ gcc pkg-config openssl systemd ];
-          nativeBuildInputs = with pkgs; [
-            gcc
-            pkg-config
-            openssl
-            systemd
-            (rust-bin.stable.latest.default.override {
-              extensions = [ "rust-src" "rustfmt-preview" "rust-analyzer" ];
-            })
-          ];
-          # This is the only way im aware of to have
-          # different build profiles with `buildRustPackage` (:
-          preBuild = ''
-            # Backup the original Cargo.toml
-            cp Cargo.toml Cargo.toml.backup
-            # Add the desired profile settings to Cargo.toml
-            echo '[profile.release]' >> Cargo.toml
-            echo 'lto = "fat"' >> Cargo.toml
-            echo 'codegen-units = 1' >> Cargo.toml
-            echo 'incremental = false' >> Cargo.toml
-          '';
-          postBuild = ''
-            # Restore the original Cargo.toml
-            mv Cargo.toml.backup Cargo.toml
-          '';
-          cargoBuildFlags = [ "" ];
+
+          default = blutgang;
+
+          docker = pkgs.dockerTools.buildLayeredImage {
+            name = "blutgang";
+            tag = cargoMeta.package.version;
+            contents = [ blutgang ];
+            config = {
+              Cmd = [ "${blutgang}/bin/blutgang" ];
+              ExposedPorts = {
+                "3000/tcp" = {};
+              };
+            };
+          };
         };
 
         devShells.default = pkgs.mkShell {
