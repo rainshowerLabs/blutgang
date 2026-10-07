@@ -35,7 +35,10 @@ use crate::{
     },
     database::{
         accept::database_processing,
-        types::GenericDatabase,
+        types::{
+            GenericDatabase,
+            SledDb,
+        },
     },
     health::{
         check::{
@@ -115,8 +118,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create/Open DB
     match cache_settings {
         CacheSettings::Sled(sled) => {
-            let cache = <sled::Db<{ FANOUT }> as GenericDatabase>::open(&sled)
-                .expect("Can't open/create database!");
+            let cache =
+                <SledDb as GenericDatabase>::open(&sled).expect("Can't open/create database!");
             run(cache, config).await
         }
         CacheSettings::RocksDB(rocks) => {
