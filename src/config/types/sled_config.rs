@@ -12,6 +12,7 @@ pub struct SledConfigRepr {
     /// The base directory for storing the database.
     pub path: Option<PathBuf>,
     /// Cache size in **bytes**. Default is 512mb.
+    #[serde(alias = "cache_capacity")]
     pub cache_capacity_bytes: Option<usize>,
     /// The percentage of the cache that is dedicated to the
     /// scan-resistant entry cache.
@@ -20,6 +21,7 @@ pub struct SledConfigRepr {
     /// every few milliseconds. Defaults to every 200ms.
     pub flush_every_ms: Option<usize>,
     /// The zstd compression level to use when writing data to disk. Defaults to 3.
+    #[serde(alias = "compression")]
     pub zstd_compression_level: Option<i32>,
 }
 

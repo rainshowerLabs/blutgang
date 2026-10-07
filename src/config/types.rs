@@ -526,6 +526,18 @@ mod tests {
     }
 
     #[test]
+    fn test_example_config_sled_settings() {
+        let settings = super::Settings::try_parse(|| command(vec![], true)).unwrap();
+        let super::CacheSettings::Sled(sled) = settings.cache else {
+            panic!("example_config.toml should use sled");
+        };
+
+        assert_eq!(sled.cache_capacity_bytes, 1_000_000_000);
+        assert_eq!(sled.zstd_compression_level, 1);
+        assert_eq!(sled.flush_every_ms, Some(12000));
+    }
+
+    #[test]
     fn test_default_config() {
         assert!(
             super::Settings::try_parse(|| command(vec![], false)).is_ok(),
