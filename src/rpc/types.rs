@@ -34,7 +34,7 @@ pub struct Status {
 /// Source of [`Rpc::id`]s.
 static NEXT_RPC_ID: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Rpc {
     id: usize,                    // stable identifier, kept by clones
     pub name: String,             // sanitized name for appearing in logs
@@ -48,6 +48,21 @@ pub struct Rpc {
     // For max_per_second
     pub last_used: u128,      // last time we sent a query to this node
     pub min_time_delta: u128, // microseconds
+}
+
+/// Leaves out the URLs, which may hold API keys, and shows the sanitized `name` instead.
+impl std::fmt::Debug for Rpc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Rpc")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .field("status", &self.status)
+            .field("max_consecutive", &self.max_consecutive)
+            .field("consecutive", &self.consecutive)
+            .field("last_used", &self.last_used)
+            .field("min_time_delta", &self.min_time_delta)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Sanitizes URLs so secrets don't get outputed.
@@ -97,7 +112,7 @@ impl Rpc {
     ) -> Self {
         Self {
             id: NEXT_RPC_ID.fetch_add(1, Ordering::Relaxed),
-            name: sanitize_url(&url).unwrap_or(url.to_string()),
+            name: sanitize_url(&url).unwrap_or_else(|_| format!("{}://<unnamed>", url.scheme())),
             url,
             client: Client::new(),
             ws_url,
@@ -128,15 +143,19 @@ impl Rpc {
     pub async fn send_request(&self, tx: Value) -> Result<String, crate::rpc::types::RpcError> {
         tracing::debug!("Sending request: {}", tx.clone());
 
-        let response = match self.client.post(self.url.clone()).json(&tx).send().await {
-            Ok(response) => response,
-            Err(err) => return Err(RpcError::InvalidResponse(err.to_string())),
-        };
+        // Converting reqwest's errors to `RpcError` strips the URL, which may hold an API key.
+        let response = self
+            .client
+            .post(self.url.clone())
+            .json(&tx)
+            .send()
+            .await
+            .map_err(RpcError::from)?;
 
-        let resp_text = response.text().await;
+        let resp_text = response.text().await.map_err(RpcError::from);
         tracing::debug!("response: {:?}", resp_text);
 
-        resp_text.map_err(From::from)
+        resp_text
     }
 
     /// Request blocknumber and return its value
@@ -300,6 +319,30 @@ mod tests {
     use super::*;
     use serde_json::json;
     use simd_json::serde::to_string;
+
+    #[tokio::test]
+    async fn test_errors_and_debug_do_not_leak_url() {
+        // Nothing listens on this port, so the request fails.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+
+        let rpc = Rpc::new(
+            format!("http://user:hunter2@{addr}/v2/SECRET_KEY")
+                .parse()
+                .unwrap(),
+            Some(format!("ws://{addr}/ws/SECRET_KEY").parse().unwrap()),
+            0,
+            0,
+            10.0,
+        );
+        let err = rpc.send_request(json!({})).await.unwrap_err();
+
+        for output in [err.to_string(), format!("{err:?}"), format!("{rpc:?}")] {
+            assert!(!output.contains("SECRET_KEY"), "leaked: {output}");
+            assert!(!output.contains("hunter2"), "leaked: {output}");
+        }
+    }
 
     #[test]
     fn test_extract_sync_syncing() {

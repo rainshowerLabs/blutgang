@@ -9,7 +9,15 @@ pub enum RpcError {
     SendError(String),
 
     #[error(transparent)]
-    ReqwestError(#[from] reqwest::Error),
+    ReqwestError(reqwest::Error),
+}
+
+impl From<reqwest::Error> for RpcError {
+    /// Drops the URL from the error: RPC URLs often carry an API key, and
+    /// these errors end up in logs.
+    fn from(error: reqwest::Error) -> Self {
+        RpcError::ReqwestError(error.without_url())
+    }
 }
 
 impl From<simd_json::Error> for RpcError {

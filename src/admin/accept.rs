@@ -185,7 +185,8 @@ where
         };
 
         // Reconstruct the TX as a normal json rpc request
-        tracing::info!(?token, "JWT claims");
+        // Only log the method: params can hold secrets, like the URL of an RPC being added.
+        tracing::info!(method = %token.claims.method, "JWT claims");
 
         tx = json!({
             "id": token.claims.id,
