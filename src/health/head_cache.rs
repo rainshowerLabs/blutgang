@@ -43,7 +43,7 @@ where
 
         // If a new block is less or equal to the last block in our cache,
         // that means that the chain has experienced a reorg and that we should
-        // remove everything from the last block to the `new_block`
+        // remove everything from `new_block` through the previous head.
         if new_block <= block_number {
             tracing::warn!("Reorg detected! Removing stale entries from the cache.");
             handle_reorg(head_cache, block_number, new_block, cache.clone()).await?;
@@ -75,10 +75,10 @@ where
     K: GenericBytes,
     V: GenericBytes,
 {
-    let range = block_number..=new_block;
+    let range = new_block..=block_number;
     let mut batch = Batch::with_capacity(range.clone().count());
 
-    // Go over the head cache and get all the keys from block_number to new_block
+    // Include both the replacement head and every block rolled back above it.
     {
         let mut head_cache_guard = head_cache.write().unwrap();
         for i in range {
@@ -114,8 +114,8 @@ fn remove_stale<K: GenericBytes>(
         None => return Ok(()), // Return early if the map is empty
     };
 
-    // Remove all entries from the head_cache up to block_number
-    for i in oldest..=block_number + 1 {
+    // Only finalized blocks can be forgotten; the next block can still reorg.
+    for i in oldest..=block_number {
         head_cache_guard.remove(&i);
     }
 
@@ -136,7 +136,7 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn test_handle_reorg() {
+    async fn test_handle_reorg_backwards() {
         // Create test data and resources
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
         let cache = Config::tmp().unwrap();
@@ -157,8 +157,8 @@ mod tests {
         let (db_tx, db_rx) = mpsc::unbounded_channel::<DbRequest<&[u8], &[u8]>>();
         tokio::task::spawn(database_processing(db_rx, cache));
 
-        // Call handle_reorg
-        let result = handle_reorg(&head_cache, 2, 3, db_tx.clone()).await;
+        // Match manage_cache's argument order when the head rolls back from 3 to 2.
+        let result = handle_reorg(&head_cache, 3, 2, db_tx.clone()).await;
 
         // Verify the result and check if the data is removed from the cache
         assert!(result.is_ok(), "handle_reorg failed");
@@ -191,8 +191,55 @@ mod tests {
         );
     }
 
+    async fn assert_same_height_reorg(prune_finalized: bool) {
+        let head_cache = Arc::new(RwLock::new(BTreeMap::from([
+            (1, vec![b"earlier".as_slice()]),
+            (2, vec![b"head_a".as_slice(), b"head_b".as_slice()]),
+        ])));
+        let config = Config::tmp().unwrap();
+        let cache = Db::open_with_config(&config).unwrap();
+        for key in [b"earlier".as_slice(), b"head_a", b"head_b"] {
+            cache.insert(key, b"cached response").unwrap();
+        }
+
+        let (db_tx, db_rx) = mpsc::unbounded_channel::<DbRequest<&[u8], &[u8]>>();
+        tokio::task::spawn(database_processing(db_rx, cache));
+
+        if prune_finalized {
+            remove_stale(&head_cache, 1).unwrap();
+        }
+        handle_reorg(&head_cache, 2, 2, db_tx.clone())
+            .await
+            .unwrap();
+
+        // Finalized/earlier responses stay cached, but every response for the
+        // replaced head must be evicted, even just after its parent finalizes.
+        assert!(db_get!(db_tx.clone(), b"earlier".as_slice())
+            .unwrap()
+            .is_some());
+        for key in [b"head_a".as_slice(), b"head_b"] {
+            assert!(
+                db_get!(db_tx.clone(), key).unwrap().is_none(),
+                "cached response for the replaced head survived invalidation"
+            );
+        }
+        assert!(!head_cache.read().unwrap().contains_key(&2));
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_handle_reorg_same_height() {
+        assert_same_height_reorg(false).await;
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_handle_reorg_after_parent_finalizes() {
+        assert_same_height_reorg(true).await;
+    }
+
     #[test]
-    fn test_remove_stale() {
+    fn test_remove_stale_keeps_unfinalized_blocks() {
         // Create test data and resources
         let head_cache = Arc::new(RwLock::new(BTreeMap::new()));
 
@@ -210,6 +257,18 @@ mod tests {
         assert!(result.is_ok());
         let head_cache_guard = head_cache.read().unwrap();
         assert!(!head_cache_guard.contains_key(&1));
-        assert!(!head_cache_guard.contains_key(&2));
+        assert!(head_cache_guard.contains_key(&2));
+    }
+
+    #[test]
+    fn test_remove_stale_max_block_number() {
+        let head_cache = Arc::new(RwLock::new(BTreeMap::from([
+            (u64::MAX - 1, vec![b"parent".as_slice()]),
+            (u64::MAX, vec![b"head".as_slice()]),
+        ])));
+
+        remove_stale(&head_cache, u64::MAX).unwrap();
+
+        assert!(head_cache.read().unwrap().is_empty());
     }
 }
