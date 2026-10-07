@@ -42,6 +42,8 @@ You must provide a config file to the docker container, as well as expose the po
 docker run -v /full/path/to/config.toml:/app/config.toml --network host makemake1337/blutgang
 ```
 
+The container runs as an unprivileged user (uid `10001`) and creates its cache in `/app`. To keep the cache between runs, mount a named volume there, e.g. `-v blutgang-data:/app`. A host directory mounted instead must be writable by uid `10001`.
+
 ### Nix
 
 Using Flakes and the [nix-community/ethereum.nix](https://github.com/nix-community/ethereum.nix) overlay:
