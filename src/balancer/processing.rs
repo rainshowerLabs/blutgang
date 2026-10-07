@@ -146,7 +146,6 @@ pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_id: usize, time:
 
     if let Some(rpc) = rpc_list_guard.iter_mut().find(|rpc| rpc.id() == rpc_id) {
         rpc.update_latency(time.as_nanos() as f64);
-        rpc.last_used = time.as_micros();
         tracing::info!("LA {}", rpc.status.latency);
     }
 }
