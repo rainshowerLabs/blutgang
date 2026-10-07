@@ -226,7 +226,7 @@ macro_rules! fetch_from_rpc {
         let mut retries = 0;
         loop {
             // Get the next Rpc in line.
-            let mut rpc;
+            let rpc;
             {
                 let mut rpc_list_guard = $con_params.rpc_list.write().unwrap_or_else(|e| {
                     // Handle the case where the RwLock is poisoned
@@ -247,25 +247,26 @@ macro_rules! fetch_from_rpc {
             // Send the request. And return a timeout if it takes too long
             //
             // Check if it contains any errors or if its `latest` and insert it if it isn't
-            match timeout(
-                Duration::from_millis($ttl.try_into().unwrap()),
-                rpc.send_request($tx.clone()),
-            )
-            .await
-            {
-                Ok(rxa) => {
-                    rx = rxa.unwrap();
+            let ttl = Duration::from_millis($ttl.try_into().unwrap());
+            match timeout(ttl, rpc.send_request($tx.clone())).await {
+                Ok(Ok(response)) => {
+                    rx = response;
                     break;
+                }
+                Ok(Err(err)) => {
+                    tracing::warn!(rpc.name, %err, "An RPC request has failed, picking new RPC and retrying.");
                 }
                 Err(_) => {
                     tracing::warn!("An RPC request has timed out, picking new RPC and retrying.");
-                    rpc.update_latency($ttl as f64);
-                    retries += 1;
                 }
             };
 
-            if retries == $max_retries {
-                return (timed_out!(), $rpc_id);
+            // Charge the RPC the whole ttl so that the next pick prefers another one.
+            update_rpc_latency(&$con_params.rpc_list, rpc.id(), ttl);
+            retries += 1;
+
+            if retries >= $max_retries {
+                return (timed_out!(), None);
             }
         }
 
@@ -537,6 +538,16 @@ mod tests {
         (url, hits)
     }
 
+    /// An upstream RPC that refuses connections.
+    async fn dead_upstream() -> url::Url {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        drop(listener);
+        url
+    }
+
     fn connection_params(rpc_list: Vec<Rpc>) -> ConnectionParams {
         let (_finalized_tx, finalized_rx) = watch::channel(0);
         let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
@@ -643,5 +654,73 @@ mod tests {
         );
         assert_eq!(result_of(response.await).await, "0x1");
         assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_fails_over_when_rpc_is_unreachable() {
+        let (url, hits) = counting_upstream().await;
+        let dead = Rpc::new(dead_upstream().await, None, 10, 0, 10.0);
+        let dead_id = dead.id();
+        let mut alive = Rpc::new(url, None, 10, 0, 10.0);
+        // Make sure the dead RPC is picked first.
+        alive.update_latency(1_000.0);
+        let con_params = connection_params(vec![dead, alive]);
+
+        let (response, rpc_id) = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            request_params(),
+        )
+        .await;
+
+        assert_eq!(result_of((response, rpc_id)).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        assert_ne!(rpc_id, Some(dead_id));
+        // The unreachable RPC was charged for its failure.
+        let rpc_list = con_params.rpc_list.read().unwrap();
+        let dead = rpc_list.iter().find(|rpc| rpc.id() == dead_id).unwrap();
+        assert!(dead.status.latency > 1_000.0);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_gives_up_when_every_rpc_is_unreachable() {
+        let con_params =
+            connection_params(vec![Rpc::new(dead_upstream().await, None, 10, 0, 10.0)]);
+
+        let (response, rpc_id) = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            request_params(),
+        )
+        .await;
+
+        assert_eq!(response.unwrap().status(), 408);
+        assert_eq!(rpc_id, None);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_zero_max_retries_still_gives_up() {
+        let con_params =
+            connection_params(vec![Rpc::new(dead_upstream().await, None, 10, 0, 10.0)]);
+        let params = RequestParams {
+            max_retries: 0,
+            ..request_params()
+        };
+
+        let request = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            params,
+        );
+        let (response, _) = tokio::time::timeout(Duration::from_secs(5), request)
+            .await
+            .expect("retried forever");
+        assert_eq!(response.unwrap().status(), 408);
     }
 }
