@@ -9,7 +9,10 @@ use crate::{
             update_rpc_latency,
             CacheArgs,
         },
-        selection::select::pick,
+        selection::{
+            cache_rules::has_block_tag,
+            select::pick,
+        },
     },
     cache_error,
     database::types::GenericBytes,
@@ -161,13 +164,19 @@ macro_rules! get_response {
         $tx:expr,
         $cache_args:expr,
         $tx_hash:expr,
+        $cacheable:expr,
         $rpc_position:expr,
         $id:expr,
         $con_params:expr,
         $ttl:expr,
         $max_retries:expr
-    ) => {
-        match db_get!($cache_args.cache, $tx_hash.as_bytes().to_owned().into()) {
+    ) => {{
+        let cached = if $cacheable {
+            db_get!($cache_args.cache, $tx_hash.as_bytes().to_owned().into())
+        } else {
+            Ok(None)
+        };
+        match cached {
             Ok(Some(mut rax)) => {
                 $rpc_position = None;
                 // Reconstruct ID
@@ -195,7 +204,7 @@ macro_rules! get_response {
                 return (cache_error!(), $rpc_position);
             }
         }
-    };
+    }};
 }
 
 macro_rules! fetch_from_rpc {
@@ -297,8 +306,25 @@ where
     }
 
     // Convert incoming body to serde value
-    let mut tx = incoming_to_value(tx).await.unwrap();
+    let tx = incoming_to_value(tx).await.unwrap();
 
+    forward_value(tx, con_params, cache_args, params).await
+}
+
+/// Answers an already parsed JSON-RPC request, from the cache if possible.
+async fn forward_value<K, V>(
+    mut tx: Value,
+    con_params: &ConnectionParams,
+    cache_args: CacheArgs<K, V>,
+    params: RequestParams,
+) -> (
+    Result<hyper::Response<Full<Bytes>>, Infallible>,
+    Option<usize>,
+)
+where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -306,19 +332,22 @@ where
     // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
-    let tx_hash = hash(tx.to_string().as_bytes());
+    // Rewrite named block parameters if possible, and only then hash the request:
+    // `latest` must be cached under the block it resolved to, not under `latest`.
+    let mut tx = replace_block_tags(&mut tx, &cache_args.named_numbers);
+    let tx_string = tx.to_string();
+    let tx_hash = hash(tx_string.as_bytes());
+    let cacheable = !has_block_tag(&tx_string);
 
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;
-
-    // Rewrite named block parameters if possible
-    let mut tx = replace_block_tags(&mut tx, &cache_args.named_numbers);
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
         cache_args,
         tx_hash,
+        cacheable,
         rpc_position,
         id,
         con_params,
@@ -433,4 +462,184 @@ where
     }
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::accept::db_insert;
+    use http_body_util::BodyExt;
+    use serde_json::json;
+    use std::sync::atomic::{
+        AtomicUsize,
+        Ordering,
+    };
+    use tokio::{
+        io::{
+            AsyncReadExt,
+            AsyncWriteExt,
+        },
+        net::{
+            TcpListener,
+            TcpStream,
+        },
+    };
+
+    /// Reads one HTTP request (headers and body) so the response isn't sent early.
+    async fn read_request(stream: &mut TcpStream) {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = stream.read(&mut chunk).await.unwrap_or(0);
+            if n == 0 {
+                return;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            if let Some(end) = memchr::memmem::find(&buf, b"\r\n\r\n") {
+                let headers = String::from_utf8_lossy(&buf[..end]).to_lowercase();
+                let len = headers
+                    .lines()
+                    .find_map(|line| line.strip_prefix("content-length:"))
+                    .and_then(|len| len.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                if buf.len() >= end + 4 + len {
+                    return;
+                }
+            }
+        }
+    }
+
+    /// An upstream RPC whose result is the number of requests it has received,
+    /// so a cache hit can be told apart from a fresh answer.
+    async fn counting_upstream() -> (url::Url, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                tokio::spawn(async move {
+                    read_request(&mut stream).await;
+                    let body = format!(r#"{{"jsonrpc":"2.0","id":1,"result":"0x{n:x}"}}"#);
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = stream.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+        (url, hits)
+    }
+
+    fn connection_params(rpc_list: Vec<Rpc>) -> ConnectionParams {
+        let (_finalized_tx, finalized_rx) = watch::channel(0);
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
+        let (_outgoing_tx, outgoing_rx) = broadcast::channel(1);
+        ConnectionParams::new(
+            &Arc::new(RwLock::new(rpc_list)),
+            RequestChannels::new(Arc::new(finalized_rx), incoming_tx, outgoing_rx),
+            &Arc::new(SubscriptionData::new()),
+            &Arc::new(RwLock::new(Settings::default())),
+        )
+    }
+
+    fn request_params() -> RequestParams {
+        RequestParams {
+            ttl: 1000,
+            max_retries: 3,
+            header_check: false,
+        }
+    }
+
+    async fn result_of(
+        response: (
+            Result<hyper::Response<Full<Bytes>>, Infallible>,
+            Option<usize>,
+        ),
+    ) -> Value {
+        let body = response.0.unwrap().into_body().collect().await.unwrap();
+        let body: Value = serde_json::from_slice(&body.to_bytes()).unwrap();
+        body["result"].clone()
+    }
+
+    fn get_balance(block: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "eth_getBalance",
+            "params": ["0x00000000000000000000000000000000000000aa", block],
+        })
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_latest_is_cached_per_block() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+        let cache_args = CacheArgs::default();
+        cache_args.named_numbers.write().unwrap().latest = 0x10;
+
+        let first = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(first.await).await, "0x1");
+
+        // Same head: the answer for block 0x10 comes from the cache.
+        let second = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(second.await).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+
+        // The head moved, so `latest` must not be answered with block 0x10's result.
+        cache_args.named_numbers.write().unwrap().latest = 0x11;
+        let third = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(third.await).await, "0x2");
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_unresolved_block_tag_skips_cache() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+        let cache_args = CacheArgs::default();
+
+        // Older versions cached `latest` under the tag itself. With no known head the
+        // tag can't be resolved, and such a stale entry must not be served.
+        let mut stale_key = get_balance("latest");
+        stale_key["id"] = Value::Null;
+        drop(
+            db_insert(
+                &cache_args.cache,
+                *hash(stale_key.to_string().as_bytes()).as_bytes(),
+                br#"{"jsonrpc":"2.0","id":null,"result":"0xdead"}"#.to_vec(),
+            )
+            .await,
+        );
+
+        let response = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(response.await).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
 }

@@ -6,7 +6,10 @@ use crate::{
             update_rpc_latency,
             CacheArgs,
         },
-        selection::select::pick,
+        selection::{
+            cache_rules::has_block_tag,
+            select::pick,
+        },
     },
     database::types::GenericBytes,
     db_get,
@@ -323,12 +326,19 @@ where
     );
 
     let id = call["id"].take();
-    let tx_hash = hash(call.to_string().as_bytes());
 
-    if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
-        let mut cached: Value = from_slice(rax.as_mut()).unwrap();
-        cached["id"] = id;
-        return Ok(cached.to_string());
+    // Rewrite block tags before hashing: `latest` must be cached under the block it
+    // resolved to, not under `latest`. Subscriptions have no block param to rewrite.
+    call = replace_block_tags(&mut call, &cache_args.named_numbers);
+    let call_string = call.to_string();
+    let tx_hash = hash(call_string.as_bytes());
+
+    if !has_block_tag(&call_string) {
+        if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
+            let mut cached: Value = from_slice(rax.as_mut()).unwrap();
+            cached["id"] = id;
+            return Ok(cached.to_string());
+        }
     }
 
     // Remove and unsubscribe user is "eth_unsubscribe"
@@ -375,9 +385,6 @@ where
                 id, rax
             ));
         }
-    } else {
-        // Replace block tags if applicable
-        call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
 
     call["id"] = user_id.into();
@@ -606,6 +613,64 @@ mod tests {
             result.unwrap(),
             "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x1a2b3c\"}"
         );
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_ws_latest_is_cached_per_block() {
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+        let cache_args = CacheArgs::default();
+        cache_args.named_numbers.write().unwrap().latest = 0x10;
+
+        let call = || {
+            json!({
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": EthRpcMethod::Call,
+                "params": [{"to": "0x00000000000000000000000000000000000000aa", "data": "0x"}, "latest"]
+            })
+        };
+        let respond = |result: &'static str| {
+            let broadcast_tx = broadcast_tx.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                let response = IncomingResponse {
+                    content: json!({"jsonrpc": "2.0", "id": 1, "result": result}),
+                    node_id: 0,
+                };
+                broadcast_tx.send(response).unwrap();
+            });
+        };
+
+        respond("0xaaaa");
+        let first = execute_ws_call(
+            call(),
+            1,
+            &incoming_tx,
+            broadcast_rx.resubscribe(),
+            &sub_data,
+            &cache_args,
+        )
+        .await
+        .unwrap();
+        assert!(first.contains("0xaaaa"));
+
+        // The head moved, so `latest` must not be answered with block 0x10's result.
+        cache_args.named_numbers.write().unwrap().latest = 0x11;
+        respond("0xbbbb");
+        let second = execute_ws_call(
+            call(),
+            1,
+            &incoming_tx,
+            broadcast_rx.resubscribe(),
+            &sub_data,
+            &cache_args,
+        )
+        .await
+        .unwrap();
+        assert!(second.contains("0xbbbb"), "got stale response {second}");
     }
 
     #[tokio::test]
