@@ -47,7 +47,7 @@ use tokio::{
 
 #[derive(Debug, Default)]
 struct HeadResult {
-    rpc_list_index: usize,
+    rpc_id: usize,
     is_syncing: bool,
     reported_head: u64,
 }
@@ -161,8 +161,9 @@ async fn head_check(
     let (tx, mut rx) = mpsc::channel(len);
 
     // Iterate over all RPCs
-    for (rpc_list_index, rpc) in rpc_list_clone.into_iter().enumerate().take(len) {
+    for rpc in rpc_list_clone.into_iter().take(len) {
         let tx = tx.clone(); // Clone the sender for this RPC
+        let rpc_id = rpc.id();
 
         // Spawn a future for each RPC
         let rpc_future = async move {
@@ -196,7 +197,7 @@ async fn head_check(
             };
 
             let head_result = HeadResult {
-                rpc_list_index,
+                rpc_id,
                 is_syncing: result.is_syncing,
                 reported_head: result.reported_head,
             };
@@ -240,14 +241,23 @@ fn make_poverty(
     }
 
     // Mark all RPCs that dont report the highest head as erroring
-    let mut rpc_list_guard = rpc_list.write().unwrap();
-    let mut poverty_list_guard = poverty_list.write().unwrap();
+    let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| e.into_inner());
+    let mut poverty_list_guard = poverty_list.write().unwrap_or_else(|e| e.into_inner());
 
     for head in heads {
         if head.reported_head < highest_head || head.is_syncing {
+            // The list may have changed while we waited for the heads,
+            // so find the RPC again by its id.
+            let Some(rpc) = rpc_list_guard
+                .iter_mut()
+                .find(|rpc| rpc.id() == head.rpc_id)
+            else {
+                continue;
+            };
+
             // Mark the RPC as erroring
-            rpc_list_guard[head.rpc_list_index].status.is_erroring = true;
-            let rpc_name = &rpc_list_guard[head.rpc_list_index].name;
+            rpc.status.is_erroring = true;
+            let rpc_name = &rpc.name;
             tracing::warn!("{rpc_name} is falling behind! Removing from active RPC pool.");
             metrics::gauge!(
                 "rpc_health_by_name",
@@ -258,7 +268,9 @@ fn make_poverty(
             .set(0.0);
 
             // Add the RPC to the poverty list
-            poverty_list_guard.push(rpc_list_guard[head.rpc_list_index].clone());
+            if !poverty_list_guard.iter().any(|p| p.id() == head.rpc_id) {
+                poverty_list_guard.push(rpc.clone());
+            }
         }
     }
 
@@ -289,8 +301,19 @@ fn escape_poverty(
 
     for head in poverty_heads {
         if head.reported_head >= agreed_head && !head.is_syncing {
-            let mut rpc = poverty_list_guard[head.rpc_list_index].clone();
-            rpc.status.is_erroring = false;
+            // The list may have changed while we waited for the heads,
+            // so find the RPC again by its id.
+            let Some(poverty_rpc) = poverty_list_guard
+                .iter_mut()
+                .find(|rpc| rpc.id() == head.rpc_id)
+            else {
+                continue;
+            };
+
+            // Remove the RPC from the poverty list
+            poverty_rpc.status.is_erroring = false;
+
+            let rpc = poverty_rpc.clone();
             let rpc_name = &rpc.name;
             tracing::info!("{rpc_name} is following the head again! Added to active RPC pool.");
             metrics::gauge!(
@@ -302,10 +325,9 @@ fn escape_poverty(
             .set(1.0);
 
             // Move the RPC from the poverty list to the rpc list
-            rpc_list_guard.push(rpc);
-
-            // Remove the RPC from the poverty list
-            poverty_list_guard[head.rpc_list_index].status.is_erroring = false;
+            if !rpc_list_guard.iter().any(|r| r.id() == head.rpc_id) {
+                rpc_list_guard.push(rpc);
+            }
         }
     }
 
@@ -334,31 +356,31 @@ fn escape_poverty(
     Ok(to_send)
 }
 
-/// Remove the RPC that dropped out ws_conn and add it to the poverty list.
+/// Remove the RPC with the given `Rpc::id` whose ws_conn dropped out and add it to the poverty list.
 pub async fn send_dropped_to_poverty(
     rpc_list: &Arc<RwLock<Vec<Rpc>>>,
     poverty_list: &Arc<RwLock<Vec<Rpc>>>,
     incoming_tx: &mpsc::UnboundedSender<WsconnMessage>,
     rx: broadcast::Receiver<IncomingResponse>,
     sub_data: &Arc<SubscriptionData>,
-    ws_conn_index: usize,
+    rpc_id: usize,
 ) -> Result<(), HealthError> {
     {
-        let mut rpc_list_guard = rpc_list.write().unwrap();
-        let mut poverty_list_guard = poverty_list.write().unwrap();
+        let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| e.into_inner());
+        let mut poverty_list_guard = poverty_list.write().unwrap_or_else(|e| e.into_inner());
 
         // Check if the RPC is in the rpc_list
-        if let Some(rpc) = rpc_list_guard.get(ws_conn_index) {
-            // Add the RPC to the poverty list
-            poverty_list_guard.push(rpc.clone());
-
-            // Remove the RPC from the rpc_list
-            rpc_list_guard.remove(ws_conn_index);
+        if let Some(position) = rpc_list_guard.iter().position(|rpc| rpc.id() == rpc_id) {
+            // Move the RPC from the rpc_list to the poverty list
+            let rpc = rpc_list_guard.remove(position);
+            if !poverty_list_guard.iter().any(|p| p.id() == rpc_id) {
+                poverty_list_guard.push(rpc);
+            }
         }
     }
 
     // Move subscriptions away from that node
-    move_subscriptions(incoming_tx, rx, sub_data, ws_conn_index).await?;
+    move_subscriptions(incoming_tx, rx, sub_data, rpc_id).await?;
 
     Ok(())
 }
@@ -405,25 +427,12 @@ pub async fn dropped_listener(
 mod tests {
     use super::*;
 
-    // Construct a hypothetical RPC and heads list for testing
-    fn dummy_head_check() -> Vec<HeadResult> {
-        vec![
-            HeadResult {
-                rpc_list_index: 0,
-                is_syncing: false,
-                reported_head: 18177557,
-            },
-            HeadResult {
-                rpc_list_index: 1,
-                is_syncing: false,
-                reported_head: 18193012,
-            },
-            HeadResult {
-                rpc_list_index: 2,
-                is_syncing: false,
-                reported_head: 0,
-            },
-        ]
+    fn head(rpc: &Rpc, is_syncing: bool, reported_head: u64) -> HeadResult {
+        HeadResult {
+            rpc_id: rpc.id(),
+            is_syncing,
+            reported_head,
+        }
     }
 
     #[test]
@@ -437,7 +446,11 @@ mod tests {
         let poverty_list = Arc::new(RwLock::new(vec![]));
 
         // Test with dummy head results
-        let heads = dummy_head_check();
+        let heads = vec![
+            head(&rpc1, false, 18177557),
+            head(&rpc2, false, 18193012),
+            head(&rpc3, false, 0),
+        ];
 
         // Call the make_poverty function
         let result = make_poverty(&rpc_list, &poverty_list, heads);
@@ -447,11 +460,42 @@ mod tests {
         let rpc_list_guard = rpc_list.read().unwrap();
         let poverty_list_guard = poverty_list.read().unwrap();
 
-        // Only 1 RPC should be in the rpc list
+        // Only rpc2 should be in the rpc list
         assert_eq!(rpc_list_guard.len(), 1);
+        assert_eq!(rpc_list_guard[0].id(), rpc2.id());
 
         // The poverty list should now contain 2 RPCs
         assert_eq!(poverty_list_guard.len(), 2);
+    }
+
+    #[test]
+    fn test_poverty_after_list_shifts() {
+        let rpc1 = Rpc::default();
+        let rpc2 = Rpc::default();
+        let rpc3 = Rpc::default();
+
+        let rpc_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc2.clone(), rpc3.clone()]));
+        let poverty_list = Arc::new(RwLock::new(vec![]));
+
+        let heads = vec![
+            head(&rpc1, false, 18193012),
+            head(&rpc2, false, 18193012),
+            head(&rpc3, false, 0),
+        ];
+
+        // rpc1's WS connection drops while the heads are being fetched.
+        rpc_list.write().unwrap().remove(0);
+
+        let result = make_poverty(&rpc_list, &poverty_list, heads);
+        assert!(result.is_ok());
+
+        // Only rpc3 is behind: rpc2 must stay, whatever its position now is.
+        let rpc_list_guard = rpc_list.read().unwrap();
+        let poverty_list_guard = poverty_list.read().unwrap();
+        assert_eq!(rpc_list_guard.len(), 1);
+        assert_eq!(rpc_list_guard[0].id(), rpc2.id());
+        assert_eq!(poverty_list_guard.len(), 1);
+        assert_eq!(poverty_list_guard[0].id(), rpc3.id());
     }
 
     #[test]
@@ -468,18 +512,7 @@ mod tests {
         let poverty_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc3.clone()]));
 
         // Test with dummy head results
-        let heads = vec![
-            HeadResult {
-                rpc_list_index: 0,
-                is_syncing: false,
-                reported_head: 18177557,
-            },
-            HeadResult {
-                rpc_list_index: 1,
-                is_syncing: false,
-                reported_head: 18193012,
-            },
-        ];
+        let heads = vec![head(&rpc1, false, 18177557), head(&rpc3, false, 18193012)];
 
         // Call the escape_poverty function
         let result = escape_poverty(&rpc_list, &poverty_list, heads, 18193012);
@@ -490,9 +523,11 @@ mod tests {
         let poverty_list_guard = poverty_list.read().unwrap();
         // RPC3 should have escaped poverty
         assert_eq!(rpc_list_guard.len(), 2);
+        assert_eq!(rpc_list_guard[1].id(), rpc3.id());
 
         // The poverty list should have 1 RPC
         assert_eq!(poverty_list_guard.len(), 1);
+        assert_eq!(poverty_list_guard[0].id(), rpc1.id());
     }
 
     #[test]
@@ -509,18 +544,7 @@ mod tests {
         let poverty_list = Arc::new(RwLock::new(vec![rpc1.clone(), rpc3.clone()]));
 
         // Test with dummy head results
-        let heads = vec![
-            HeadResult {
-                rpc_list_index: 0,
-                is_syncing: false,
-                reported_head: 18193012,
-            },
-            HeadResult {
-                rpc_list_index: 1,
-                is_syncing: true,
-                reported_head: 18193012,
-            },
-        ];
+        let heads = vec![head(&rpc1, false, 18193012), head(&rpc3, true, 18193012)];
 
         // Call the escape_poverty function
         let result = escape_poverty(&rpc_list, &poverty_list, heads, 18193012);
@@ -529,10 +553,12 @@ mod tests {
         // Check the state of RPCs after the test
         let rpc_list_guard = rpc_list.read().unwrap();
         let poverty_list_guard = poverty_list.read().unwrap();
-        // RPC3 should have escaped poverty
+        // RPC1 should have escaped poverty, RPC3 is still syncing
         assert_eq!(rpc_list_guard.len(), 2);
+        assert_eq!(rpc_list_guard[1].id(), rpc1.id());
 
         // The poverty list should have 1 RPC
         assert_eq!(poverty_list_guard.len(), 1);
+        assert_eq!(poverty_list_guard[0].id(), rpc3.id());
     }
 }

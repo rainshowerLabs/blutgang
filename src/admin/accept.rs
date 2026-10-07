@@ -8,6 +8,7 @@ use crate::{
         GenericBytes,
         RequestBus,
     },
+    invalid_request,
 };
 use http_body_util::Full;
 use hyper::{
@@ -107,6 +108,10 @@ where
     K: GenericBytes,
     V: GenericBytes,
 {
+    if !tx.is_object() {
+        return invalid_request!();
+    }
+
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -180,7 +185,8 @@ where
         };
 
         // Reconstruct the TX as a normal json rpc request
-        tracing::info!(?token, "JWT claims");
+        // Only log the method: params can hold secrets, like the URL of an RPC being added.
+        tracing::info!(method = %token.claims.method, "JWT claims");
 
         tx = json!({
             "id": token.claims.id,

@@ -6,10 +6,14 @@ use crate::{
             update_rpc_latency,
             CacheArgs,
         },
-        selection::select::pick,
+        selection::{
+            cache_rules::has_block_tag,
+            select::pick,
+        },
     },
     database::types::GenericBytes,
     db_get,
+    invalid_request_body,
     rpc::{
         method::EthRpcMethod,
         types::Rpc,
@@ -26,6 +30,7 @@ use crate::{
 };
 
 use std::{
+    collections::HashMap,
     sync::{
         Arc,
         RwLock,
@@ -52,11 +57,7 @@ use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
 
-#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
-
-#[cfg(feature = "xxhash")]
-use xxhash_rust::xxh3::xxh3_64;
 
 /// Accepts incoming internal WS messages.
 ///
@@ -64,150 +65,149 @@ use xxhash_rust::xxh3::xxh3_64;
 /// connections and initiate new ones from the `rpc_list`.
 pub async fn ws_conn_manager(
     rpc_list: Arc<RwLock<Vec<Rpc>>>,
-    ws_handles: Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
     mut incoming_rx: mpsc::UnboundedReceiver<WsconnMessage>,
     broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
 ) {
+    let mut connections = WsConnections {
+        rpc_list,
+        handles: HashMap::new(),
+        broadcast_tx,
+        ws_error_tx,
+    };
+
     // Initialize WebSocket connections
-    update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
+    connections.reconnect().await;
 
     // Buffer for WS subscriptions when all nodes are ded
     let mut ws_buffer: Vec<Value> = Vec::new();
 
     while let Some(message) = incoming_rx.recv().await {
         match message {
-            WsconnMessage::Message(incoming, specified_index) => {
-                handle_incoming_message(
-                    &ws_handles,
-                    &rpc_list,
-                    incoming,
-                    specified_index,
-                    &mut ws_buffer,
-                )
-                .await;
+            WsconnMessage::Message(incoming, specified_node) => {
+                connections
+                    .send(incoming, specified_node, &mut ws_buffer)
+                    .await;
             }
             WsconnMessage::Reconnect() => {
-                update_ws_connections(&rpc_list, &ws_handles, &broadcast_tx, &ws_error_tx).await;
-                unload_buffer(&rpc_list, &ws_handles, &mut ws_buffer).await;
+                connections.reconnect().await;
+                unload_buffer(&mut connections, &mut ws_buffer).await;
             }
         }
     }
 }
 
-/// Updates the active WS handles to match the active connections.
-async fn update_ws_connections(
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
-    broadcast_tx: &broadcast::Sender<IncomingResponse>,
-    ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
-) {
-    let ws_vec = create_ws_vec(rpc_list, broadcast_tx, ws_error_tx).await;
-    let mut ws_handle_guard = ws_handles.write().unwrap_or_else(|e| {
-        // Handle the case where the ws_handles RwLock is poisoned
-        tracing::error!(?e);
-        e.into_inner()
-    });
-    *ws_handle_guard = ws_vec;
+/// The WS connections to the RPCs, and what is needed to open new ones.
+struct WsConnections {
+    rpc_list: Arc<RwLock<Vec<Rpc>>>,
+    /// Channels to each RPC's connection, by [`Rpc::id`].
+    ///
+    /// Keyed by id rather than position: the health check moves RPCs in and
+    /// out of `rpc_list` without reconnecting.
+    handles: HashMap<usize, mpsc::UnboundedSender<Value>>,
+    broadcast_tx: broadcast::Sender<IncomingResponse>,
+    ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
+}
+
+impl WsConnections {
+    /// Replaces all connections with new ones to the RPCs currently in `rpc_list`.
+    async fn reconnect(&mut self) {
+        let rpc_list_clone = self
+            .rpc_list
+            .read()
+            .unwrap_or_else(|e| {
+                // Handle the case where the rpc_list RwLock is poisoned
+                tracing::error!(?e);
+                e.into_inner()
+            })
+            .clone();
+
+        let mut handles = HashMap::new();
+        for rpc in rpc_list_clone.iter() {
+            handles.insert(rpc.id(), self.open(rpc).await);
+        }
+        self.handles = handles;
+    }
+
+    /// Opens a connection to `rpc` and returns the channel for sending it requests.
+    async fn open(&self, rpc: &Rpc) -> mpsc::UnboundedSender<Value> {
+        let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
+        ws_conn(
+            rpc.clone(),
+            self.rpc_list.clone(),
+            ws_conn_incoming_rx,
+            self.broadcast_tx.clone(),
+            self.ws_error_tx.clone(),
+        )
+        .await;
+        ws_conn_incoming_tx
+    }
+
+    /// Sends an incoming request to a WS connection.
+    ///
+    /// The RPC can be specified by its [`Rpc::id`] via `specified_node`,
+    /// otherwise one is picked from `rpc_list`.
+    async fn send(
+        &mut self,
+        incoming: Value,
+        specified_node: Option<usize>,
+        ws_buffer: &mut Vec<Value>,
+    ) {
+        let node_id = if let Some(node_id) = specified_node {
+            node_id
+        } else {
+            let picked = {
+                let mut rpc_list_guard = self.rpc_list.write().unwrap_or_else(|e| {
+                    // Handle the case where the rpc_list RwLock is poisoned
+                    tracing::error!(?e);
+                    e.into_inner()
+                });
+                let (rpc, position) = pick(&mut rpc_list_guard);
+                position.map(|_| rpc)
+            };
+
+            match picked {
+                Some(rpc) => {
+                    // An RPC that rejoined the list after the last reconnect has no connection yet.
+                    if !self.handles.contains_key(&rpc.id()) {
+                        let handle = self.open(&rpc).await;
+                        self.handles.insert(rpc.id(), handle);
+                    }
+                    rpc.id()
+                }
+                None => {
+                    // Check if the incoming content is a subscription.
+                    //
+                    // We do this because we want to send it to a buffer
+                    // in case we have no available RPCs.
+                    let method = &incoming["method"];
+                    if method.eq(&EthRpcMethod::Subscription) || method.eq(&EthRpcMethod::Subscribe)
+                    {
+                        ws_buffer.push(incoming);
+                    }
+                    tracing::error!("No RPC position available");
+                    return;
+                }
+            }
+        };
+
+        if let Some(ws) = self.handles.get(&node_id) {
+            if ws.send(incoming).is_err() {
+                tracing::error!("ws_conn_manager error: failed to send message");
+            }
+        } else {
+            tracing::error!(node_id, "No WS connection for node");
+        }
+    }
 }
 
 /// Dispatches buffered WS subscriptions out to nodes.
-async fn unload_buffer(
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
-    ws_buffer: &mut Vec<Value>,
-) {
-    for i in 0..ws_buffer.len() {
-        let incoming = ws_buffer[i].clone();
-        handle_incoming_message(ws_handles, rpc_list, incoming, None, ws_buffer).await;
-    }
-    ws_buffer.clear();
-}
-
-/// Sends an incoming request to a WS connection.
 ///
-/// Indexes can be specified via the `specified_index` param.
-async fn handle_incoming_message(
-    ws_handles: &Arc<RwLock<Vec<Option<mpsc::UnboundedSender<Value>>>>>,
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    incoming: Value,
-    specified_index: Option<usize>,
-    ws_buffer: &mut Vec<Value>,
-) {
-    let rpc_position = if let Some(index) = specified_index {
-        index
-    } else {
-        let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
-            // Handle the case where the rpc_list RwLock is poisoned
-            tracing::error!(?e);
-            e.into_inner()
-        });
-
-        match pick(&mut rpc_list_guard).1 {
-            Some(position) => position,
-            None => {
-                // Check if the incoming content is a subscription.
-                //
-                // We do this because we want to send it to a buffer
-                // in case we have no available RPCs.
-                let method = &incoming["method"];
-                if method.eq(&EthRpcMethod::Subscription) || method.eq(&EthRpcMethod::Subscribe) {
-                    ws_buffer.push(incoming);
-                }
-                tracing::error!("No RPC position available");
-                return;
-            }
-        }
-    };
-
-    if let Some(ws) = ws_handles
-        .read()
-        .unwrap()
-        .get(rpc_position)
-        .and_then(|handle| handle.as_ref())
-    {
-        if ws.send(incoming).is_err() {
-            tracing::error!("ws_conn_manager error: failed to send message");
-        }
-    } else {
-        tracing::error!(rpc_position, "No WS connection at index");
+/// Subscriptions that still can't be sent are buffered again.
+async fn unload_buffer(connections: &mut WsConnections, ws_buffer: &mut Vec<Value>) {
+    for incoming in std::mem::take(ws_buffer) {
+        connections.send(incoming, None, ws_buffer).await;
     }
-}
-
-/// Creates new WS connections off of RPCs in `rpc_list`.
-///
-/// Returns a Vec of channels that can be used to send values
-/// to different individual WS connections.
-pub async fn create_ws_vec(
-    rpc_list: &Arc<RwLock<Vec<Rpc>>>,
-    broadcast_tx: &broadcast::Sender<IncomingResponse>,
-    ws_error_tx: &mpsc::UnboundedSender<WsChannelErr>,
-) -> Vec<Option<mpsc::UnboundedSender<Value>>> {
-    let rpc_list_clone = rpc_list
-        .read()
-        .unwrap_or_else(|e| {
-            // Handle the case where the rpc_list RwLock is poisoned
-            tracing::error!(?e);
-            e.into_inner()
-        })
-        .clone();
-    let mut ws_handles = Vec::new();
-
-    for (index, rpc) in rpc_list_clone.iter().enumerate() {
-        let (ws_conn_incoming_tx, ws_conn_incoming_rx) = mpsc::unbounded_channel();
-        ws_handles.push(Some(ws_conn_incoming_tx));
-        ws_conn(
-            rpc.clone(),
-            rpc_list.clone(),
-            ws_conn_incoming_rx,
-            broadcast_tx.clone(),
-            ws_error_tx.clone(),
-            index,
-        )
-        .await;
-    }
-
-    ws_handles
 }
 
 /// Represents a single WS connection to an RPC.
@@ -225,9 +225,13 @@ pub async fn ws_conn(
     mut incoming_rx: mpsc::UnboundedReceiver<Value>,
     broadcast_tx: broadcast::Sender<IncomingResponse>,
     ws_error_tx: mpsc::UnboundedSender<WsChannelErr>,
-    index: usize,
 ) {
-    let ws_stream = match connect_async(&rpc.ws_url.unwrap()).await {
+    let index = rpc.id();
+    let Some(ws_url) = &rpc.ws_url else {
+        tracing::error!("Node {} has no WS endpoint!", rpc.name);
+        return;
+    };
+    let ws_stream = match connect_async(ws_url).await {
         Ok((ws_stream, _)) => ws_stream,
         Err(_) => {
             tracing::error!(
@@ -326,22 +330,24 @@ where
         call
     );
 
-    let id = call["id"].take();
-    let tx_hash = {
-        #[cfg(not(feature = "xxhash"))]
-        {
-            hash(call.to_string().as_bytes())
-        }
-        #[cfg(feature = "xxhash")]
-        {
-            xxh3_64(call.to_string().as_bytes())
-        }
-    };
+    if !call.is_object() {
+        return Ok(invalid_request_body!().to_string());
+    }
 
-    if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
-        let mut cached: Value = from_slice(rax.as_mut()).unwrap();
-        cached["id"] = id;
-        return Ok(cached.to_string());
+    let id = call["id"].take();
+
+    // Rewrite block tags before hashing: `latest` must be cached under the block it
+    // resolved to, not under `latest`. Subscriptions have no block param to rewrite.
+    call = replace_block_tags(&mut call, &cache_args.named_numbers);
+    let call_string = call.to_string();
+    let tx_hash = hash(call_string.as_bytes());
+
+    if !has_block_tag(&call_string) {
+        if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
+            let mut cached: Value = from_slice(rax.as_mut()).unwrap();
+            cached["id"] = id;
+            return Ok(cached.to_string());
+        }
     }
 
     // Remove and unsubscribe user is "eth_unsubscribe"
@@ -388,9 +394,6 @@ where
                 id, rax
             ));
         }
-    } else {
-        // Replace block tags if applicable
-        call = replace_block_tags(&mut call, &cache_args.named_numbers);
     }
 
     call["id"] = user_id.into();
@@ -499,26 +502,71 @@ mod tests {
         )
     }
 
+    /// Connections whose handles go to the returned receivers, by [`Rpc::id`].
+    fn mock_connections(
+        rpc_list: &Arc<RwLock<Vec<Rpc>>>,
+    ) -> (
+        WsConnections,
+        HashMap<usize, mpsc::UnboundedReceiver<Value>>,
+    ) {
+        let (broadcast_tx, _) = broadcast::channel(10);
+        let (ws_error_tx, _) = mpsc::unbounded_channel();
+        let mut handles = HashMap::new();
+        let mut receivers = HashMap::new();
+        for rpc in rpc_list.read().unwrap().iter() {
+            let (tx, rx) = mpsc::unbounded_channel();
+            handles.insert(rpc.id(), tx);
+            receivers.insert(rpc.id(), rx);
+        }
+        let connections = WsConnections {
+            rpc_list: rpc_list.clone(),
+            handles,
+            broadcast_tx,
+            ws_error_tx,
+        };
+        (connections, receivers)
+    }
+
     #[tokio::test]
     async fn test_handle_incoming_message() {
         let rpc_list = create_mock_rpc_list().await;
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let ws_handles = Arc::new(RwLock::new(vec![Some(tx)]));
+        let id = rpc_list.read().unwrap()[1].id();
+        let (mut connections, mut receivers) = mock_connections(&rpc_list);
         let incoming = json!({"type": "test"});
         let mut ws_buffer: Vec<Value> = Vec::new();
 
-        handle_incoming_message(
-            &ws_handles,
-            &rpc_list,
-            incoming.clone(),
-            Some(0),
-            &mut ws_buffer,
-        )
-        .await;
+        connections
+            .send(incoming.clone(), Some(id), &mut ws_buffer)
+            .await;
 
         // Check if the message was sent through the channel
-        let received = rx.recv().await;
+        let received = receivers.get_mut(&id).unwrap().recv().await;
         assert_eq!(received, Some(incoming));
+    }
+
+    #[tokio::test]
+    async fn test_message_goes_to_picked_rpc_after_list_shifts() {
+        let rpc_list = create_mock_rpc_list().await;
+        let (mut connections, mut receivers) = mock_connections(&rpc_list);
+
+        // The health check evicts the first RPC without reconnecting.
+        let evicted = rpc_list.write().unwrap().remove(0);
+        let remaining = rpc_list.read().unwrap()[0].id();
+
+        let incoming = json!({"method": "eth_chainId"});
+        connections
+            .send(incoming.clone(), None, &mut Vec::new())
+            .await;
+
+        assert_eq!(
+            receivers.get_mut(&remaining).unwrap().try_recv().ok(),
+            Some(incoming)
+        );
+        assert!(receivers
+            .get_mut(&evicted.id())
+            .unwrap()
+            .try_recv()
+            .is_err());
     }
 
     #[tokio::test]
@@ -618,6 +666,95 @@ mod tests {
         assert_eq!(
             result.unwrap(),
             "{\"id\":1,\"jsonrpc\":\"2.0\",\"result\":\"0x1a2b3c\"}"
+        );
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_ws_latest_is_cached_per_block() {
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
+        let (broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+        let cache_args = CacheArgs::default();
+        cache_args.named_numbers.write().unwrap().latest = 0x10;
+
+        let call = || {
+            json!({
+                "jsonrpc": "2.0",
+                "id": 5,
+                "method": EthRpcMethod::Call,
+                "params": [{"to": "0x00000000000000000000000000000000000000aa", "data": "0x"}, "latest"]
+            })
+        };
+        let respond = |result: &'static str| {
+            let broadcast_tx = broadcast_tx.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                let response = IncomingResponse {
+                    content: json!({"jsonrpc": "2.0", "id": 1, "result": result}),
+                    node_id: 0,
+                };
+                broadcast_tx.send(response).unwrap();
+            });
+        };
+
+        respond("0xaaaa");
+        let first = execute_ws_call(
+            call(),
+            1,
+            &incoming_tx,
+            broadcast_rx.resubscribe(),
+            &sub_data,
+            &cache_args,
+        )
+        .await
+        .unwrap();
+        assert!(first.contains("0xaaaa"));
+
+        // The head moved, so `latest` must not be answered with block 0x10's result.
+        cache_args.named_numbers.write().unwrap().latest = 0x11;
+        respond("0xbbbb");
+        let second = execute_ws_call(
+            call(),
+            1,
+            &incoming_tx,
+            broadcast_rx.resubscribe(),
+            &sub_data,
+            &cache_args,
+        )
+        .await
+        .unwrap();
+        assert!(second.contains("0xbbbb"), "got stale response {second}");
+    }
+
+    #[tokio::test]
+    async fn test_ws_call_that_is_not_an_object() {
+        let (incoming_tx, mut incoming_rx) = mpsc::unbounded_channel();
+        let (_broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+        let cache_args = CacheArgs::default();
+
+        for call in [
+            json!([{"jsonrpc": "2.0", "id": 1, "method": "eth_chainId"}]),
+            json!(1),
+            json!("eth_chainId"),
+        ] {
+            let response = execute_ws_call(
+                call,
+                1,
+                &incoming_tx,
+                broadcast_rx.resubscribe(),
+                &sub_data,
+                &cache_args,
+            )
+            .await
+            .unwrap();
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["code"], -32600);
+        }
+        assert!(
+            incoming_rx.try_recv().is_err(),
+            "nothing is forwarded upstream"
         );
     }
 

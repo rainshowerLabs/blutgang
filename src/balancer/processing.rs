@@ -134,24 +134,19 @@ where
     }
 }
 
-/// Updates the latency of an RPC node given an rpc list, its position, and the time it took for
+/// Updates the latency of the RPC with the given [`Rpc::id`], given the time it took for
 /// a request to complete.
-pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_position: usize, time: Duration) {
+///
+/// Does nothing if the RPC has left the list since the request was sent.
+pub fn update_rpc_latency(rpc_list: &Arc<RwLock<Vec<Rpc>>>, rpc_id: usize, time: Duration) {
     let mut rpc_list_guard = rpc_list.write().unwrap_or_else(|e| {
         // Handle the case where the RwLock is poisoned
         e.into_inner()
     });
 
-    // Handle weird edge cases ¯\_(ツ)_/¯
-    if !rpc_list_guard.is_empty() {
-        let index = if rpc_position >= rpc_list_guard.len() {
-            rpc_list_guard.len() - 1
-        } else {
-            rpc_position
-        };
-        rpc_list_guard[index].update_latency(time.as_nanos() as f64);
-        rpc_list_guard[index].last_used = time.as_micros();
-        tracing::info!("LA {}", rpc_list_guard[index].status.latency);
+    if let Some(rpc) = rpc_list_guard.iter_mut().find(|rpc| rpc.id() == rpc_id) {
+        rpc.update_latency(time.as_nanos() as f64);
+        tracing::info!("LA {}", rpc.status.latency);
     }
 }
 
@@ -251,16 +246,22 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_update_rpc_latency() {
-        let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".parse().unwrap(),
-            Some("ws://test_rpc".parse().unwrap()),
+    fn test_rpc(name: &str) -> Rpc {
+        Rpc::new(
+            format!("http://{name}").parse().unwrap(),
+            Some(format!("ws://{name}").parse().unwrap()),
             0,
             0,
             1.0,
-        )]));
-        update_rpc_latency(&rpc_list, 0, Duration::from_nanos(100));
+        )
+    }
+
+    #[tokio::test]
+    async fn test_update_rpc_latency() {
+        let rpc = test_rpc("test_rpc");
+        let id = rpc.id();
+        let rpc_list = Arc::new(RwLock::new(vec![rpc]));
+        update_rpc_latency(&rpc_list, id, Duration::from_nanos(100));
 
         let rpcs = rpc_list.read().unwrap();
         assert_eq!(rpcs[0].status.latency, 100.0);
@@ -268,42 +269,26 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_rpc_latency_with_multiple_rpcs() {
-        let rpc_list = Arc::new(RwLock::new(vec![
-            Rpc::new(
-                "http://test_rpc1".parse().unwrap(),
-                Some("ws://test_rpc1".parse().unwrap()),
-                0,
-                0,
-                1.0,
-            ),
-            Rpc::new(
-                "http://test_rpc2".parse().unwrap(),
-                Some("ws://test_rpc2".parse().unwrap()),
-                0,
-                0,
-                1.0,
-            ),
-        ]));
-        update_rpc_latency(&rpc_list, 1, Duration::from_nanos(200));
+        let rpcs = vec![test_rpc("test_rpc1"), test_rpc("test_rpc2")];
+        let id = rpcs[1].id();
+        let rpc_list = Arc::new(RwLock::new(rpcs));
+        update_rpc_latency(&rpc_list, id, Duration::from_nanos(200));
 
         let rpcs = rpc_list.read().unwrap();
+        assert_eq!(rpcs[0].status.latency, 0.0);
         assert_eq!(rpcs[1].status.latency, 200.0);
     }
 
     #[tokio::test]
-    async fn test_update_rpc_latency_with_invalid_position() {
-        let rpc_list = Arc::new(RwLock::new(vec![Rpc::new(
-            "http://test_rpc".parse().unwrap(),
-            Some("ws://test_rpc".parse().unwrap()),
-            0,
-            0,
-            1.0,
-        )]));
-        update_rpc_latency(&rpc_list, 10, Duration::from_nanos(300));
+    async fn test_update_rpc_latency_with_unknown_id() {
+        let rpc = test_rpc("test_rpc");
+        let unknown = test_rpc("removed_rpc").id();
+        let rpc_list = Arc::new(RwLock::new(vec![rpc]));
+        update_rpc_latency(&rpc_list, unknown, Duration::from_nanos(300));
 
-        // Since the position is invalid, it should update the last available RPC
+        // The RPC that served the request is gone, so no other RPC should be charged.
         let rpcs = rpc_list.read().unwrap();
-        assert_eq!(rpcs[0].status.latency, 300.0);
+        assert_eq!(rpcs[0].status.latency, 0.0);
     }
 
     #[tokio::test]
@@ -317,30 +302,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_update_rpc_latency_edge_cases() {
-        let rpc_list = Arc::new(RwLock::new(vec![
-            Rpc::new(
-                "http://test_rpc1".parse().unwrap(),
-                Some("ws://test_rpc1".parse().unwrap()),
-                0,
-                0,
-                1.0,
-            ),
-            Rpc::new(
-                "http://test_rpc2".parse().unwrap(),
-                Some("ws://test_rpc2".parse().unwrap()),
-                0,
-                0,
-                1.0,
-            ),
-        ]));
+    async fn test_update_rpc_latency_after_list_shifts() {
+        let rpcs = vec![test_rpc("test_rpc1"), test_rpc("test_rpc2")];
+        let id = rpcs[1].id();
+        let rpc_list = Arc::new(RwLock::new(rpcs));
 
-        // Test edge case where rpc_position is equal to rpc_list length
-        update_rpc_latency(&rpc_list, 2, Duration::from_nanos(500));
+        // The first RPC is removed while a request to the second is in flight.
+        rpc_list.write().unwrap().remove(0);
+        update_rpc_latency(&rpc_list, id, Duration::from_nanos(500));
+
         let rpcs = rpc_list.read().unwrap();
-        assert_eq!(
-            rpcs[1].status.latency, 500.0,
-            "Should update the last RPC in the list"
-        );
+        assert_eq!(rpcs[0].id(), id);
+        assert_eq!(rpcs[0].status.latency, 500.0);
     }
 }

@@ -7,8 +7,13 @@ services:
     ports:
       - "3000-4000:3000-4000"  # Expose a range of ports from 3000 to 4000 (adjust as needed)
     volumes:
-      - ./:/app
-    working_dir: /app
+      # Blutgang runs as an unprivileged user and creates its cache in /app,
+      # so keep /app in a volume that user owns and mount the config into it.
+      - blutgang-data:/app
+      - ./config.toml:/app/config.toml:ro
+
+volumes:
+  blutgang-data:
 
 networks:
   blutgang_net:

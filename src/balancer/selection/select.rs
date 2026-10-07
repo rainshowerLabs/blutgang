@@ -52,7 +52,7 @@ fn algo(list: &mut [Rpc]) -> (Rpc, Option<usize>) {
     let mut choice_consecutive = 0;
     for i in indices.iter().rev() {
         if list[*i].max_consecutive > list[*i].consecutive
-            && (time - list[*i].last_used > list[*i].min_time_delta)
+            && (time.saturating_sub(list[*i].last_used) > list[*i].min_time_delta)
         {
             choice = *i;
             choice_consecutive = list[*i].consecutive;
@@ -198,6 +198,51 @@ mod tests {
         let (rpc, index) = pick(&mut rpc_list);
         println!("rpc index: {:?}", index);
         assert_eq!(rpc.status.latency, 7.0);
+        assert_eq!(index, Some(1));
+    }
+
+    // A finished request must not reset the time an RPC was last picked,
+    // or `max_per_second` stops applying to it.
+    #[test]
+    fn test_max_per_second_after_request_completes() {
+        let mut limited = Rpc::new(
+            "http://limited".parse().unwrap(),
+            None,
+            10,
+            10_000_000,
+            10.0,
+        );
+        limited.update_latency(1.0);
+        let mut unlimited = Rpc::new("http://unlimited".parse().unwrap(), None, 10, 0, 10.0);
+        unlimited.update_latency(1_000_000_000.0);
+        let (limited_id, unlimited_id) = (limited.id(), unlimited.id());
+        let rpc_list = std::sync::Arc::new(std::sync::RwLock::new(vec![limited, unlimited]));
+
+        let (rpc, _) = pick(&mut rpc_list.write().unwrap());
+        assert_eq!(rpc.id(), limited_id);
+
+        crate::balancer::processing::update_rpc_latency(
+            &rpc_list,
+            limited_id,
+            std::time::Duration::from_micros(500),
+        );
+
+        // `limited` allows one request per 10s, so the next one goes elsewhere.
+        let (rpc, _) = pick(&mut rpc_list.write().unwrap());
+        assert_eq!(rpc.id(), unlimited_id);
+    }
+
+    #[test]
+    fn test_pick_with_last_used_in_the_future() {
+        // The clock can step backwards, leaving `last_used` ahead of now.
+        let mut rpc1 = Rpc::default();
+        rpc1.max_consecutive = 10;
+        rpc1.min_time_delta = 100;
+        rpc1.last_used = u128::MAX;
+        let mut rpc2 = Rpc::default();
+        rpc2.max_consecutive = 10;
+
+        let (_, index) = pick(&mut [rpc1, rpc2]);
         assert_eq!(index, Some(1));
     }
 }

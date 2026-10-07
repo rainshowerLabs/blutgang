@@ -297,7 +297,7 @@ impl Settings {
         if args.clear_cache {
             settings.do_clear = args.clear_cache;
         } else if args.no_clear_cache {
-            settings.do_clear = args.no_clear_cache;
+            settings.do_clear = false;
         } else if let Some(clear_cache) = blutgang.and_then(|blutgang| {
             blutgang
                 .get("clear_cache")
@@ -309,7 +309,7 @@ impl Settings {
         if args.sort_on_startup {
             settings.sort_on_startup = args.sort_on_startup;
         } else if args.no_sort_on_startup {
-            settings.sort_on_startup = args.no_sort_on_startup;
+            settings.sort_on_startup = false;
         } else if let Some(sort_on_startup) = blutgang.and_then(|blutgang| {
             blutgang
                 .get("sort_on_startup")
@@ -321,7 +321,7 @@ impl Settings {
         if args.health_check {
             settings.health_check = args.health_check;
         } else if args.no_health_check {
-            settings.health_check = args.no_health_check;
+            settings.health_check = false;
         } else if let Some(health_check) = blutgang.and_then(|blutgang| {
             blutgang
                 .get("health_check")
@@ -333,7 +333,7 @@ impl Settings {
         if args.header_check {
             settings.header_check = args.header_check;
         } else if args.no_header_check {
-            settings.header_check = args.no_header_check;
+            settings.header_check = false;
         } else if let Some(header_check) = blutgang.and_then(|blutgang| {
             blutgang
                 .get("header_check")
@@ -345,7 +345,7 @@ impl Settings {
         if args.supress_rpc_check {
             settings.supress_rpc_check = args.supress_rpc_check;
         } else if args.no_supress_rpc_check {
-            settings.supress_rpc_check = args.no_supress_rpc_check;
+            settings.supress_rpc_check = false;
         } else if let Some(supress_rpc_check) = blutgang.and_then(|blutgang| {
             blutgang
                 .get("supress_rpc_check")
@@ -359,7 +359,7 @@ impl Settings {
             blutgang.and_then(|blutgang| blutgang.get("admin").and_then(|admin| admin.as_table()));
         let enabled = (args.admin)
             .then_some(args.admin)
-            .or((args.no_admin).then_some(args.no_admin))
+            .or((args.no_admin).then_some(false))
             .or(admin_table.and_then(|admin_table| {
                 admin_table
                     .get("enable")
@@ -367,7 +367,10 @@ impl Settings {
             }))
             .unwrap_or_default();
         if enabled {
-            let mut admin_settings = AdminSettings::default();
+            let mut admin_settings = AdminSettings {
+                enabled: true,
+                ..Default::default()
+            };
 
             let address = args.admin_address.or(admin_table.and_then(|admin_table| {
                 admin_table
@@ -388,7 +391,7 @@ impl Settings {
 
             if let Some(readonly) = (args.admin_readonly)
                 .then_some(args.admin_readonly)
-                .or((args.no_admin_readonly).then_some(args.no_admin_readonly))
+                .or((args.no_admin_readonly).then_some(false))
                 .or(admin_table.and_then(|admin_table| {
                     admin_table
                         .get("readonly")
@@ -399,7 +402,7 @@ impl Settings {
             }
             if let Some(jwt) = (args.admin_jwt)
                 .then_some(args.admin_jwt)
-                .or((args.no_admin_jwt).then_some(args.no_admin_jwt))
+                .or((args.no_admin_jwt).then_some(false))
                 .or(admin_table
                     .and_then(|admin_table| admin_table.get("jwt").and_then(|jwt| jwt.as_bool())))
             {
@@ -563,5 +566,56 @@ mod tests {
             settings.rpc_list.first().unwrap().get_url().as_str(),
             rpc_url
         );
+    }
+
+    fn parse(cli_opts: &[&str], use_config: bool) -> super::Settings {
+        let cli_opts = cli_opts.iter().map(ToString::to_string).collect();
+        super::Settings::try_parse(|| command(cli_opts, use_config)).unwrap()
+    }
+
+    #[test]
+    fn test_admin_enable() {
+        assert!(!parse(&[], false).admin.enabled);
+        assert!(parse(&["--admin"], false).admin.enabled);
+        assert!(!parse(&["--no-admin"], false).admin.enabled);
+
+        let config =
+            std::env::temp_dir().join(format!("blutgang-admin-{}.toml", std::process::id()));
+        std::fs::write(&config, "[blutgang.admin]\nenable = true\n").unwrap();
+        let config = config.to_str().unwrap();
+        assert!(parse(&["-c", config], false).admin.enabled);
+        assert!(!parse(&["-c", config, "--no-admin"], false).admin.enabled);
+        std::fs::remove_file(config).unwrap();
+    }
+
+    #[test]
+    fn test_negated_flags_override_config() {
+        // example_config.toml enables these
+        let settings = parse(
+            &[
+                "--no-sort-on-startup",
+                "--no-health-check",
+                "--no-header-check",
+            ],
+            true,
+        );
+        assert!(!settings.sort_on_startup);
+        assert!(!settings.health_check);
+        assert!(!settings.header_check);
+
+        let settings = parse(
+            &[
+                "--no-clear-cache",
+                "--no-supress-rpc-check",
+                "--admin",
+                "--no-admin-readonly",
+                "--no-admin-jwt",
+            ],
+            false,
+        );
+        assert!(!settings.do_clear);
+        assert!(!settings.supress_rpc_check);
+        assert!(!settings.admin.readonly);
+        assert!(!settings.admin.jwt);
     }
 }

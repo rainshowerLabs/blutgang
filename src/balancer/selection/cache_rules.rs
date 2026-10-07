@@ -14,13 +14,12 @@ pub fn cache_method<M: AsRef<str>>(rx: M) -> bool {
     #[cfg(feature = "no-cache")]
     return false;
 
+    if has_block_tag(&rx) {
+        return false;
+    }
+
     // all of the below cannot be cached properly
     let blacklist = [
-        NamedNumber::Latest.as_ref(),
-        NamedNumber::Earliest.as_ref(),
-        NamedNumber::Safe.as_ref(),
-        NamedNumber::Finalized.as_ref(),
-        NamedNumber::Pending.as_ref(),
         EthRpcMethod::BlockNumber.as_ref(),
         EthRpcMethod::GetTransactionCount.as_ref(),
         EthRpcMethod::Subscribe.as_ref(),
@@ -39,6 +38,23 @@ pub fn cache_method<M: AsRef<str>>(rx: M) -> bool {
     }
 
     true
+}
+
+/// Returns true if the request still names a block by tag (`latest`, `safe`, ...).
+///
+/// A tag points at a different block as the chain moves, so a response to such a
+/// request must never be written to or served from the cache.
+pub fn has_block_tag<M: AsRef<str>>(rx: M) -> bool {
+    let tags = [
+        NamedNumber::Latest,
+        NamedNumber::Earliest,
+        NamedNumber::Safe,
+        NamedNumber::Finalized,
+        NamedNumber::Pending,
+    ];
+
+    tags.iter()
+        .any(|tag| memmem::find(rx.as_ref().as_bytes(), tag.as_ref().as_bytes()).is_some())
 }
 
 // Same as cache_method but for results

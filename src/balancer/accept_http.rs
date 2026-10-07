@@ -9,11 +9,15 @@ use crate::{
             update_rpc_latency,
             CacheArgs,
         },
-        selection::select::pick,
+        selection::{
+            cache_rules::has_block_tag,
+            select::pick,
+        },
     },
     cache_error,
     database::types::GenericBytes,
     db_get,
+    invalid_request,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
@@ -38,14 +42,7 @@ use tokio::sync::{
 
 use serde_json::Value;
 
-// Select either blake3 or xxhash based on the features
-#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
-
-#[cfg(feature = "xxhash")]
-use xxhash_rust::xxh3::xxh3_64;
-#[cfg(feature = "xxhash")]
-use zerocopy::AsBytes; // Impls AsBytes trait for u64
 
 use http_body_util::Full;
 use hyper::{
@@ -168,15 +165,21 @@ macro_rules! get_response {
         $tx:expr,
         $cache_args:expr,
         $tx_hash:expr,
-        $rpc_position:expr,
+        $cacheable:expr,
+        $rpc_id:expr,
         $id:expr,
         $con_params:expr,
         $ttl:expr,
         $max_retries:expr
-    ) => {
-        match db_get!($cache_args.cache, $tx_hash.as_bytes().to_owned().into()) {
+    ) => {{
+        let cached = if $cacheable {
+            db_get!($cache_args.cache, $tx_hash.as_bytes().to_owned().into())
+        } else {
+            Ok(None)
+        };
+        match cached {
             Ok(Some(mut rax)) => {
-                $rpc_position = None;
+                $rpc_id = None;
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(rax.as_mut()).unwrap();
 
@@ -188,7 +191,7 @@ macro_rules! get_response {
                     $tx,
                     $cache_args,
                     $tx_hash,
-                    $rpc_position,
+                    $rpc_id,
                     $id,
                     $con_params,
                     $ttl,
@@ -198,11 +201,11 @@ macro_rules! get_response {
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
                 print_cache_error!();
-                $rpc_position = None;
-                return (cache_error!(), $rpc_position);
+                $rpc_id = None;
+                return (cache_error!(), $rpc_id);
             }
         }
-    };
+    }};
 }
 
 macro_rules! fetch_from_rpc {
@@ -210,7 +213,7 @@ macro_rules! fetch_from_rpc {
         $tx:expr,
         $cache_args:expr,
         $tx_hash:expr,
-        $rpc_position:expr,
+        $rpc_id:expr,
         $id:expr,
         $con_params:expr,
         $ttl:expr,
@@ -224,44 +227,47 @@ macro_rules! fetch_from_rpc {
         let mut retries = 0;
         loop {
             // Get the next Rpc in line.
-            let mut rpc;
+            let rpc;
             {
                 let mut rpc_list_guard = $con_params.rpc_list.write().unwrap_or_else(|e| {
                     // Handle the case where the RwLock is poisoned
                     e.into_inner()
                 });
 
-                (rpc, $rpc_position) = pick(&mut rpc_list_guard);
+                let position;
+                (rpc, position) = pick(&mut rpc_list_guard);
+                $rpc_id = position.map(|_| rpc.id());
             }
             tracing::info!(rpc.name, "Forwarding to");
 
             // Check if we have any RPCs in the list, if not return error
-            if $rpc_position == None {
+            if $rpc_id == None {
                 return (no_rpc_available!(), None);
             }
 
             // Send the request. And return a timeout if it takes too long
             //
             // Check if it contains any errors or if its `latest` and insert it if it isn't
-            match timeout(
-                Duration::from_millis($ttl.try_into().unwrap()),
-                rpc.send_request($tx.clone()),
-            )
-            .await
-            {
-                Ok(rxa) => {
-                    rx = rxa.unwrap();
+            let ttl = Duration::from_millis($ttl.try_into().unwrap());
+            match timeout(ttl, rpc.send_request($tx.clone())).await {
+                Ok(Ok(response)) => {
+                    rx = response;
                     break;
+                }
+                Ok(Err(err)) => {
+                    tracing::warn!(rpc.name, %err, "An RPC request has failed, picking new RPC and retrying.");
                 }
                 Err(_) => {
                     tracing::warn!("An RPC request has timed out, picking new RPC and retrying.");
-                    rpc.update_latency($ttl as f64);
-                    retries += 1;
                 }
             };
 
-            if retries == $max_retries {
-                return (timed_out!(), $rpc_position);
+            // Charge the RPC the whole ttl so that the next pick prefers another one.
+            update_rpc_latency(&$con_params.rpc_list, rpc.id(), ttl);
+            retries += 1;
+
+            if retries >= $max_retries {
+                return (timed_out!(), None);
             }
         }
 
@@ -304,7 +310,28 @@ where
     }
 
     // Convert incoming body to serde value
-    let mut tx = incoming_to_value(tx).await.unwrap();
+    let tx = incoming_to_value(tx).await.unwrap();
+
+    forward_value(tx, con_params, cache_args, params).await
+}
+
+/// Answers an already parsed JSON-RPC request, from the cache if possible.
+async fn forward_value<K, V>(
+    mut tx: Value,
+    con_params: &ConnectionParams,
+    cache_args: CacheArgs<K, V>,
+    params: RequestParams,
+) -> (
+    Result<hyper::Response<Full<Bytes>>, Infallible>,
+    Option<usize>,
+)
+where
+    K: GenericBytes + From<[u8; 32]>,
+    V: GenericBytes + From<Vec<u8>>,
+{
+    if !tx.is_object() {
+        return (invalid_request!(), None);
+    }
 
     // Get the id of the request and set it to 0 for caching
     //
@@ -313,29 +340,23 @@ where
     // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
-    // Hash the request with either blake3 or xxhash depending on the enabled feature
-    let tx_hash;
-    #[cfg(not(feature = "xxhash"))]
-    {
-        tx_hash = hash(tx.to_string().as_bytes());
-    }
-    #[cfg(feature = "xxhash")]
-    {
-        tx_hash = xxh3_64(tx.to_string().as_bytes());
-    }
-
-    // RPC used to get the response, we use it to update the latency for it later.
-    let mut rpc_position;
-
-    // Rewrite named block parameters if possible
+    // Rewrite named block parameters if possible, and only then hash the request:
+    // `latest` must be cached under the block it resolved to, not under `latest`.
     let mut tx = replace_block_tags(&mut tx, &cache_args.named_numbers);
+    let tx_string = tx.to_string();
+    let tx_hash = hash(tx_string.as_bytes());
+    let cacheable = !has_block_tag(&tx_string);
+
+    // Id of the RPC used to get the response, we use it to update its latency later.
+    let mut rpc_id;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
         tx,
         cache_args,
         tx_hash,
-        rpc_position,
+        cacheable,
+        rpc_id,
         id,
         con_params,
         params.ttl,
@@ -356,7 +377,7 @@ where
         .body(body)
         .unwrap();
 
-    (Ok(res), rpc_position)
+    (Ok(res), rpc_id)
 }
 
 /// Forward the request to *a* RPC picked by the algo set by the user.
@@ -417,7 +438,7 @@ where
 
     // Send request
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
-    let rpc_position: Option<usize>;
+    let rpc_id: Option<usize>;
 
     // RequestParams from config
     let params = {
@@ -434,19 +455,296 @@ where
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, &connection_params, cache_args, params).await;
+    (response, rpc_id) = forward_body(tx, &connection_params, cache_args, params).await;
 
     let time = time.elapsed();
     tracing::info!(?time, "Request time");
 
-    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // `rpc_id` is an Option<> that either contains the id of the RPC
     // we forwarded our request to, or is None if the result was cached.
     //
     // Here, we update the latency of the RPC that was used to process the request
-    // if `rpc_position` is Some.
-    if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&connection_params.rpc_list, rpc_position, time);
+    // if `rpc_id` is Some.
+    if let Some(rpc_id) = rpc_id {
+        update_rpc_latency(&connection_params.rpc_list, rpc_id, time);
     }
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::accept::db_insert;
+    use http_body_util::BodyExt;
+    use serde_json::json;
+    use std::sync::atomic::{
+        AtomicUsize,
+        Ordering,
+    };
+    use tokio::{
+        io::{
+            AsyncReadExt,
+            AsyncWriteExt,
+        },
+        net::{
+            TcpListener,
+            TcpStream,
+        },
+    };
+
+    /// Reads one HTTP request (headers and body) so the response isn't sent early.
+    async fn read_request(stream: &mut TcpStream) {
+        let mut buf = Vec::new();
+        let mut chunk = [0u8; 4096];
+        loop {
+            let n = stream.read(&mut chunk).await.unwrap_or(0);
+            if n == 0 {
+                return;
+            }
+            buf.extend_from_slice(&chunk[..n]);
+            if let Some(end) = memchr::memmem::find(&buf, b"\r\n\r\n") {
+                let headers = String::from_utf8_lossy(&buf[..end]).to_lowercase();
+                let len = headers
+                    .lines()
+                    .find_map(|line| line.strip_prefix("content-length:"))
+                    .and_then(|len| len.trim().parse::<usize>().ok())
+                    .unwrap_or(0);
+                if buf.len() >= end + 4 + len {
+                    return;
+                }
+            }
+        }
+    }
+
+    /// An upstream RPC whose result is the number of requests it has received,
+    /// so a cache hit can be told apart from a fresh answer.
+    async fn counting_upstream() -> (url::Url, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let hits = Arc::new(AtomicUsize::new(0));
+        let counter = hits.clone();
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let n = counter.fetch_add(1, Ordering::SeqCst) + 1;
+                tokio::spawn(async move {
+                    read_request(&mut stream).await;
+                    let body = format!(r#"{{"jsonrpc":"2.0","id":1,"result":"0x{n:x}"}}"#);
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = stream.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+        (url, hits)
+    }
+
+    /// An upstream RPC that refuses connections.
+    async fn dead_upstream() -> url::Url {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        drop(listener);
+        url
+    }
+
+    fn connection_params(rpc_list: Vec<Rpc>) -> ConnectionParams {
+        let (_finalized_tx, finalized_rx) = watch::channel(0);
+        let (incoming_tx, _incoming_rx) = mpsc::unbounded_channel();
+        let (_outgoing_tx, outgoing_rx) = broadcast::channel(1);
+        ConnectionParams::new(
+            &Arc::new(RwLock::new(rpc_list)),
+            RequestChannels::new(Arc::new(finalized_rx), incoming_tx, outgoing_rx),
+            &Arc::new(SubscriptionData::new()),
+            &Arc::new(RwLock::new(Settings::default())),
+        )
+    }
+
+    fn request_params() -> RequestParams {
+        RequestParams {
+            ttl: 1000,
+            max_retries: 3,
+            header_check: false,
+        }
+    }
+
+    async fn result_of(
+        response: (
+            Result<hyper::Response<Full<Bytes>>, Infallible>,
+            Option<usize>,
+        ),
+    ) -> Value {
+        let body = response.0.unwrap().into_body().collect().await.unwrap();
+        let body: Value = serde_json::from_slice(&body.to_bytes()).unwrap();
+        body["result"].clone()
+    }
+
+    fn get_balance(block: &str) -> Value {
+        json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "eth_getBalance",
+            "params": ["0x00000000000000000000000000000000000000aa", block],
+        })
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_latest_is_cached_per_block() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+        let cache_args = CacheArgs::default();
+        cache_args.named_numbers.write().unwrap().latest = 0x10;
+
+        let first = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(first.await).await, "0x1");
+
+        // Same head: the answer for block 0x10 comes from the cache.
+        let second = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(second.await).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+
+        // The head moved, so `latest` must not be answered with block 0x10's result.
+        cache_args.named_numbers.write().unwrap().latest = 0x11;
+        let third = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(third.await).await, "0x2");
+        assert_eq!(hits.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_unresolved_block_tag_skips_cache() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+        let cache_args = CacheArgs::default();
+
+        // Older versions cached `latest` under the tag itself. With no known head the
+        // tag can't be resolved, and such a stale entry must not be served.
+        let mut stale_key = get_balance("latest");
+        stale_key["id"] = Value::Null;
+        drop(
+            db_insert(
+                &cache_args.cache,
+                *hash(stale_key.to_string().as_bytes()).as_bytes(),
+                br#"{"jsonrpc":"2.0","id":null,"result":"0xdead"}"#.to_vec(),
+            )
+            .await,
+        );
+
+        let response = forward_value(
+            get_balance("latest"),
+            &con_params,
+            cache_args.clone(),
+            request_params(),
+        );
+        assert_eq!(result_of(response.await).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_fails_over_when_rpc_is_unreachable() {
+        let (url, hits) = counting_upstream().await;
+        let dead = Rpc::new(dead_upstream().await, None, 10, 0, 10.0);
+        let dead_id = dead.id();
+        let mut alive = Rpc::new(url, None, 10, 0, 10.0);
+        // Make sure the dead RPC is picked first.
+        alive.update_latency(1_000.0);
+        let con_params = connection_params(vec![dead, alive]);
+
+        let (response, rpc_id) = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            request_params(),
+        )
+        .await;
+
+        assert_eq!(result_of((response, rpc_id)).await, "0x1");
+        assert_eq!(hits.load(Ordering::SeqCst), 1);
+        assert_ne!(rpc_id, Some(dead_id));
+        // The unreachable RPC was charged for its failure.
+        let rpc_list = con_params.rpc_list.read().unwrap();
+        let dead = rpc_list.iter().find(|rpc| rpc.id() == dead_id).unwrap();
+        assert!(dead.status.latency > 1_000.0);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_gives_up_when_every_rpc_is_unreachable() {
+        let con_params =
+            connection_params(vec![Rpc::new(dead_upstream().await, None, 10, 0, 10.0)]);
+
+        let (response, rpc_id) = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            request_params(),
+        )
+        .await;
+
+        assert_eq!(response.unwrap().status(), 408);
+        assert_eq!(rpc_id, None);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_zero_max_retries_still_gives_up() {
+        let con_params =
+            connection_params(vec![Rpc::new(dead_upstream().await, None, 10, 0, 10.0)]);
+        let params = RequestParams {
+            max_retries: 0,
+            ..request_params()
+        };
+
+        let request = forward_value(
+            get_balance("0x10"),
+            &con_params,
+            CacheArgs::default(),
+            params,
+        );
+        let (response, _) = tokio::time::timeout(Duration::from_secs(5), request)
+            .await
+            .expect("retried forever");
+        assert_eq!(response.unwrap().status(), 408);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_request_that_is_not_an_object() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+
+        let batch = json!([get_balance("0x10"), get_balance("0x11")]);
+        let (response, rpc_id) =
+            forward_value(batch, &con_params, CacheArgs::default(), request_params()).await;
+
+        let response = response.unwrap();
+        assert_eq!(response.status(), 400);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error"]["code"], -32600);
+        assert_eq!(rpc_id, None);
+        assert_eq!(hits.load(Ordering::SeqCst), 0);
+    }
 }
