@@ -63,12 +63,6 @@ toml = "0.8"
 tracing = "0.1"
 tungstenite = "0.20.1"
 url = "2.4.0"
-xxhash-rust = { version = "0.8.7", features = [
-  "xxh3",
-  "const_xxh3",
-], optional = true }
-zerocopy = { version = "0.7.20", features = ["simd", "alloc"] }
-zerocopy-derive = "0.7.28"
 
 [dev-dependencies]
 serial_test = "3.2"
@@ -87,7 +81,6 @@ journald = []
 default = ["selection-weighed-round-robin", "rocksdb", "sled"]
 sled = ["dep:sled"]
 rocksdb = ["dep:rocksdb"]
-xxhash = ["xxhash-rust"]                                       # 4x faster hashing but potentially less secure
 no-cache = []                                                  # enable this to disable caching
 selection-weighed-round-robin = []                             # default algo
 selection-random = []                                          # optional random algo

@@ -52,11 +52,7 @@ use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
 
-#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
-
-#[cfg(feature = "xxhash")]
-use xxhash_rust::xxh3::xxh3_64;
 
 /// Accepts incoming internal WS messages.
 ///
@@ -327,16 +323,7 @@ where
     );
 
     let id = call["id"].take();
-    let tx_hash = {
-        #[cfg(not(feature = "xxhash"))]
-        {
-            hash(call.to_string().as_bytes())
-        }
-        #[cfg(feature = "xxhash")]
-        {
-            xxh3_64(call.to_string().as_bytes())
-        }
-    };
+    let tx_hash = hash(call.to_string().as_bytes());
 
     if let Ok(Some(mut rax)) = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned().into()) {
         let mut cached: Value = from_slice(rax.as_mut()).unwrap();

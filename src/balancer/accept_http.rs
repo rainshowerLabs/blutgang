@@ -38,14 +38,7 @@ use tokio::sync::{
 
 use serde_json::Value;
 
-// Select either blake3 or xxhash based on the features
-#[cfg(not(feature = "xxhash"))]
 use blake3::hash;
-
-#[cfg(feature = "xxhash")]
-use xxhash_rust::xxh3::xxh3_64;
-#[cfg(feature = "xxhash")]
-use zerocopy::AsBytes; // Impls AsBytes trait for u64
 
 use http_body_util::Full;
 use hyper::{
@@ -313,16 +306,7 @@ where
     // and does not impact the request result.
     let id = tx["id"].take().as_u64().unwrap_or(0);
 
-    // Hash the request with either blake3 or xxhash depending on the enabled feature
-    let tx_hash;
-    #[cfg(not(feature = "xxhash"))]
-    {
-        tx_hash = hash(tx.to_string().as_bytes());
-    }
-    #[cfg(feature = "xxhash")]
-    {
-        tx_hash = xxh3_64(tx.to_string().as_bytes());
-    }
+    let tx_hash = hash(tx.to_string().as_bytes());
 
     // RPC used to get the response, we use it to update the latency for it later.
     let mut rpc_position;

@@ -40,23 +40,11 @@ pub fn setup_data<DB: GenericDatabase>(cache: &DB, do_clear: bool) {
         version_json.as_bytes(),
     );
 
-    // Insert which hashing algo we're using based on the selected features.
-    // If `xxhash` is enabled we're using xxhash3, otherwise blake3.
-    //
-    // Print a warning if we see an keys are in an unexpectd hash format.
-    if cfg!(feature = "xxhash") {
-        let _ = cache.write(b"xxhash", b"true");
-        if cache.read(b"blake3").unwrap().is_some() {
-            tracing::error!("Blutgang has detected that your DB is using blake3 while we're currently using xxhash! \
-                Please remove all cache entries and try again.");
-            tracing::info!("If you believe this is an error, please open a pull request!");
-        }
-    } else {
-        let _ = cache.write(b"blake3", b"true");
-        if cache.read(b"xxhash").unwrap().is_some() {
-            tracing::error!("Blutgang has detected that your DB is using xxhash while we're currently using blake3! \
-                Please remove all cache entries and try again.");
-            tracing::info!("If you believe this is an error, please open a pull request!");
-        }
+    // Cache keys are blake3 hashes. Older builds could be compiled with an `xxhash`
+    // feature that keyed the cache differently, so warn if we find one of their DBs.
+    let _ = cache.write(b"blake3", b"true");
+    if cache.read(b"xxhash").unwrap().is_some() {
+        tracing::error!("Blutgang has detected that your DB is using xxhash while we're currently using blake3! \
+            Please remove all cache entries and try again.");
     }
 }
