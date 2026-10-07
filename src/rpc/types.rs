@@ -4,6 +4,10 @@ use crate::rpc::{
 };
 use reqwest::Client;
 use rust_tracing::deps::metrics;
+use std::sync::atomic::{
+    AtomicUsize,
+    Ordering,
+};
 use url::Url;
 
 use serde_json::{
@@ -27,8 +31,12 @@ pub struct Status {
     // pub throughput: f64,
 }
 
+/// Source of [`Rpc::id`]s.
+static NEXT_RPC_ID: AtomicUsize = AtomicUsize::new(0);
+
 #[derive(Debug, Clone)]
 pub struct Rpc {
+    id: usize,                    // stable identifier, kept by clones
     pub name: String,             // sanitized name for appearing in logs
     url: url::Url,                // url of the rpc we're forwarding requests to.
     client: Client,               // Reqwest client
@@ -64,6 +72,7 @@ fn sanitize_url(url: &url::Url) -> Result<String, url::ParseError> {
 impl Default for Rpc {
     fn default() -> Self {
         Self {
+            id: NEXT_RPC_ID.fetch_add(1, Ordering::Relaxed),
             name: "".to_string(),
             url: "https://eth.merkle.io".parse().unwrap(),
             ws_url: None,
@@ -87,6 +96,7 @@ impl Rpc {
         ma_length: f64,
     ) -> Self {
         Self {
+            id: NEXT_RPC_ID.fetch_add(1, Ordering::Relaxed),
             name: sanitize_url(&url).unwrap_or(url.to_string()),
             url,
             client: Client::new(),
@@ -100,6 +110,12 @@ impl Rpc {
             last_used: 0,
             min_time_delta,
         }
+    }
+
+    /// Identifies this RPC across the RPC and poverty lists, whose positions shift
+    /// as RPCs are added, removed and moved between them.
+    pub fn id(&self) -> usize {
+        self.id
     }
 
     /// Explicitly get the url of the Rpc, potentially dangerous as it can expose basic auth

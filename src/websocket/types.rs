@@ -33,7 +33,7 @@ impl From<RequestResult> for Value {
 /// WsconnMessage enum
 #[derive(Debug)]
 pub enum WsconnMessage {
-    // call received from user and optional node index
+    // call received from user and optional node, by `Rpc::id`
     Message(Value, Option<usize>),
     Reconnect(),
 }
@@ -50,6 +50,7 @@ impl From<WsconnMessage> for Value {
 /// WsChannelErr enum
 #[derive(Debug, Clone)]
 pub enum WsChannelErr {
+    /// The WS connection to the RPC with this `Rpc::id` closed.
     Closed(usize),
 }
 
@@ -57,6 +58,7 @@ pub type UserData = mpsc::UnboundedSender<RequestResult>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NodeSubInfo {
+    /// `Rpc::id` of the node holding the subscription.
     pub node_id: usize,
     pub subscription_id: String,
 }
@@ -64,6 +66,7 @@ pub struct NodeSubInfo {
 #[derive(Debug, Clone)]
 pub struct IncomingResponse {
     pub content: Value,
+    /// `Rpc::id` of the node that sent this.
     pub node_id: usize,
 }
 

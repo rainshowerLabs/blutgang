@@ -165,7 +165,7 @@ macro_rules! get_response {
         $cache_args:expr,
         $tx_hash:expr,
         $cacheable:expr,
-        $rpc_position:expr,
+        $rpc_id:expr,
         $id:expr,
         $con_params:expr,
         $ttl:expr,
@@ -178,7 +178,7 @@ macro_rules! get_response {
         };
         match cached {
             Ok(Some(mut rax)) => {
-                $rpc_position = None;
+                $rpc_id = None;
                 // Reconstruct ID
                 let mut cached: Value = simd_json::serde::from_slice(rax.as_mut()).unwrap();
 
@@ -190,7 +190,7 @@ macro_rules! get_response {
                     $tx,
                     $cache_args,
                     $tx_hash,
-                    $rpc_position,
+                    $rpc_id,
                     $id,
                     $con_params,
                     $ttl,
@@ -200,8 +200,8 @@ macro_rules! get_response {
             Err(_) => {
                 // If anything errors send an rpc request and see if it works, if not then gg
                 print_cache_error!();
-                $rpc_position = None;
-                return (cache_error!(), $rpc_position);
+                $rpc_id = None;
+                return (cache_error!(), $rpc_id);
             }
         }
     }};
@@ -212,7 +212,7 @@ macro_rules! fetch_from_rpc {
         $tx:expr,
         $cache_args:expr,
         $tx_hash:expr,
-        $rpc_position:expr,
+        $rpc_id:expr,
         $id:expr,
         $con_params:expr,
         $ttl:expr,
@@ -233,12 +233,14 @@ macro_rules! fetch_from_rpc {
                     e.into_inner()
                 });
 
-                (rpc, $rpc_position) = pick(&mut rpc_list_guard);
+                let position;
+                (rpc, position) = pick(&mut rpc_list_guard);
+                $rpc_id = position.map(|_| rpc.id());
             }
             tracing::info!(rpc.name, "Forwarding to");
 
             // Check if we have any RPCs in the list, if not return error
-            if $rpc_position == None {
+            if $rpc_id == None {
                 return (no_rpc_available!(), None);
             }
 
@@ -263,7 +265,7 @@ macro_rules! fetch_from_rpc {
             };
 
             if retries == $max_retries {
-                return (timed_out!(), $rpc_position);
+                return (timed_out!(), $rpc_id);
             }
         }
 
@@ -339,8 +341,8 @@ where
     let tx_hash = hash(tx_string.as_bytes());
     let cacheable = !has_block_tag(&tx_string);
 
-    // RPC used to get the response, we use it to update the latency for it later.
-    let mut rpc_position;
+    // Id of the RPC used to get the response, we use it to update its latency later.
+    let mut rpc_id;
 
     // Get the response from either the DB or from a RPC. If it timeouts, retry.
     let rax = get_response!(
@@ -348,7 +350,7 @@ where
         cache_args,
         tx_hash,
         cacheable,
-        rpc_position,
+        rpc_id,
         id,
         con_params,
         params.ttl,
@@ -369,7 +371,7 @@ where
         .body(body)
         .unwrap();
 
-    (Ok(res), rpc_position)
+    (Ok(res), rpc_id)
 }
 
 /// Forward the request to *a* RPC picked by the algo set by the user.
@@ -430,7 +432,7 @@ where
 
     // Send request
     let response: Result<hyper::Response<Full<Bytes>>, Infallible>;
-    let rpc_position: Option<usize>;
+    let rpc_id: Option<usize>;
 
     // RequestParams from config
     let params = {
@@ -447,18 +449,18 @@ where
     //
     // Also handle cache insertions.
     let time = Instant::now();
-    (response, rpc_position) = forward_body(tx, &connection_params, cache_args, params).await;
+    (response, rpc_id) = forward_body(tx, &connection_params, cache_args, params).await;
 
     let time = time.elapsed();
     tracing::info!(?time, "Request time");
 
-    // `rpc_position` is an Option<> that either contains the index of the RPC
+    // `rpc_id` is an Option<> that either contains the id of the RPC
     // we forwarded our request to, or is None if the result was cached.
     //
     // Here, we update the latency of the RPC that was used to process the request
-    // if `rpc_position` is Some.
-    if let Some(rpc_position) = rpc_position {
-        update_rpc_latency(&connection_params.rpc_list, rpc_position, time);
+    // if `rpc_id` is Some.
+    if let Some(rpc_id) = rpc_id {
+        update_rpc_latency(&connection_params.rpc_list, rpc_id, time);
     }
 
     response
