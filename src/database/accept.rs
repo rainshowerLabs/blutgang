@@ -16,7 +16,7 @@ use tokio::sync::{
 /// Processes incoming requests from clients and returns responses
 pub async fn database_processing<K, V, DB>(
     mut rax: tokio::sync::mpsc::UnboundedReceiver<DbRequest<K, V>>,
-    cache: DB,
+    mut cache: DB,
 ) where
     DB: GenericDatabase,
     K: GenericBytes,
@@ -33,10 +33,13 @@ pub async fn database_processing<K, V, DB>(
         if result.is_err() {
             tracing::error!("Db failed to send response back: {:?}", result.err());
             let _ = incoming.sender.send(None);
-            continue;
+        } else {
+            let _ = incoming.sender.send(result.ok().flatten());
         }
 
-        let _ = incoming.sender.send(result.ok().flatten());
+        if let Err(err) = cache.maintain() {
+            tracing::error!(?err, "Db maintenance failed");
+        }
     }
 }
 

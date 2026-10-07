@@ -220,7 +220,7 @@ macro_rules! fetch_from_rpc {
         $tx["id"] = $id.into();
 
         // Loop until we get a response
-        let mut rx;
+        let rx;
         let mut retries = 0;
         loop {
             // Get the next Rpc in line.
@@ -266,7 +266,7 @@ macro_rules! fetch_from_rpc {
         }
 
         // Don't cache responses that contain errors or missing trie nodes
-        cache_query(&mut rx, $tx, $tx_hash, &$cache_args);
+        cache_query(&rx, $tx, $tx_hash, &$cache_args).await;
 
         rx
     }};

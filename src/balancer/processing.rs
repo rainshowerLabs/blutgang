@@ -81,12 +81,8 @@ pub fn can_cache<M: AsRef<str>>(method: M, result: &str) -> bool {
 }
 
 /// Check if we should cache the query, and if so cache it in the DB
-pub async fn cache_query<K, V>(
-    rx: &mut str,
-    method: Value,
-    tx_hash: Hash,
-    cache_args: &CacheArgs<K, V>,
-) where
+pub async fn cache_query<K, V>(rx: &str, method: Value, tx_hash: Hash, cache_args: &CacheArgs<K, V>)
+where
     K: GenericBytes + From<[u8; 32]>,
     V: GenericBytes + From<Vec<u8>>,
 {
@@ -112,7 +108,14 @@ pub async fn cache_query<K, V>(
             // In this case we just skip inserting it into the DB as its an error.
             //
             // TODO: kinda cringe how we do this gymnasctics of changing things back and forth
-            let mut rx_value: Value = unsafe { simd_json::serde::from_str(rx).unwrap() };
+            //
+            // simd-json parses in place and rewrites its input, so parse a copy: `rx` is
+            // still sent to the client.
+            let Ok(mut rx_value) =
+                simd_json::serde::from_slice::<Value>(&mut rx.as_bytes().to_vec())
+            else {
+                return;
+            };
             if let Some(id) = rx_value.get_mut("id") {
                 *id = Value::Null;
             } else {
@@ -183,11 +186,11 @@ mod tests {
     #[serial_test::serial]
     async fn test_cache_query() {
         let cache_args = CacheArgs::default();
-        let mut rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#.to_string();
+        let rx = r#"{"jsonrpc":"2.0","result":"0x1","id":1}"#;
         let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
+        cache_query(rx, method.clone(), tx_hash, &cache_args).await;
 
         let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned())
             .unwrap()
@@ -198,13 +201,48 @@ mod tests {
 
     #[tokio::test]
     #[serial_test::serial]
-    async fn test_cache_infura_error_query() {
+    async fn test_cache_query_leaves_response_untouched() {
         let cache_args = CacheArgs::default();
-        let mut rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#.to_string();
+        // The response is sent to the client after caching it, so escapes must survive.
+        let response = r#"{"jsonrpc":"2.0","result":"say \"hi\"\nto é","id":1}"#;
+        let rx = response.to_string();
         let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
         let tx_hash = blake3::hash(method.to_string().as_bytes());
 
-        cache_query(&mut rx, method.clone(), tx_hash, &cache_args).await;
+        cache_query(&rx, method, tx_hash, &cache_args).await;
+
+        assert_eq!(rx, response);
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            std::str::from_utf8(&cached_value).unwrap(),
+            r#"{"id":null,"jsonrpc":"2.0","result":"say \"hi\"\nto é"}"#
+        );
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_cache_query_skips_invalid_json() {
+        let cache_args = CacheArgs::default();
+        let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
+
+        cache_query("<html>502 Bad Gateway</html>", method, tx_hash, &cache_args).await;
+
+        let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned()).unwrap();
+        assert!(cached_value.is_none());
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_cache_infura_error_query() {
+        let cache_args = CacheArgs::default();
+        let rx = r#"{ "code": -32005, "data": { "see": "https://infura.io/dashboard" }, "message": "daily request count exceeded, request rate limited" }, payload={ "id": 12449, "jsonrpc": "2.0", "method": "eth_blockNumber", "params": [  ] }"#;
+        let method = json!({"method": EthRpcMethod::GetBlockByNumber, "params": ["0x10", false]});
+        let tx_hash = blake3::hash(method.to_string().as_bytes());
+
+        cache_query(rx, method.clone(), tx_hash, &cache_args).await;
 
         let cached_value = db_get!(cache_args.cache, tx_hash.as_bytes().to_owned()).unwrap();
         assert!(

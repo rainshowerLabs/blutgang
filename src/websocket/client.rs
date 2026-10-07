@@ -415,7 +415,7 @@ where
         sub_data.register_subscription(call.clone(), sub_id.clone(), response.node_id);
         sub_data.subscribe_user(user_id, call)?;
     } else {
-        cache_query(&mut response.content.to_string(), call, tx_hash, cache_args).await;
+        cache_query(&response.content.to_string(), call, tx_hash, cache_args).await;
     }
 
     response.content["id"] = id;
