@@ -13,6 +13,7 @@ use crate::{
     },
     database::types::GenericBytes,
     db_get,
+    invalid_request_body,
     rpc::{
         method::EthRpcMethod,
         types::Rpc,
@@ -328,6 +329,10 @@ where
         user_id,
         call
     );
+
+    if !call.is_object() {
+        return Ok(invalid_request_body!().to_string());
+    }
 
     let id = call["id"].take();
 
@@ -720,6 +725,37 @@ mod tests {
         .await
         .unwrap();
         assert!(second.contains("0xbbbb"), "got stale response {second}");
+    }
+
+    #[tokio::test]
+    async fn test_ws_call_that_is_not_an_object() {
+        let (incoming_tx, mut incoming_rx) = mpsc::unbounded_channel();
+        let (_broadcast_tx, broadcast_rx) = broadcast::channel(10);
+        let sub_data = Arc::new(SubscriptionData::new());
+        let cache_args = CacheArgs::default();
+
+        for call in [
+            json!([{"jsonrpc": "2.0", "id": 1, "method": "eth_chainId"}]),
+            json!(1),
+            json!("eth_chainId"),
+        ] {
+            let response = execute_ws_call(
+                call,
+                1,
+                &incoming_tx,
+                broadcast_rx.resubscribe(),
+                &sub_data,
+                &cache_args,
+            )
+            .await
+            .unwrap();
+            let response: Value = serde_json::from_str(&response).unwrap();
+            assert_eq!(response["error"]["code"], -32600);
+        }
+        assert!(
+            incoming_rx.try_recv().is_err(),
+            "nothing is forwarded upstream"
+        );
     }
 
     #[tokio::test]

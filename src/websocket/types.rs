@@ -384,30 +384,47 @@ impl SubscriptionData {
             subscription_id: subscription_id.to_string(),
         };
 
-        let users = self.users.read().unwrap_or_else(|e| e.into_inner());
-        if let Some(subscribers) = self.subscriptions.read().unwrap().get(&node_sub_info) {
-            if subscribers.is_empty() {
-                self.unregister_subscription(subscription_id.to_string());
-                tracing::info!(
-                    subscription_id,
-                    "No more users to send subscription to: Unsubscribing from ID",
-                );
-                return Ok(true);
-            }
-            for &user_id in subscribers {
-                if let Some(user) = users.get(&user_id) {
-                    tracing::debug!("Sending user_id {:?} subscription: {:?}", user_id, message);
-                    match user.send(message.clone()) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            tracing::warn!(
-                                "user_id {} unsubscribed without closing channel! Removing.",
-                                user_id
-                            );
-                            let _ = &self.unsubscribe_user(user_id, subscription_id.to_string());
-                        }
-                    };
+        // Collect the recipients and release the locks before sending: removing a
+        // user whose channel is closed needs them for writing, and taking a write
+        // lock while this thread still holds a read lock on it deadlocks.
+        let recipients = {
+            let users = self.users.read().unwrap_or_else(|e| e.into_inner());
+            let subscriptions = self.subscriptions.read().unwrap_or_else(|e| e.into_inner());
+
+            match subscriptions.get(&node_sub_info) {
+                None => return Ok(false),
+                Some(subscribers) if subscribers.is_empty() => None,
+                Some(subscribers) => {
+                    Some(
+                        subscribers
+                            .iter()
+                            .filter_map(|user_id| {
+                                users.get(user_id).map(|user| (*user_id, user.clone()))
+                            })
+                            .collect::<Vec<_>>(),
+                    )
                 }
+            }
+        };
+
+        let Some(recipients) = recipients else {
+            self.unregister_subscription(subscription_id.to_string());
+            tracing::info!(
+                subscription_id,
+                "No more users to send subscription to: Unsubscribing from ID",
+            );
+            return Ok(true);
+        };
+
+        for (user_id, user) in recipients {
+            tracing::debug!("Sending user_id {:?} subscription: {:?}", user_id, message);
+            if user.send(message.clone()).is_err() {
+                // The user's connection is gone, so it won't receive anything else either.
+                tracing::warn!(
+                    "user_id {} unsubscribed without closing channel! Removing.",
+                    user_id
+                );
+                self.remove_user(user_id);
             }
         }
 
@@ -900,5 +917,47 @@ mod tests {
             .dispatch_to_subscribers(&nonexistent_subscription_id, nonexistent_node_id, &message)
             .await;
         assert!(dispatch_result.is_ok()); // Should succeed as it should handle subscriptions with no users gracefully
+    }
+
+    #[test]
+    fn test_dispatch_to_closed_user_channel() {
+        let sub_data = Arc::new(SubscriptionData::new());
+        let (dead_tx, dead_rx) = mpsc::unbounded_channel();
+        let (live_tx, mut live_rx) = mpsc::unbounded_channel();
+        sub_data.add_user(1, dead_tx);
+        sub_data.add_user(2, live_tx);
+
+        let request = json!({"jsonrpc": "2.0", "id": 1, "method": EthRpcMethod::Subscribe, "params": ["newHeads"]});
+        sub_data.register_subscription(request.clone(), "0xsub".to_string(), 0);
+        sub_data.subscribe_user(1, request.clone()).unwrap();
+        sub_data.subscribe_user(2, request).unwrap();
+
+        // User 1's connection task died without removing the user.
+        drop(dead_rx);
+
+        // Removing user 1 used to take the subscriptions write lock while this thread still
+        // held its read lock, so run the dispatch on another thread with a deadline.
+        let dispatch_sub_data = sub_data.clone();
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap();
+            let result = runtime.block_on(dispatch_sub_data.dispatch_to_subscribers(
+                "0xsub",
+                0,
+                &RequestResult::Subscription(json!({"params": {"subscription": "0xsub"}})),
+            ));
+            let _ = done_tx.send(result.is_ok());
+        });
+        let dispatched = done_rx
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .expect("dispatch_to_subscribers deadlocked or panicked");
+        assert!(dispatched);
+
+        // The live user got the message and the dead one is gone.
+        assert!(live_rx.try_recv().is_ok());
+        assert_eq!(sub_data.get_users_for_subscription("0xsub"), vec![2]);
+        assert!(!sub_data.users.read().unwrap().contains_key(&1));
     }
 }

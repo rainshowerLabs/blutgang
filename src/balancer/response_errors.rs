@@ -60,3 +60,22 @@ macro_rules! rpc_response {
             .unwrap())
     };
 }
+
+/// JSON-RPC error for a request that isn't a single request object, e.g. a batch.
+#[macro_export]
+macro_rules! invalid_request_body {
+    () => {
+        r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32600,"message":"Invalid request: expected a single JSON-RPC request object"}}"#
+    };
+}
+
+#[macro_export]
+macro_rules! invalid_request {
+    () => {
+        Ok(hyper::Response::builder()
+            .status(400)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from($crate::invalid_request_body!())))
+            .unwrap())
+    };
+}

@@ -8,6 +8,7 @@ use crate::{
         GenericBytes,
         RequestBus,
     },
+    invalid_request,
 };
 use http_body_util::Full;
 use hyper::{
@@ -107,6 +108,10 @@ where
     K: GenericBytes,
     V: GenericBytes,
 {
+    if !tx.is_object() {
+        return invalid_request!();
+    }
+
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the

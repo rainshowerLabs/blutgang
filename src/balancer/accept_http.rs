@@ -17,6 +17,7 @@ use crate::{
     cache_error,
     database::types::GenericBytes,
     db_get,
+    invalid_request,
     no_rpc_available,
     print_cache_error,
     rpc::types::Rpc,
@@ -328,6 +329,10 @@ where
     K: GenericBytes + From<[u8; 32]>,
     V: GenericBytes + From<Vec<u8>>,
 {
+    if !tx.is_object() {
+        return (invalid_request!(), None);
+    }
+
     // Get the id of the request and set it to 0 for caching
     //
     // We're doing this ID gymnastics because we're hashing the
@@ -722,5 +727,24 @@ mod tests {
             .await
             .expect("retried forever");
         assert_eq!(response.unwrap().status(), 408);
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_request_that_is_not_an_object() {
+        let (url, hits) = counting_upstream().await;
+        let con_params = connection_params(vec![Rpc::new(url, None, 10, 0, 10.0)]);
+
+        let batch = json!([get_balance("0x10"), get_balance("0x11")]);
+        let (response, rpc_id) =
+            forward_value(batch, &con_params, CacheArgs::default(), request_params()).await;
+
+        let response = response.unwrap();
+        assert_eq!(response.status(), 400);
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["error"]["code"], -32600);
+        assert_eq!(rpc_id, None);
+        assert_eq!(hits.load(Ordering::SeqCst), 0);
     }
 }
