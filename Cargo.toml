@@ -66,6 +66,7 @@ url = "2.4.0"
 
 [dev-dependencies]
 serial_test = "3.2"
+tempfile = "3"
 
 # Maxperf profile for absolute maximum performance
 # Only use for builds that are going to get used by end users

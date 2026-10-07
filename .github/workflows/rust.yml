@@ -16,7 +16,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
     - name: Build
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose -- --test-threads=1
+      env:
+        # Fail the anvil integration tests instead of skipping them if anvil is missing.
+        BLUTGANG_REQUIRE_ANVIL: 1

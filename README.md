@@ -52,6 +52,14 @@ Using Flakes and the [nix-community/ethereum.nix](https://github.com/nix-communi
 nix run github:nix-community/ethereum.nix#blutgang -- --help
 ```
 
+## Testing
+
+```bash
+cargo test
+```
+
+The end-to-end tests in `tests/` start real [anvil](https://book.getfoundry.sh/anvil/) nodes and run blutgang in front of them. Install anvil with [foundryup](https://book.getfoundry.sh/getting-started/installation), or point `ANVIL_BIN` at the binary. Without anvil these tests are skipped; set `BLUTGANG_REQUIRE_ANVIL=1` to make them fail instead, as CI does.
+
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
 

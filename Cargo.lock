@@ -827,6 +827,7 @@ dependencies = [
  "serial_test",
  "simd-json",
  "sled",
+ "tempfile",
  "thiserror 2.0.16",
  "tikv-jemallocator",
  "tokio",
