@@ -1,0 +1,12 @@
+[project]
+name = "blutgang-scripts"
+version = "0.1.0"
+description = "Load-testing scripts for blutgang"
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "websocket-client",
+]
+
+[tool.uv]
+package = false

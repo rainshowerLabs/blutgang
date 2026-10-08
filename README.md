@@ -60,6 +60,15 @@ cargo test
 
 The end-to-end tests in `tests/` start real [anvil](https://book.getfoundry.sh/anvil/) nodes and run blutgang in front of them. Install anvil with [foundryup](https://book.getfoundry.sh/getting-started/installation), or point `ANVIL_BIN` at the binary. Without anvil these tests are skipped; set `BLUTGANG_REQUIRE_ANVIL=1` to make them fail instead, as CI does.
 
+## Load testing scripts
+
+`spam.py` (HTTP) and `spam_ws.py` (WebSocket) hammer a blutgang instance listening on `127.0.0.1:3000`. Their dependencies are managed with [uv](https://docs.astral.sh/uv/), so there's no need to create a virtualenv by hand:
+
+```bash
+uv run spam.py
+uv run spam_ws.py
+```
+
 ## Benchmarks
 *Benchmarks were performed with a Ryzen 7 2700X, NVME SSD, and default Ubuntu 23.04 kernel. Same RPC endpoints were used*
 

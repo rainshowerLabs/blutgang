@@ -257,6 +257,7 @@
                 requests
                 websocket-client
               ]))
+              uv
               nixpkgs-fmt
             ] ++ optional stdenv.isLinux [
               nil
